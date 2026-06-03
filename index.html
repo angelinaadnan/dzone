@@ -229,11 +229,12 @@ const USER_ACCOUNTS = [
   {name:'TC FAJAR',  role:'cabang',  password:'fajar38'},
   {name:'TC ALDO',   role:'cabang',  password:'aldo39'},
   {name:'TC MAHESA', role:'cabang',  password:'mahesa40'},
+  {name:'TC GITA',   role:'cabang',  password:'gita41'},
 ];
 // Branch groups — PS (Poins) and TC (Dusit) are siloed; cannot see each other's data
 const BRANCH_GROUPS = {
   PS: ['PS TITI','PS DARTIK','PS DWI'],
-  TC: ['TC RIZAL','TC ULIN','TC APRIL','TC LUVI','TC RIA','TC ICHA','TC ARYA','TC DEFA','TC SANDI','TC FAJAR','TC ALDO','TC MAHESA'],
+  TC: ['TC RIZAL','TC ULIN','TC APRIL','TC LUVI','TC RIA','TC ICHA','TC ARYA','TC DEFA','TC SANDI','TC FAJAR','TC ALDO','TC MAHESA','TC GITA'],
 };
 const getBranchGroup   = function(name){ var keys=Object.keys(BRANCH_GROUPS); for(var i=0;i<keys.length;i++){ if(BRANCH_GROUPS[keys[i]].indexOf(name)>=0) return keys[i]; } return null; };
 const getBranchMembers = function(name){ var g=getBranchGroup(name); return g?BRANCH_GROUPS[g]:[name]; };
