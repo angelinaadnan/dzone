@@ -378,9 +378,16 @@ function App() {
 
   const loadCourierTasks = async () => {
     if (!db) return;
-    const {data,error} = await db.from('courier_tasks').select('*').order('created_at',{ascending:false});
-    if (error) { console.error('loadCourierTasks error:', error); showToast('Error tasks: '+error.message, 'error'); return; }
-    if (data) setCourierTasks(data);
+    const {data,error,count} = await db.from('courier_tasks').select('id,assigned_courier,status,destination', {count:'exact'}).order('created_at',{ascending:false});
+    if (error) { showToast('Error tasks: '+error.message, 'error'); return; }
+    showToast('courier_tasks: '+(data?.length??0)+' rows', data?.length>0?'success':'error');
+    // Reload full data if partial select worked
+    if (data && data.length>0) {
+      const {data:full} = await db.from('courier_tasks').select('*').order('created_at',{ascending:false});
+      if (full) setCourierTasks(full);
+    } else {
+      setCourierTasks(data||[]);
+    }
   };
 
   const loadBranchRequests = async () => {
