@@ -416,6 +416,9 @@ function App() {
             await db.from('purchase_orders').update({pickups: updatedPickups, pickup: null}).eq('id', a.poId);
             setPurchaseOrders(prev => prev.map(p => p.id===a.poId ? {...p, pickups: updatedPickups, pickup: null} : p));
           }
+        } else if (a.type === 'task_patch') {
+          await db.from('courier_tasks').update({...a.patch, [a.photoField]: url}).eq('id', a.id);
+          setCourierTasks(prev => prev.map(t => t.id===a.id ? {...t, ...a.patch, [a.photoField]: url} : t));
         } else if (a.type === 'branch_patch') {
           const req = branchRequestsRef.current.find(r => r.id===a.reqId);
           if (req) {
@@ -9148,13 +9151,14 @@ function WalkInServiceModal({task, onSaveIntake, onUpdateTask, onClose, allIntak
   );
 }
 
-function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFillServiceForm, onSaveServiceIntake, allIntakes, getLastCheckin, onCheckin, isLocked=false, lockMessage=null}) {
+function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFillServiceForm, onSaveServiceIntake, allIntakes, getLastCheckin, onCheckin, isLocked=false, lockMessage=null, onQueuePhoto=null}) {
   const [photo, setPhoto] = React.useState(null);
   const [note, setNote] = React.useState('');
   const [assigning, setAssigning] = React.useState(false);
   const [gpsLoading, setGpsLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [showWalkIn, setShowWalkIn] = React.useState(false);
+  const [uploadMsg, setUploadMsg] = React.useState(null);
 
   const handlePhoto = (e) => {
     const file = e.target.files[0]; if(!file) return;
@@ -9208,7 +9212,18 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
     if (km > 0) updates.distance_km = parseFloat(km.toFixed(2));
     if (note && !task.completion_note) updates.completion_note = note;
     if (photo && !task.completion_photo) {
-      const photoUrl = await uploadPhoto(photo, 'tasks');
+      const photoUrl = await uploadPhoto(photo, 'tasks', 0, (msg) => setUploadMsg(msg));
+      if (!photoUrl) {
+        if (onQueuePhoto) {
+          onQueuePhoto(photo, 'tasks', {type:'task_patch', id:task.id, photoField:'completion_photo', patch:{...updates}});
+          setUploadMsg('📱 Foto tersimpan di HP, upload otomatis saat sinyal kembali');
+          await onUpdate(task.id, {...updates, completion_photo: null});
+        } else {
+          setUploadMsg('❌ Foto gagal diupload. Pastikan internet aktif lalu coba lagi.');
+        }
+        setSaving(false); return;
+      }
+      setUploadMsg(null);
       updates.completion_photo = photoUrl;
     }
     await onUpdate(task.id, updates);
@@ -9399,9 +9414,10 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
               </div>
               <input placeholder="Catatan (opsional)" value={note} onChange={e=>setNote(e.target.value)}
                 style={{width:'100%',padding:'8px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',fontSize:13,boxSizing:'border-box',marginBottom:8}}/>
+              {uploadMsg && <div style={{textAlign:'center',fontSize:12,color:uploadMsg.startsWith('❌')?'var(--red)':uploadMsg.startsWith('📱')?'var(--blue)':'var(--amber)',marginBottom:6,padding:'6px 10px',background:uploadMsg.startsWith('❌')?'rgba(239,68,68,0.1)':uploadMsg.startsWith('📱')?'rgba(59,130,246,0.1)':'rgba(245,158,11,0.1)',borderRadius:6}}>{uploadMsg}</div>}
               <button style={{width:'100%',padding:'12px',background:'var(--green)',color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor:(gpsLoading||saving)?'default':'pointer',opacity:(gpsLoading||saving)?0.7:1}}
-                onClick={markDone} disabled={gpsLoading||saving}>
-                {gpsLoading?'📡 Mengambil GPS...':saving?'⏳ Menyimpan...':'✅ Selesai'}
+                onClick={()=>{setUploadMsg(null);markDone();}} disabled={gpsLoading||saving}>
+                {uploadMsg&&!uploadMsg.startsWith('❌')&&!uploadMsg.startsWith('📱') ? uploadMsg : gpsLoading?'📡 Mengambil GPS...':saving?'⏳ Menyimpan...':'✅ Selesai'}
               </button>
             </div>
           )}
@@ -9902,7 +9918,8 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                 <TaskCard task={t} onUpdate={onUpdate} showAssign={false} showComplete={true}
                   courierName={courierName} onFillServiceForm={setServiceFormTask}
                   getLastCheckin={getLastCheckin} onCheckin={onCheckin} isLocked={isLocked}
-                  lockMessage={packingLock?'📦 Cek & konfirmasi packing barang kiriman dulu':null}/>
+                  lockMessage={packingLock?'📦 Cek & konfirmasi packing barang kiriman dulu':null}
+                  onQueuePhoto={onQueuePhoto}/>
               </div>
             </div>
           );
