@@ -933,14 +933,22 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
   const [notes,      setNotes]      = React.useState('');
   const [loading,    setLoading]    = React.useState(false);
   const [photoStep,  setPhotoStep]  = React.useState(null);   // 'in'|'out'|null
-  const LATE_HOUR = 9;
-  const LATE_MIN  = 45; // batas masuk: 09:45
+  // Jadwal per user: {h: jam masuk, m: menit masuk}
+  const USER_SCHEDULES = {
+    'PS TITI':   {h:10, m:0,  label:'10:00'},
+    'PS DWI':    {h:11, m:0,  label:'11:00'},
+    'PS DARTIK': {h:11, m:0,  label:'11:00'},
+  };
+  const DEFAULT_SCHEDULE = {h:9, m:45, label:'09:45'};
+  const getSchedule = (name) => USER_SCHEDULES[name] || DEFAULT_SCHEDULE;
+
   // Hitung berapa menit telat (0 = tepat waktu / lebih awal)
   const lateMinutes = (rec) => {
     if (!rec?.check_in) return 0;
     const d = new Date(rec.check_in);
     const actual = d.getHours()*60 + d.getMinutes();
-    const limit  = LATE_HOUR*60 + LATE_MIN;
+    const sched = getSchedule(rec.user_name);
+    const limit  = sched.h*60 + sched.m;
     return Math.max(0, actual - limit);
   };
 
@@ -1019,7 +1027,7 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
       'Role'            : ROLE_LABELS[a.role]||a.role,
       'Jam Masuk'       : fmtT(a.check_in),
       'Jam Pulang'      : fmtT(a.check_out),
-      'Batas Masuk'     : '09:45',
+      'Batas Masuk'     : getSchedule(a.user_name).label,
       'Telat (menit)'   : lateMinutes(a)||0,
       'Durasi'          : duration(a)||'-',
       'Status'          : statusOf(a).label.replace(/[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,'').trim(),
@@ -1057,7 +1065,7 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
         row.push(rec?fmtT(rec.check_in):'-');
         row.push(rec?fmtT(rec.check_out):'-');
         const late = rec?lateMinutes(rec):0;
-        row.push(late>0?late+' mnt':'-');
+        row.push(late>0?late+' mnt (batas '+getSchedule(name).label+')':'-');
       });
       pivotRows.push(row);
     });
