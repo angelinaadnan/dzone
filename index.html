@@ -603,7 +603,9 @@ function App() {
 
   if (!role) return <LoginScreen onLogin={doLogin} demoMode={demoMode}/>;
 
-  const navItems = ROLE_NAV[role];
+  const navItems = role==='supervisor' && userName==='Santo'
+    ? [...ROLE_NAV[role], {id:'branch_request',icon:'📦',label:'Request Barang'}]
+    : ROLE_NAV[role];
 
   return (
     <div style={{display:'flex',minHeight:'100vh'}}>
@@ -659,6 +661,7 @@ function App() {
         {role==='ops' && page==='op_orders' && <SupervisorOrders orders={orders} onSelect={setSelectedOrder} onUpdate={updateOrder} currentUser={userName} allowRevisi={false} hideNew={true}/>}
         {role==='ops' && page==='op_tasks' && <OpsTaskManager tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} opsName={userName} onSaveServiceIntake={saveServiceIntake} allIntakes={serviceIntakes}/>}
         {role==='ops' && page==='op_branch' && <OpsBranchManager requests={branchRequests} onUpdate={updateBranchRequest}/>}
+        {role==='supervisor' && userName==='Santo' && page==='branch_request' && <BranchRequestPage requests={branchRequests} onSave={saveBranchRequest} branchName={userName} branchMembers={[]}/>}
         {role==='cabang' && page==='branch_dashboard' && <BranchDashboard requests={branchRequests} intakes={serviceIntakes} orders={orders} branchName={userName} branchMembers={getBranchMembers(userName)} onNavigate={setPage}/>}
         {role==='cabang' && page==='branch_request' && <BranchRequestPage requests={branchRequests} onSave={saveBranchRequest} branchName={userName} branchMembers={getBranchMembers(userName)}/>}
         {role==='cabang' && page==='branch_service' && <BranchServicePage intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} branchName={userName} branchMembers={getBranchMembers(userName)}/>}
