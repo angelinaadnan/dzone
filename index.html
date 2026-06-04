@@ -288,6 +288,17 @@ const getBranchMembers = function(name){ var g=getBranchGroup(name); return g?BR
 
 // Sales yang invoicingnya ke Admin Online (bukan ke Admin biasa)
 const SALES_AO = USER_ACCOUNTS.filter(u=>u.ao).map(u=>u.name);
+const SALES_OFFLINE = USER_ACCOUNTS.filter(u=>u.role==='sales'&&!u.ao).map(u=>u.name);
+const CABANG_NAMES  = USER_ACCOUNTS.filter(u=>u.role==='cabang').map(u=>u.name);
+// Kategorisasi order: 'online' | 'offline' | 'cabang' | 'other'
+function getOrderSource(o) {
+  if ((o.info_tambahan||'').includes('[Titip Kirim dari Cabang:')) return 'cabang';
+  if (SALES_AO.includes(o.sales_name)) return 'online';
+  if (SALES_OFFLINE.includes(o.sales_name)) return 'offline';
+  return 'other';
+}
+const ORDER_SOURCE_LABEL = { online:'🌐 Online', offline:'🏪 Offline', cabang:'🏢 Cabang', other:'➖ Lainnya' };
+const ORDER_SOURCE_COLOR = { online:'var(--teal)', offline:'var(--accent2)', cabang:'var(--amber)', other:'var(--text3)' };
 
 const ROLE_NAV = {
   sales:          [{id:'dashboard',icon:'📊',label:'Dashboard'},{id:'new_order',icon:'📝',label:'New Order'},{id:'quotations',icon:'📄',label:'Penawaran'},{id:'new_service',icon:'🛠',label:'New Servis'},{id:'my_orders',icon:'📦',label:'My Orders'},{id:'minta_kurir',icon:'✅',label:'To Do List'},{id:'pesan_barang',icon:'🛒',label:'Pesan Barang'},{id:'absensi',icon:'🗓',label:'Absensi'}],
@@ -5459,8 +5470,9 @@ function AdminOrders({orders, onUpdate, onSelect}) {
 
 // ─── ADMIN INVOICING ───────────────────────────────────────────────
 function AdminInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
-  // Hanya tampilkan order dari sales reguler (bukan dari Ade/Lili yang ke Admin Online)
-  const pending = orders.filter(o=>o.status==='new' && !SALES_AO.includes(o.sales_name));
+  const [srcFilter, setSrcFilter] = useState('all');
+  const allNew = orders.filter(o=>o.status==='new');
+  const pending = srcFilter==='all' ? allNew : allNew.filter(o=>getOrderSource(o)===srcFilter);
   const [photoData, setPhotoData] = useState({});
   const [invoiceNum, setInvoiceNum] = useState({});
   const handlePhoto = (id,e) => {
@@ -5471,14 +5483,24 @@ function AdminInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
   };
   return (
     <div style={{maxWidth:900}}>
-      <div className="section-title">🧾 Invoicing Queue <span style={{fontSize:14,fontWeight:400,color:'var(--text2)',fontFamily:'DM Sans'}}>({pending.length} pending)</span></div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:4}}>
+        <div className="section-title" style={{margin:0}}>🧾 Invoicing Queue <span style={{fontSize:14,fontWeight:400,color:'var(--text2)',fontFamily:'DM Sans'}}>({pending.length} pending)</span></div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {[['all','Semua',allNew.length],['offline','🏪 Offline',allNew.filter(o=>getOrderSource(o)==='offline').length],['online','🌐 Online',allNew.filter(o=>getOrderSource(o)==='online').length],['cabang','🏢 Cabang',allNew.filter(o=>getOrderSource(o)==='cabang').length]].map(([k,lbl,cnt])=>(
+            <button key={k} className={srcFilter===k?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setSrcFilter(k)}>{lbl} {cnt>0&&`(${cnt})`}</button>
+          ))}
+        </div>
+      </div>
       {pending.length===0 && <div className="empty-state"><div className="icon">✅</div><div>Semua order sudah diproses</div></div>}
       {pending.map(o=>(
         <div key={o.id} className="card" style={{marginBottom:12,borderLeft:o.faktur_pajak?'4px solid var(--blue)':''}}>
           <div style={{display:'flex',alignItems:'flex-start',gap:14,flexWrap:'wrap'}}>
             <div style={{flex:1}}>
               <div style={{fontWeight:600,fontSize:15}}>{o.customer_name}</div>
-              <div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>{o.sales_name} · {fmtDate(o.date)} · {o.delivery_method}</div>
+              <div style={{fontSize:12,color:'var(--text2)',marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                <span style={{fontSize:11,fontWeight:700,color:ORDER_SOURCE_COLOR[getOrderSource(o)],background:ORDER_SOURCE_COLOR[getOrderSource(o)]+'22',padding:'1px 7px',borderRadius:10}}>{ORDER_SOURCE_LABEL[getOrderSource(o)]}</span>
+                {o.sales_name} · {fmtDate(o.date)} · {o.delivery_method}
+              </div>
 
               {/* Barang */}
               <div style={{marginTop:6,marginBottom:4}}>
@@ -5564,10 +5586,12 @@ function AdminInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
 
 // ─── ADMIN ONLINE INVOICING ────────────────────────────────────────
 function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
-  const pending = orders.filter(o=>o.status==='new' && SALES_AO.includes(o.sales_name));
-  // Pickup orders from Ade/Lili that finished tech — waiting to route to ao_serah
+  const [srcFilter, setSrcFilter] = useState('all');
+  const allNew = orders.filter(o=>o.status==='new');
+  const pending = srcFilter==='all' ? allNew : allNew.filter(o=>getOrderSource(o)===srcFilter);
   const techDonePickup = orders.filter(o=>
-    o.status==='tech_done' && SALES_AO.includes(o.sales_name) && o.delivery_method==='Di Pickup Sendiri'
+    o.status==='tech_done' && o.delivery_method==='Di Pickup Sendiri' &&
+    (srcFilter==='all' || getOrderSource(o)===srcFilter)
   );
   const [photoData, setPhotoData] = useState({});
   const [invoiceNum, setInvoiceNum] = useState({});
@@ -5598,12 +5622,16 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
 
   return (
     <div style={{maxWidth:900}}>
-      <div className="section-title">🧾 Invoicing <span style={{fontSize:12,fontWeight:400,color:'var(--blue)'}}>Admin Online</span> <span style={{fontSize:14,fontWeight:400,color:'var(--text2)',fontFamily:'DM Sans'}}>({pending.length} pending)</span></div>
-      <div style={{marginBottom:14,padding:'8px 14px',background:'rgba(99,102,241,0.07)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:8,fontSize:12,color:'var(--accent)'}}>
-        📌 Menampilkan order dari: <b>{SALES_AO.join(', ')}</b>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:4}}>
+        <div className="section-title" style={{margin:0}}>🧾 Invoicing <span style={{fontSize:12,fontWeight:400,color:'var(--blue)'}}>Admin Online</span> <span style={{fontSize:14,fontWeight:400,color:'var(--text2)',fontFamily:'DM Sans'}}>({pending.length} pending)</span></div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {[['all','Semua',allNew.length],['offline','🏪 Offline',allNew.filter(o=>getOrderSource(o)==='offline').length],['online','🌐 Online',allNew.filter(o=>getOrderSource(o)==='online').length],['cabang','🏢 Cabang',allNew.filter(o=>getOrderSource(o)==='cabang').length]].map(([k,lbl,cnt])=>(
+            <button key={k} className={srcFilter===k?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setSrcFilter(k)}>{lbl} {cnt>0&&`(${cnt})`}</button>
+          ))}
+        </div>
       </div>
 
-      {/* ── Teknisi Selesai — Pickup Ade/Lili ── */}
+      {/* ── Teknisi Selesai — Pickup ── */}
       {techDonePickup.length>0&&(
         <div style={{marginBottom:20}}>
           <div style={{fontSize:13,fontWeight:700,color:'var(--teal)',marginBottom:10}}>🔧 Teknisi Selesai — Siap Diserahkan ({techDonePickup.length})</div>
@@ -5635,7 +5663,10 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
           <div style={{display:'flex',alignItems:'flex-start',gap:14,flexWrap:'wrap'}}>
             <div style={{flex:1}}>
               <div style={{fontWeight:600,fontSize:15}}>{o.customer_name}</div>
-              <div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>{o.sales_name} · {fmtDate(o.date)} · {o.delivery_method}</div>
+              <div style={{fontSize:12,color:'var(--text2)',marginTop:3,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                <span style={{fontSize:11,fontWeight:700,color:ORDER_SOURCE_COLOR[getOrderSource(o)],background:ORDER_SOURCE_COLOR[getOrderSource(o)]+'22',padding:'1px 7px',borderRadius:10}}>{ORDER_SOURCE_LABEL[getOrderSource(o)]}</span>
+                {o.sales_name} · {fmtDate(o.date)} · {o.delivery_method}
+              </div>
               <div style={{marginTop:6,marginBottom:4}}>
                 {(o.goods||[]).map((g,i)=>{
                   const disc=Number(g.discount)||0;
