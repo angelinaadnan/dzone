@@ -738,15 +738,22 @@ function App() {
 
   const loadAttendance = async (retry=0) => {
     if (!db) return;
+    // Coba select semua kolom
     const {data,error} = await db.from('attendance').select('*').order('check_in',{ascending:false}).limit(1000);
-    if (error) {
-      if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
-        await new Promise(r=>setTimeout(r, 2000*(retry+1)));
-        return loadAttendance(retry+1);
-      }
-      showToast('Error attendance: '+error.message, 'error'); return;
+    if (!error) { if (data) setAttendance(data); return; }
+    const isTimeout = (error.message||'').includes('timeout') || (error.message||'').includes('canceling');
+    // Jika timeout dan masih ada retry, coba lagi
+    if (isTimeout && retry < 2) {
+      await new Promise(r=>setTimeout(r, 2000*(retry+1)));
+      return loadAttendance(retry+1);
     }
-    if (data) setAttendance(data);
+    // Fallback: select tanpa foto (hindari base64 besar)
+    if (isTimeout) {
+      const safeCols = 'id,created_at,user_name,role,date,check_in,check_out,check_in_lat,check_in_lng,check_out_lat,check_out_lng,notes';
+      const {data:d2, error:e2} = await db.from('attendance').select(safeCols).order('check_in',{ascending:false}).limit(1000);
+      if (!e2 && d2) { setAttendance(d2); showToast('⚠ Data foto absensi tidak termuat (ada data besar di DB)', 'error'); return; }
+    }
+    showToast('Error attendance: '+error.message, 'error');
   };
   const saveAttendance = async (rec) => {
     if (!db) {
@@ -1221,7 +1228,7 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
     return Math.max(0, actual - limit);
   };
 
-  const myToday   = attendance.find(a=>a.user_name===userName && a.date===todayStr);
+  const myToday   = attendance.find(a=>a.user_name===userName && (a.date===todayStr || (!a.date && a.check_in && a.check_in.slice(0,10)===todayStr)));
   const myHistory = attendance.filter(a=>a.user_name===userName && a.date!==todayStr).slice(0,60);
   const allUsers  = USER_ACCOUNTS.filter(u=>u.name && u.name!=='Supervisor' && u.role!=='absensi_only');
   const lainnyaUsers = USER_ACCOUNTS.filter(u=>u.role==='absensi_only');
