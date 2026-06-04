@@ -738,8 +738,7 @@ function App() {
 
   const loadAttendance = async (retry=0) => {
     if (!db) return;
-    const attCols = 'id,created_at,user_name,role,date,check_in,check_out,check_in_photo,check_out_photo,check_in_lat,check_in_lng,check_in_acc,check_in_address,check_out_lat,check_out_lng,check_out_acc,check_out_address,notes';
-    const {data,error} = await db.from('attendance').select(attCols).order('date',{ascending:false}).order('check_in',{ascending:false,nullsFirst:false}).limit(1000);
+    const {data,error} = await db.from('attendance').select('*').order('date',{ascending:false}).limit(1000);
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
@@ -756,8 +755,17 @@ function App() {
       showToast('✅ Absensi tersimpan (demo)');
       return n;
     }
-    const {data,error} = await db.from('attendance').insert([rec]).select().single();
-    if (error) { showToast('Error: '+error.message,'error'); return null; }
+    let {data,error} = await db.from('attendance').insert([rec]).select().single();
+    // Jika gagal karena kolom tidak ada, coba lagi dengan kolom inti saja
+    if (error && (error.message||'').includes('column')) {
+      const core = {user_name:rec.user_name, role:rec.role, date:rec.date,
+        check_in:rec.check_in, check_out:rec.check_out,
+        check_in_photo:rec.check_in_photo,
+        check_in_lat:rec.check_in_lat, check_in_lng:rec.check_in_lng,
+        notes:rec.notes||null};
+      ({data,error} = await db.from('attendance').insert([core]).select().single());
+    }
+    if (error) { showToast('Error absensi: '+error.message,'error'); return null; }
     await loadAttendance();
     showToast('✅ Absensi tersimpan!');
     return data;
@@ -768,8 +776,14 @@ function App() {
       showToast('✅ Absensi diperbarui (demo)');
       return;
     }
-    const {error} = await db.from('attendance').update(updates).eq('id',id);
-    if (error) { showToast('Error: '+error.message,'error'); return; }
+    let {error} = await db.from('attendance').update(updates).eq('id',id);
+    // Jika gagal karena kolom tidak ada, coba lagi dengan kolom inti saja
+    if (error && (error.message||'').includes('column')) {
+      const core = {check_out:updates.check_out, check_out_photo:updates.check_out_photo,
+        check_out_lat:updates.check_out_lat, check_out_lng:updates.check_out_lng};
+      ({error} = await db.from('attendance').update(core).eq('id',id));
+    }
+    if (error) { showToast('Error absensi: '+error.message,'error'); return; }
     await loadAttendance();
     showToast('✅ Absensi diperbarui!');
   };
