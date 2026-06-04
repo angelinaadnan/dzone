@@ -379,7 +379,8 @@ function App() {
   const loadCourierTasks = async () => {
     if (!db) return;
     const {data,error} = await db.from('courier_tasks').select('*').order('created_at',{ascending:false});
-    if (!error && data) setCourierTasks(data);
+    if (error) { console.error('loadCourierTasks error:', error); showToast('Error tasks: '+error.message, 'error'); return; }
+    if (data) setCourierTasks(data);
   };
 
   const loadBranchRequests = async () => {
