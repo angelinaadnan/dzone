@@ -3878,6 +3878,7 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                 supervisorName={supervisorName}
                 canVerify={true}
                 showHistory={true}
+                onSaveNotes={!o.tech_components_verified ? (newComp)=>onUpdate(o.id,{tech_components:newComp}) : null}
               />
             </div>
           ))}
@@ -3910,6 +3911,7 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                 supervisorName={supervisorName}
                 canVerify={true}
                 showHistory={true}
+                onSaveNotes={!si.tech_components_verified ? (newComp)=>onUpdateSI(si.id,{tech_components:newComp}) : null}
               />
             </div>
           ))}
