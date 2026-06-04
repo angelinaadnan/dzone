@@ -1028,7 +1028,7 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
       'Jam Masuk'       : fmtT(a.check_in),
       'Jam Pulang'      : fmtT(a.check_out),
       'Batas Masuk'     : getSchedule(a.user_name).label,
-      'Telat (menit)'   : lateMinutes(a)||0,
+      'Telat'           : !a.check_in ? '-' : lateMinutes(a)>0 ? `TELAT ${lateMinutes(a)} menit` : 'Ontime',
       'Durasi'          : duration(a)||'-',
       'Status'          : statusOf(a).label.replace(/[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,'').trim(),
       'GPS Masuk'       : (a.check_in_lat&&a.check_in_lng)?`${a.check_in_lat.toFixed(6)}, ${a.check_in_lng.toFixed(6)}`:'',
@@ -1040,7 +1040,17 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
       'Foto Pulang'     : a.check_out_photo?'Ada':'-',
     }));
     const ws1 = XLSX.utils.json_to_sheet(rows);
-    ws1['!cols']=[10,18,16,12,12,10,12,10,18,24,30,24,30,24,12,12].map(w=>({wch:w}));
+    ws1['!cols']=[10,18,16,12,12,10,14,10,18,24,30,24,30,24,12,12].map(w=>({wch:w}));
+    // Warnai sel TELAT merah
+    const telatColIdx = Object.keys(rows[0]||{}).indexOf('Telat');
+    if (telatColIdx>=0) {
+      rows.forEach((r,ri)=>{
+        if(String(r['Telat']).startsWith('TELAT')) {
+          const cellRef = XLSX.utils.encode_cell({r:ri+1, c:telatColIdx});
+          if(ws1[cellRef]) ws1[cellRef].s = {font:{bold:true,color:{rgb:'CC0000'}},fill:{fgColor:{rgb:'FFE5E5'}}};
+        }
+      });
+    }
     XLSX.utils.book_append_sheet(wb, ws1, 'Detail');
 
     // ── Sheet 2: Pivot per orang (format ringkas) ──
