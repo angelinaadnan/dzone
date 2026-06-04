@@ -378,16 +378,10 @@ function App() {
 
   const loadCourierTasks = async () => {
     if (!db) return;
-    const {data,error,count} = await db.from('courier_tasks').select('id,assigned_courier,status,destination', {count:'exact'}).order('created_at',{ascending:false});
+    const cols = 'id,created_at,updated_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo';
+    const {data,error} = await db.from('courier_tasks').select(cols).order('created_at',{ascending:false});
     if (error) { showToast('Error tasks: '+error.message, 'error'); return; }
-    showToast('courier_tasks: '+(data?.length??0)+' rows', data?.length>0?'success':'error');
-    // Reload full data if partial select worked
-    if (data && data.length>0) {
-      const {data:full} = await db.from('courier_tasks').select('*').order('created_at',{ascending:false});
-      if (full) setCourierTasks(full);
-    } else {
-      setCourierTasks(data||[]);
-    }
+    if (data) setCourierTasks(data);
   };
 
   const loadBranchRequests = async () => {
@@ -9553,11 +9547,6 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
 
   return (
     <div style={{maxWidth:700}}>
-      {/* DEBUG SEMENTARA */}
-      <div style={{fontSize:10,color:'var(--text3)',marginBottom:4,padding:'4px 8px',background:'var(--bg3)',borderRadius:6,wordBreak:'break-all'}}>
-        DBG: tasks={tasks.length} | myTasks={myTasks.length} | active={activeTasks.length} | courier="{courierName}" | len={courierName.length}
-        {tasks.slice(0,3).map(t=><div key={t.id}>→ "{t.assigned_courier}"({t.assigned_courier?.length}) status={t.status}</div>)}
-      </div>
       {/* GPS Check-in Panel */}
       {onCheckin && <CourierCheckinPanel courierName={courierName} checkins={checkins} onCheckin={onCheckin}/>}
 
