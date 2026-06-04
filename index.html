@@ -939,12 +939,6 @@ function App() {
           <div style={{color:'var(--text2)'}}>{ROLE_LABELS[role]}</div>
           <div style={{fontWeight:600,marginTop:2}}>{userName}</div>
           <button className="btn-secondary btn-sm" style={{marginTop:10,width:'100%'}} onClick={doLogout}>Logout</button>
-          {role==='admin' && (
-            <button onClick={runBase64Cleanup} disabled={cleanupRunning}
-              style={{marginTop:6,width:'100%',padding:'6px',fontSize:11,borderRadius:6,border:'1px solid var(--amber)',background:'transparent',color: cleanupRunning?'var(--text3)':'var(--amber)',cursor:cleanupRunning?'not-allowed':'pointer'}}>
-              {cleanupRunning?'⏳ Membersihkan...':'🧹 Bersihkan DB'}
-            </button>
-          )}
         </div>
       </aside>
 
