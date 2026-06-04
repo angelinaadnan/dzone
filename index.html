@@ -336,10 +336,14 @@ function App() {
     setTimeout(()=>setToast(null),3000);
   };
 
+  // npwp_file & po_file dikecualikan dari query utama karena base64 besar → timeout & egress tinggi
+  // File di-load on-demand via loadOrderFiles(id) saat user mau lihat lampiran
+  const ORDER_COLS = 'id,created_at,date,status,status_history,sales_name,customer_name,customer_phone,customer_address,goods,goods_ready,goods_status,payment_status,delivery_method,notes,invoice_number,invoice_materai,admin_photo,tech_note,tech_photo,tech_photos,tech_components,tech_components_verified,tech_name,assigned_to,courier_name,delivery_note,delivered_at,delivery_photo,distance_km,end_location,in_transit,faktur_pajak,npwp,has_po,po_number,info_tambahan,source_branch,source_type,tracking,cancel_reason,cancel_prev_status,faktur_checked,faktur_checked_at,faktur_checked_by,revisions';
+
   const loadOrders = async (retry=0) => {
     if (!db) return;
     setLoading(true);
-    const {data,error} = await db.from('orders').select('*').order('created_at',{ascending:false});
+    const {data,error} = await db.from('orders').select(ORDER_COLS).order('created_at',{ascending:false});
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
@@ -351,6 +355,15 @@ function App() {
     }
     if (data) setOrders(data);
     setLoading(false);
+  };
+
+  const loadOrderFiles = async (orderId) => {
+    if (!db) return;
+    const {data,error} = await db.from('orders').select('npwp_file,po_file').eq('id',orderId).single();
+    if (!error && data) {
+      setOrders(prev=>prev.map(o=>o.id===orderId?{...o,...data}:o));
+      setSelectedOrder(prev=>prev?.id===orderId?{...prev,...data}:prev);
+    }
   };
 
   const loadServiceIntakes = async (retry=0) => {
@@ -726,7 +739,7 @@ function App() {
 
         {role==='admin' && page==='dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} onUpdateSI={updateServiceIntake} onUpdateTask={updateCourierTask} userRole="admin" userName={userName}/>}
         {role==='admin' && page==='orders' && <AdminOrders orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
-        {role==='admin' && page==='invoicing' && <AdminInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
+        {role==='admin' && page==='invoicing' && <AdminInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
         {role==='ops' && page==='dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} onUpdateSI={updateServiceIntake} onUpdateTask={updateCourierTask} userRole="ops" userName={userName}/>}
         {role==='ops' && page==='queue' && <OpsQueue orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
         {role==='ops' && page==='op_orders' && <SupervisorOrders orders={orders} onSelect={setSelectedOrder} onUpdate={updateOrder} currentUser={userName} allowRevisi={false} hideNew={true}/>}
@@ -760,7 +773,7 @@ function App() {
         {role==='ops' && page==='op_tech_log' && <SupervisorTech orders={orders} serviceIntakes={serviceIntakes} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} supervisorName={userName}/>}
         {role==='supervisor' && page==='sup_kurir' && <CourierDailyMonitor orders={orders} courierTasks={courierTasks} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes}/>}
         {role==='supervisor' && page==='sup_minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName} createdByRole="supervisor"/>}
-        {role==='admin_online' && page==='ao_invoicing' && <AdminOnlineInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
+        {role==='admin_online' && page==='ao_invoicing' && <AdminOnlineInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
         {role==='admin_online' && page==='ao_orders' && <AdminOnlineOrders orders={orders} onSelect={setSelectedOrder}/>}
         {role==='admin_online' && page==='ao_tech_request' && <AdminOnlineTechRequest intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} createdBy={userName}/>}
         {['sales','admin','ops','supervisor','admin_pembelian','admin_online'].includes(role) && page==='pesan_barang' && <PesanBarangPage orders={purchaseOrders} onSave={savePurchaseOrder} onUpdate={updatePurchaseOrder} onDelete={deletePurchaseOrder} createdBy={userName} role={role}/>}
@@ -768,7 +781,7 @@ function App() {
       </main>
 
       {selectedOrder && (
-        <OrderDetailModal order={selectedOrder} onClose={()=>setSelectedOrder(null)} onUpdate={updateOrder} role={role} courierName={userName}/>
+        <OrderDetailModal order={selectedOrder} onClose={()=>setSelectedOrder(null)} onUpdate={updateOrder} onLoadFiles={loadOrderFiles} role={role} courierName={userName}/>
       )}
     </div>
   );
@@ -5304,7 +5317,7 @@ function AdminOrders({orders, onUpdate, onSelect}) {
 }
 
 // ─── ADMIN INVOICING ───────────────────────────────────────────────
-function AdminInvoicing({orders, onUpdate, onSelect}) {
+function AdminInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
   // Hanya tampilkan order dari sales reguler (bukan dari Ade/Lili yang ke Admin Online)
   const pending = orders.filter(o=>o.status==='new' && !SALES_AO.includes(o.sales_name));
   const [photoData, setPhotoData] = useState({});
@@ -5351,12 +5364,13 @@ function AdminInvoicing({orders, onUpdate, onSelect}) {
                     <span style={{color:'var(--text2)'}}>NPWP: </span>
                     <span style={{fontFamily:'DM Mono',fontWeight:600,color:'var(--text)'}}>{o.npwp||<span style={{color:'var(--red)'}}>Belum diisi</span>}</span>
                   </div>
-                  {o.npwp_file && (
-                    o.npwp_file.startsWith('data:image')
-                      ? <img src={o.npwp_file} alt="NPWP" style={{marginTop:4,maxHeight:120,maxWidth:'100%',borderRadius:6,border:'1px solid var(--border)'}}/>
-                      : <a href={o.npwp_file} download="NPWP.pdf" style={{fontSize:12,color:'var(--blue)'}}>⬇ Download Lampiran NPWP</a>
-                  )}
-                  {!o.npwp_file && <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>Tidak ada lampiran NPWP</div>}
+                  {o.npwp_file===undefined
+                    ? <button onClick={e=>{e.stopPropagation();onLoadFiles&&onLoadFiles(o.id);}} style={{marginTop:4,fontSize:11,color:'var(--blue)',background:'transparent',border:'1px solid var(--blue)',borderRadius:5,padding:'2px 8px',cursor:'pointer'}}>⬇ Muat Lampiran NPWP</button>
+                    : o.npwp_file
+                      ? (o.npwp_file.startsWith('data:image')
+                          ? <img src={o.npwp_file} alt="NPWP" style={{marginTop:4,maxHeight:120,maxWidth:'100%',borderRadius:6,border:'1px solid var(--border)'}}/>
+                          : <a href={o.npwp_file} download="NPWP.pdf" style={{fontSize:12,color:'var(--blue)'}}>⬇ Download Lampiran NPWP</a>)
+                      : <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>Tidak ada lampiran NPWP</div>}
                 </div>
               )}
 
@@ -5365,11 +5379,13 @@ function AdminInvoicing({orders, onUpdate, onSelect}) {
                 <div style={{marginTop:8,padding:'8px 12px',background:'rgba(245,158,11,0.07)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8,fontSize:12}}>
                   <div style={{fontWeight:700,color:'var(--amber)',marginBottom:4}}>📋 Ada Purchase Order</div>
                   {o.po_number && <div>No. PO: <span style={{fontFamily:'DM Mono',fontWeight:600}}>{o.po_number}</span></div>}
-                  {o.po_file && (
-                    o.po_file.startsWith('data:image')
-                      ? <img src={o.po_file} alt="PO" style={{marginTop:4,maxHeight:100,maxWidth:'100%',borderRadius:6,border:'1px solid var(--border)'}}/>
-                      : <a href={o.po_file} download="PO.pdf" style={{color:'var(--amber)'}}>⬇ Download Lampiran PO</a>
-                  )}
+                  {o.po_file===undefined
+                    ? <button onClick={e=>{e.stopPropagation();onLoadFiles&&onLoadFiles(o.id);}} style={{marginTop:4,fontSize:11,color:'var(--amber)',background:'transparent',border:'1px solid var(--amber)',borderRadius:5,padding:'2px 8px',cursor:'pointer'}}>⬇ Muat Lampiran PO</button>
+                    : o.po_file
+                      ? (o.po_file.startsWith('data:image')
+                          ? <img src={o.po_file} alt="PO" style={{marginTop:4,maxHeight:100,maxWidth:'100%',borderRadius:6,border:'1px solid var(--border)'}}/>
+                          : <a href={o.po_file} download="PO.pdf" style={{color:'var(--amber)'}}>⬇ Download Lampiran PO</a>)
+                      : null}
                 </div>
               )}
 
@@ -5406,7 +5422,7 @@ function AdminInvoicing({orders, onUpdate, onSelect}) {
 }
 
 // ─── ADMIN ONLINE INVOICING ────────────────────────────────────────
-function AdminOnlineInvoicing({orders, onUpdate, onSelect}) {
+function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
   const pending = orders.filter(o=>o.status==='new' && SALES_AO.includes(o.sales_name));
   // Pickup orders from Ade/Lili that finished tech — waiting to route to ao_serah
   const techDonePickup = orders.filter(o=>
@@ -5494,17 +5510,25 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect}) {
               {o.faktur_pajak && (
                 <div style={{marginTop:10,padding:'10px 12px',background:'rgba(59,130,246,0.07)',border:'1px solid rgba(59,130,246,0.25)',borderRadius:8}}>
                   <div style={{fontWeight:700,fontSize:12,color:'var(--blue)',marginBottom:4}}>📄 Perlu Faktur Pajak — NPWP: <span style={{fontFamily:'DM Mono'}}>{o.npwp||'—'}</span></div>
-                  {o.npwp_file && (o.npwp_file.startsWith('data:image')
-                    ? <img src={o.npwp_file} alt="NPWP" style={{marginTop:4,maxHeight:100,maxWidth:'100%',borderRadius:6}}/>
-                    : <a href={o.npwp_file} download="NPWP.pdf" style={{fontSize:12,color:'var(--blue)'}}>⬇ Download NPWP</a>)}
+                  {o.npwp_file===undefined
+                    ? <button onClick={e=>{e.stopPropagation();onLoadFiles&&onLoadFiles(o.id);}} style={{marginTop:4,fontSize:11,color:'var(--blue)',background:'transparent',border:'1px solid var(--blue)',borderRadius:5,padding:'2px 8px',cursor:'pointer'}}>⬇ Muat Lampiran NPWP</button>
+                    : o.npwp_file
+                      ? (o.npwp_file.startsWith('data:image')
+                          ? <img src={o.npwp_file} alt="NPWP" style={{marginTop:4,maxHeight:100,maxWidth:'100%',borderRadius:6}}/>
+                          : <a href={o.npwp_file} download="NPWP.pdf" style={{fontSize:12,color:'var(--blue)'}}>⬇ Download NPWP</a>)
+                      : null}
                 </div>
               )}
               {o.has_po && o.po_number && (
                 <div style={{marginTop:8,padding:'8px 12px',background:'rgba(245,158,11,0.07)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8}}>
                   <div style={{fontWeight:700,fontSize:12,color:'var(--amber)',marginBottom:3}}>📋 PO: {o.po_number}</div>
-                  {o.po_file && (o.po_file.startsWith('data:image')
-                    ? <img src={o.po_file} alt="PO" style={{maxHeight:100,maxWidth:'100%',borderRadius:6}}/>
-                    : <a href={o.po_file} download="PO.pdf" style={{fontSize:12,color:'var(--amber)'}}>⬇ Download PO</a>)}
+                  {o.po_file===undefined
+                    ? <button onClick={e=>{e.stopPropagation();onLoadFiles&&onLoadFiles(o.id);}} style={{marginTop:4,fontSize:11,color:'var(--amber)',background:'transparent',border:'1px solid var(--amber)',borderRadius:5,padding:'2px 8px',cursor:'pointer'}}>⬇ Muat Lampiran PO</button>
+                    : o.po_file
+                      ? (o.po_file.startsWith('data:image')
+                          ? <img src={o.po_file} alt="PO" style={{maxHeight:100,maxWidth:'100%',borderRadius:6}}/>
+                          : <a href={o.po_file} download="PO.pdf" style={{fontSize:12,color:'var(--amber)'}}>⬇ Download PO</a>)
+                      : null}
                 </div>
               )}
               {o.info_tambahan && <div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {o.info_tambahan}</div>}
@@ -13068,7 +13092,7 @@ function OpsServiceMonitor({intakes, onUpdate, orders}) {
 }
 
 // ─── ORDER DETAIL MODAL ────────────────────────────────────────────
-function OrderDetailModal({order, onClose, onUpdate, role, courierName}) {
+function OrderDetailModal({order, onClose, onUpdate, onLoadFiles, role, courierName}) {
   const history = order.status_history || [];
   const total = totalOrder(order.goods);
   return (
@@ -13112,10 +13136,13 @@ function OrderDetailModal({order, onClose, onUpdate, role, courierName}) {
                   <div style={{padding:'10px',background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.2)',borderRadius:8}}>
                     <div style={{fontSize:11,fontWeight:700,color:'var(--blue)',marginBottom:6}}>📄 Faktur Pajak</div>
                     <div style={{fontSize:13}}>NPWP: <span style={{fontFamily:'DM Mono',fontWeight:600}}>{order.npwp||<span style={{color:'var(--red)'}}>Belum diisi</span>}</span></div>
-                    {order.npwp_file && (order.npwp_file.startsWith('data:image')
-                      ? <img src={order.npwp_file} style={{marginTop:6,width:'100%',maxHeight:160,objectFit:'cover',borderRadius:6}} alt="NPWP"/>
-                      : <a href={order.npwp_file} download="NPWP.pdf" style={{display:'inline-block',marginTop:6,fontSize:12,color:'var(--blue)'}}>⬇ Download Lampiran NPWP</a>)}
-                    {!order.npwp_file && <div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>Tidak ada lampiran NPWP</div>}
+                    {order.npwp_file===undefined
+                      ? <button onClick={()=>onLoadFiles&&onLoadFiles(order.id)} style={{marginTop:6,fontSize:11,color:'var(--blue)',background:'transparent',border:'1px solid var(--blue)',borderRadius:5,padding:'2px 8px',cursor:'pointer'}}>⬇ Muat Lampiran NPWP</button>
+                      : order.npwp_file
+                        ? (order.npwp_file.startsWith('data:image')
+                            ? <img src={order.npwp_file} style={{marginTop:6,width:'100%',maxHeight:160,objectFit:'cover',borderRadius:6}} alt="NPWP"/>
+                            : <a href={order.npwp_file} download="NPWP.pdf" style={{display:'inline-block',marginTop:6,fontSize:12,color:'var(--blue)'}}>⬇ Download Lampiran NPWP</a>)
+                        : <div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>Tidak ada lampiran NPWP</div>}
                   </div>
                 )}
                 {order.invoice_materai && (
@@ -13127,10 +13154,13 @@ function OrderDetailModal({order, onClose, onUpdate, role, courierName}) {
                   <div style={{padding:'10px',background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.25)',borderRadius:8}}>
                     <div style={{fontSize:11,fontWeight:700,color:'var(--amber)',marginBottom:6}}>📋 Purchase Order Customer</div>
                     {order.po_number && <div style={{fontSize:13}}>No. PO: <span style={{fontFamily:'DM Mono',fontWeight:600}}>{order.po_number}</span></div>}
-                    {order.po_file && (order.po_file.startsWith('data:image')
-                      ? <img src={order.po_file} style={{marginTop:6,width:'100%',maxHeight:160,objectFit:'cover',borderRadius:6}} alt="PO"/>
-                      : <a href={order.po_file} download="PO.pdf" style={{display:'inline-block',marginTop:6,fontSize:12,color:'var(--amber)'}}>⬇ Download Lampiran PO</a>)}
-                    {!order.po_number && !order.po_file && <div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>Nomor & lampiran PO belum dilengkapi</div>}
+                    {order.po_file===undefined
+                      ? <button onClick={()=>onLoadFiles&&onLoadFiles(order.id)} style={{marginTop:6,fontSize:11,color:'var(--amber)',background:'transparent',border:'1px solid var(--amber)',borderRadius:5,padding:'2px 8px',cursor:'pointer'}}>⬇ Muat Lampiran PO</button>
+                      : order.po_file
+                        ? (order.po_file.startsWith('data:image')
+                            ? <img src={order.po_file} style={{marginTop:6,width:'100%',maxHeight:160,objectFit:'cover',borderRadius:6}} alt="PO"/>
+                            : <a href={order.po_file} download="PO.pdf" style={{display:'inline-block',marginTop:6,fontSize:12,color:'var(--amber)'}}>⬇ Download Lampiran PO</a>)
+                        : <div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>Nomor & lampiran PO belum dilengkapi</div>}
                   </div>
                 )}
               </div>
