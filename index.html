@@ -378,7 +378,7 @@ function App() {
 
   const loadCourierTasks = async () => {
     if (!db) return;
-    const cols = 'id,created_at,updated_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo';
+    const cols = 'id,created_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo';
     const {data,error} = await db.from('courier_tasks').select(cols).order('created_at',{ascending:false});
     if (error) { showToast('Error tasks: '+error.message, 'error'); return; }
     if (data) setCourierTasks(data);
