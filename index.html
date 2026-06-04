@@ -159,12 +159,12 @@ async function uploadPhoto(base64DataUrl, folder='misc') {
     const { error } = await db.storage.from('photos').upload(name, blob, {
       contentType: blob.type, upsert: false,
     });
-    if (error) { console.warn('Storage upload error:', error.message); return base64DataUrl; }
+    if (error) { console.warn('Storage upload error:', error.message); return null; }
     const { data: urlData } = db.storage.from('photos').getPublicUrl(name);
     return urlData.publicUrl;
   } catch(e) {
-    console.warn('uploadPhoto fallback to base64:', e);
-    return base64DataUrl;
+    console.warn('uploadPhoto failed:', e);
+    return null;
   }
 }
 
