@@ -676,7 +676,7 @@ function App() {
         {role==='supervisor' && page==='sup_dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} userRole="supervisor" userName={userName}/>}
         {role==='supervisor' && page==='sup_new_order' && <NewOrderForm onSave={saveOrder} salesName={userName} onToast={showToast}/>}
         {role==='supervisor' && page==='sup_quotations' && <QuotationPage quotations={quotations} onSave={saveQuotation} onUpdate={updateQuotation} onSaveOrder={saveOrder} salesName={userName} onToast={showToast} supervisorMode={true} canCreate={true}/>}
-        {role==='supervisor' && page==='sup_orders' && <SupervisorOrders orders={orders} onSelect={setSelectedOrder} onUpdate={updateOrder} currentUser={userName} allowRevisi={false}/>}
+        {role==='supervisor' && page==='sup_orders' && <SupervisorOrders orders={orders} onSelect={setSelectedOrder} onUpdate={updateOrder} currentUser={userName} allowRevisi={true}/>}
         {role==='supervisor' && page==='sup_service' && <SupervisorService intakes={serviceIntakes} orders={orders}/>}
         {role==='supervisor' && page==='sup_branch' && <SupervisorBranch requests={branchRequests}/>}
         {role==='supervisor' && page==='sup_tasks' && <SupervisorTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName}/>}
@@ -2579,13 +2579,61 @@ function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
   const [tab, setTab] = React.useState('mytasks');
   const [filter, setFilter] = React.useState('all');
   const [showForm, setShowForm] = React.useState(false);
+  const [editingTask, setEditingTask] = React.useState(null);
   const allTasks = tasks||[];
   const myTasks = allTasks.filter(t=>t.created_by===createdBy);
   const filtered = filter==='all' ? allTasks : allTasks.filter(t=>t.status===filter);
-
   const statusBorder = (s) => s==='done'?'var(--green)':s==='on_the_way'||s==='arrived'?'var(--blue)':s==='assigned'?'var(--amber)':'var(--border)';
 
   if(showForm) return <CourierTaskForm onSave={onSave} onCancel={()=>setShowForm(false)} createdBy={createdBy} createdByRole="supervisor" opsMode={false} taskTypes={TASK_TYPES_SALES}/>;
+
+  const EditTaskModal = ({t, onClose}) => {
+    const inp = {width:'100%',padding:'9px 11px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',fontSize:13,boxSizing:'border-box'};
+    const [frm, setFrm] = React.useState({task_type:t.task_type||'',description:t.description||'',destination:t.destination||'',contact_name:t.contact_name||'',contact_phone:t.contact_phone||''});
+    const setF = (k,v) => setFrm(f=>({...f,[k]:v}));
+    const [saving, setSaving] = React.useState(false);
+    const handleSave = async () => {
+      if (!frm.destination.trim()) { alert('Tujuan wajib diisi'); return; }
+      setSaving(true);
+      await onUpdate(t.id, {task_type:frm.task_type,description:frm.description,destination:frm.destination,contact_name:frm.contact_name,contact_phone:frm.contact_phone});
+      setSaving(false); onClose();
+    };
+    return (
+      <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+        <div className="modal" style={{maxWidth:480}}>
+          <div className="modal-header">
+            <div style={{fontWeight:700,fontSize:15}}>&#9998; Edit Tugas</div>
+            <button className="btn-secondary btn-sm" onClick={onClose}>&#10005;</button>
+          </div>
+          <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:12}}>
+            <div><label>Jenis Tugas</label>
+              <select style={inp} value={frm.task_type} onChange={e=>setF('task_type',e.target.value)}>
+                {TASK_TYPES_SALES.map(tp=><option key={tp} value={tp}>{tp}</option>)}
+              </select>
+            </div>
+            <div><label>Tujuan / Lokasi <span style={{color:'var(--red)'}}>*</span></label>
+              <input style={inp} value={frm.destination} onChange={e=>setF('destination',e.target.value)} placeholder="Alamat atau nama tempat"/>
+            </div>
+            <div><label>Keterangan / Detail</label>
+              <textarea style={{...inp,minHeight:70,resize:'vertical'}} value={frm.description} onChange={e=>setF('description',e.target.value)} placeholder="Tambahkan info detail tugas..."/>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div><label>Nama Kontak</label>
+                <input style={inp} value={frm.contact_name} onChange={e=>setF('contact_name',e.target.value)} placeholder="Nama PIC"/>
+              </div>
+              <div><label>No. HP Kontak</label>
+                <input style={inp} value={frm.contact_phone} onChange={e=>setF('contact_phone',e.target.value)} placeholder="08xx"/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:10,marginTop:4}}>
+              <button className="btn-secondary" style={{flex:1}} onClick={onClose}>Batal</button>
+              <button className="btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>{saving?'Menyimpan...':'Simpan Perubahan'}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const TaskCard = ({t}) => (
     <div className="card" style={{marginBottom:10,borderLeft:`3px solid ${statusBorder(t.status)}`}}>
@@ -2601,7 +2649,12 @@ function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
           </div>
           {t.status==='done'&&t.completion_note&&<div style={{fontSize:12,color:'var(--green)',marginTop:4}}>✓ {t.completion_note}</div>}
         </div>
-        <span className={`badge ${TASK_STATUS[t.status]?.cls||'badge-new'}`}>{TASK_STATUS[t.status]?.label||t.status}</span>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
+          <span className={`badge ${TASK_STATUS[t.status]?.cls||'badge-new'}`}>{TASK_STATUS[t.status]?.label||t.status}</span>
+          {['pending','assigned'].includes(t.status) && t.created_by===createdBy && (
+            <button className="btn-secondary btn-sm" style={{fontSize:10,padding:'3px 8px',color:'var(--amber)'}} onClick={()=>setEditingTask(t)}>&#9998; Edit</button>
+          )}
+        </div>
       </div>
       {t.completion_photo&&<img src={t.completion_photo} style={{width:'100%',maxHeight:120,objectFit:'cover',borderRadius:8,marginTop:8}} alt="bukti"/>}
     </div>
@@ -2609,6 +2662,7 @@ function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
 
   return (
     <div style={{maxWidth:900}}>
+      {editingTask && <EditTaskModal t={editingTask} onClose={()=>setEditingTask(null)}/>}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}}>
         <div className="section-title" style={{margin:0}}>✅ To Do List</div>
         <div style={{display:'flex',gap:6}}>
