@@ -146,11 +146,12 @@ try {
 // ─── UPLOAD FOTO KE SUPABASE STORAGE ──────────────────────────────
 // Semua foto di-upload ke bucket 'photos', database hanya simpan URL.
 // Jika upload gagal, fallback ke base64 (tidak crash).
-async function uploadPhoto(base64DataUrl, folder='misc', retry=0) {
+async function uploadPhoto(base64DataUrl, folder='misc', retry=0, onStatus=null) {
   if (!base64DataUrl) return null;
   // Kalau sudah URL (bukan base64), langsung return
   if (!base64DataUrl.startsWith('data:')) return base64DataUrl;
   if (!db) return null;
+  if (onStatus) onStatus(retry === 0 ? '📤 Mengupload foto...' : `🔄 Koneksi lambat, mencoba lagi (${retry+1}/3)...`);
   try {
     const res  = await fetch(base64DataUrl);
     const blob = await res.blob();
@@ -163,18 +164,21 @@ async function uploadPhoto(base64DataUrl, folder='misc', retry=0) {
       console.warn('Storage upload error:', error.message);
       if (retry < 2) {
         await new Promise(r=>setTimeout(r, 1500*(retry+1)));
-        return uploadPhoto(base64DataUrl, folder, retry+1);
+        return uploadPhoto(base64DataUrl, folder, retry+1, onStatus);
       }
-      return null; // gagal setelah 3x coba
+      if (onStatus) onStatus('❌ Gagal');
+      return null;
     }
+    if (onStatus) onStatus(null);
     const { data: urlData } = db.storage.from('photos').getPublicUrl(name);
     return urlData.publicUrl;
   } catch(e) {
     console.warn('uploadPhoto failed:', e);
     if (retry < 2) {
       await new Promise(r=>setTimeout(r, 1500*(retry+1)));
-      return uploadPhoto(base64DataUrl, folder, retry+1);
+      return uploadPhoto(base64DataUrl, folder, retry+1, onStatus);
     }
+    if (onStatus) onStatus('❌ Gagal');
     return null;
   }
 }
@@ -9464,6 +9468,8 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
   const [orderNote, setOrderNote] = React.useState({});
   const [orderDelivering, setOrderDelivering] = React.useState({});
   const [transitLoading, setTransitLoading] = React.useState({});
+  const [photoMsg, setPhotoMsg] = React.useState({}); // {key: statusMsg}
+  const setUploadMsg = (key) => (msg) => setPhotoMsg(prev => msg ? {...prev,[key]:msg} : (({[key]:_,...rest})=>rest)(prev));
   // Persist packing check ke localStorage — key per kurir (tanpa tanggal).
   // Check per order/task ID tetap tersimpan sampai order benar-benar terkirim
   // (order terkirim → hilang dari deliverableSlots secara alami, bukan karena key expired).
@@ -9511,8 +9517,8 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
     setOrderDelivering(d=>({...d,[o.id]:true}));
     const startLoc = getLastCheckin();
     let loc=null; try{loc=await getGPS();}catch(e){}
-    const photoUrl = await uploadPhoto(orderPhoto[o.id], 'delivery');
-    if (!photoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); setOrderDelivering(d=>({...d,[o.id]:false})); return; }
+    const photoUrl = await uploadPhoto(orderPhoto[o.id], 'delivery', 0, setUploadMsg('ord_'+o.id));
+    if (!photoUrl) { setPhotoMsg(p=>({...p,['ord_err_'+o.id]:'❌ Foto gagal diupload. Pastikan internet aktif lalu coba lagi.'})); setOrderDelivering(d=>({...d,[o.id]:false})); return; }
     const updates={status:'delivered',status_note:'Terkirim. '+(orderNote[o.id]||''),delivery_photo:photoUrl,delivered_at:new Date().toISOString()};
     if(loc) updates.end_location=loc;
     if(startLoc&&loc) updates.distance_km=parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2));
@@ -9874,10 +9880,13 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         <input type="file" accept="image/*" capture="environment" onChange={e=>handleOrderPhoto(o.id,e)}/>
                         {orderPhoto[o.id]&&<img src={orderPhoto[o.id]} style={{width:'100%',maxHeight:160,objectFit:'cover',borderRadius:8,marginTop:6}} alt="bukti"/>}
                       </div>
-                      <button className="btn-green" style={{width:'100%',padding:'12px',fontWeight:700}} disabled={orderDelivering[o.id]} onClick={()=>{
+                      {photoMsg['ord_'+o.id] && <div style={{textAlign:'center',fontSize:12,color:'var(--amber)',marginBottom:6,padding:'6px 10px',background:'rgba(245,158,11,0.1)',borderRadius:6}}>{photoMsg['ord_'+o.id]}</div>}
+                      {photoMsg['ord_err_'+o.id] && <div style={{textAlign:'center',fontSize:12,color:'var(--red)',marginBottom:6,padding:'6px 10px',background:'rgba(239,68,68,0.1)',borderRadius:6}}>{photoMsg['ord_err_'+o.id]}</div>}
+                      <button className="btn-green" style={{width:'100%',padding:'12px',fontWeight:700}} disabled={orderDelivering[o.id]||!!photoMsg['ord_'+o.id]} onClick={()=>{
+                        setPhotoMsg(p=>(({['ord_err_'+o.id]:_,...rest})=>rest)(p));
                         if(!orderPhoto[o.id]){alert('Foto bukti pengiriman wajib diupload dulu');return;}
                         markOrderDelivered(o);
-                      }}>{orderDelivering[o.id]?'📡 GPS...':'✅ Konfirmasi Sudah Terkirim'}</button>
+                      }}>{photoMsg['ord_'+o.id]||( orderDelivering[o.id]?'📡 GPS...':'✅ Konfirmasi Sudah Terkirim')}</button>
                     </div>
                   )}
                 </div>
@@ -9929,19 +9938,21 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           <input type="file" accept="image/*" capture="environment" onChange={e=>handleSIPhoto('sup_'+po.id+'_'+p.no,e)}/>
                           {siPhotos['sup_'+po.id+'_'+p.no]&&<img src={siPhotos['sup_'+po.id+'_'+p.no]} style={{width:'100%',maxHeight:160,objectFit:'cover',borderRadius:8,marginTop:6}} alt="bukti"/>}
                         </div>
-                        <button className="btn-green" style={{width:'100%',padding:'10px',fontWeight:700}} disabled={isGpsLoading} onClick={async()=>{
+                        {photoMsg['sup_'+po.id+'_'+p.no] && <div style={{textAlign:'center',fontSize:12,color: photoMsg['sup_'+po.id+'_'+p.no].startsWith('❌')?'var(--red)':'var(--amber)',marginBottom:6,padding:'6px 10px',background: photoMsg['sup_'+po.id+'_'+p.no].startsWith('❌')?'rgba(239,68,68,0.1)':'rgba(245,158,11,0.1)',borderRadius:6}}>{photoMsg['sup_'+po.id+'_'+p.no]}</div>}
+                        <button className="btn-green" style={{width:'100%',padding:'10px',fontWeight:700}} disabled={isGpsLoading||!!photoMsg['sup_'+po.id+'_'+p.no]&&!photoMsg['sup_'+po.id+'_'+p.no].startsWith('❌')} onClick={async()=>{
                           const supPk='sup_'+po.id+'_'+p.no;
+                          setPhotoMsg(prev=>(({[supPk]:_,...r})=>r)(prev));
                           if(!siPhotos[supPk]){alert('Upload foto bukti tiba di supplier dulu');return;}
                           setPoKm(prev=>({...prev,[po.id+'_'+p.no]:{loading:true}}));
                           const startLoc=getLastCheckin(); let endLoc=null; try{endLoc=await getGPS();}catch(e){}
                           setPoKm(prev=>({...prev,[po.id+'_'+p.no]:{loading:false}}));
                           const kmTotal=startLoc&&endLoc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng).toFixed(2)):null;
                           if(onCheckin&&endLoc) onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:`✅ Tiba jemput supplier: ${po.supplier_name}${kmTotal?' · '+kmTotal+' km':''}`});
-                          const supPhotoUrl = await uploadPhoto(siPhotos[supPk], 'supplier');
-                          if (!supPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
+                          const supPhotoUrl = await uploadPhoto(siPhotos[supPk], 'supplier', 0, setUploadMsg(supPk));
+                          if (!supPhotoUrl) { setUploadMsg(supPk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); return; }
                           const updatedPickups=(po.pickups||[]).map(t=>t.no===p.no?{...t,status:'done',arrival_photo:supPhotoUrl,start_location:startLoc,end_location:endLoc,distance_km:kmTotal,done_at:new Date().toISOString()}:t);
                           onUpdatePO(po.id,{pickups:updatedPickups,pickup:null});
-                        }}>{isGpsLoading?'📡 GPS...':'✅ Tiba & Sudah Dijemput dari Supplier'}</button>
+                        }}>{photoMsg['sup_'+po.id+'_'+p.no]&&!photoMsg['sup_'+po.id+'_'+p.no].startsWith('❌') ? photoMsg['sup_'+po.id+'_'+p.no] : isGpsLoading?'📡 GPS...':'✅ Tiba & Sudah Dijemput dari Supplier'}</button>
                       </div>
                     )}
                   </div>
@@ -9991,20 +10002,22 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           <input type="file" accept="image/*" capture="environment" onChange={e=>handleBranchPhoto(bk,e)}/>
                           {branchPhotos[bk]&&<img src={branchPhotos[bk]} style={{width:'100%',maxHeight:160,objectFit:'cover',borderRadius:8,marginTop:6}} alt="foto"/>}
                         </div>
-                        <button className="btn-green" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={bGps} onClick={async()=>{
+                        {photoMsg[bk] && <div style={{textAlign:'center',fontSize:12,color: photoMsg[bk].startsWith('❌')?'var(--red)':'var(--amber)',marginBottom:6,padding:'6px 10px',background: photoMsg[bk].startsWith('❌')?'rgba(239,68,68,0.1)':'rgba(245,158,11,0.1)',borderRadius:6}}>{photoMsg[bk]}</div>}
+                        <button className="btn-green" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={bGps||!!photoMsg[bk]&&!photoMsg[bk].startsWith('❌')} onClick={async()=>{
+                          setPhotoMsg(prev=>(({[bk]:_,...r})=>r)(prev));
                           if(!branchPhotos[bk]){alert('Upload foto bukti pengiriman ke cabang dulu');return;}
                           setSiPhotos(p=>({...p,[bk+'_gps']:true}));
                           const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                           setSiPhotos(p=>({...p,[bk+'_gps']:false}));
                           const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
                           if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`📍 Tiba di cabang: ${r.branch_name}${km?' · '+km+' km':''}`});
-                          const branchPhotoUrl = await uploadPhoto(branchPhotos[bk]||null, 'branch');
-                          if (!branchPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
+                          const branchPhotoUrl = await uploadPhoto(branchPhotos[bk]||null, 'branch', 0, setUploadMsg(bk));
+                          if (!branchPhotoUrl) { setUploadMsg(bk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); return; }
                           const updatedTrips=(r.trips||[]).map(t=>t.no===trip.no?{...t,status:'delivered',delivered_at:new Date().toISOString(),photo:branchPhotoUrl||null,start_location:startLoc||null,arrived_location:loc,distance_km:km}:t);
                           const allDone=updatedTrips.every(t=>t.status==='delivered');
                           const pendingItems=(r.items||[]).filter(it=>!updatedTrips.find(t=>t.status==='delivered'&&(t.items||[]).find(ti=>ti.name===it.name)));
                           onUpdateBranch(r.id,{trips:updatedTrips,status:allDone&&pendingItems.length===0?'completed':'partial'});
-                        }}>{bGps?'📡 GPS...':'✅ Tiba & Diserahkan ke Cabang'}</button>
+                        }}>{photoMsg[bk]&&!photoMsg[bk].startsWith('❌') ? photoMsg[bk] : bGps?'📡 GPS...':'✅ Tiba & Diserahkan ke Cabang'}</button>
                       </div>
                     )}
                   </div>
@@ -10047,17 +10060,19 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         <input type="file" accept="image/*" capture="environment" onChange={e=>handleSIPhoto(k,e)}/>
                         {siPhotos[k]&&<img src={siPhotos[k]} style={{width:'100%',maxHeight:160,objectFit:'cover',borderRadius:8,marginTop:6}} alt="bukti"/>}
                       </div>
-                      <button className="btn-green" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={gpsL} onClick={async()=>{
+                      {photoMsg['sip_'+k] && <div style={{textAlign:'center',fontSize:12,color: photoMsg['sip_'+k].startsWith('❌')?'var(--red)':'var(--amber)',marginBottom:6,padding:'6px 10px',background: photoMsg['sip_'+k].startsWith('❌')?'rgba(239,68,68,0.1)':'rgba(245,158,11,0.1)',borderRadius:6}}>{photoMsg['sip_'+k]}</div>}
+                      <button className="btn-green" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={gpsL||!!photoMsg['sip_'+k]&&!photoMsg['sip_'+k].startsWith('❌')} onClick={async()=>{
+                        setPhotoMsg(prev=>(({['sip_'+k]:_,...r})=>r)(prev));
                         if(!siPhotos[k]){alert('Upload foto bukti tiba di cabang dulu');return;}
                         setSiPhotos(p=>({...p,[k+'_gps']:true}));
                         const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
                         const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Tiba & jemput di cabang: ${s.branch_name}${km?' · '+km+' km':''}`});
-                        const pickupPhotoUrl = await uploadPhoto(siPhotos[k], 'si_pickup');
-                        if (!pickupPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
+                        const pickupPhotoUrl = await uploadPhoto(siPhotos[k], 'si_pickup', 0, setUploadMsg('sip_'+k));
+                        if (!pickupPhotoUrl) { setUploadMsg('sip_'+k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); return; }
                         onUpdateSI(s.id,{courier_picked_up:true,courier_picked_up_at:new Date().toISOString(),pickup_arrival_photo:pickupPhotoUrl,pickup_start_location:startLoc||null,pickup_arrived_location:loc,pickup_distance_km:km});
-                      }}>{gpsL?'📡 GPS...':'✅ Tiba & Sudah Dijemput dari Cabang'}</button>
+                      }}>{photoMsg['sip_'+k]&&!photoMsg['sip_'+k].startsWith('❌') ? photoMsg['sip_'+k] : gpsL?'📡 GPS...':'✅ Tiba & Sudah Dijemput dari Cabang'}</button>
                     </div>
                   )}
                 </div>
@@ -10098,17 +10113,19 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         <input type="file" accept="image/*" capture="environment" onChange={e=>handleSIPhoto(k,e)}/>
                         {siPhotos[k]&&<img src={siPhotos[k]} style={{width:'100%',maxHeight:160,objectFit:'cover',borderRadius:8,marginTop:6}} alt="bukti"/>}
                       </div>
-                      <button className="btn-green" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={gpsL} onClick={async()=>{
+                      {photoMsg['scr_'+k] && <div style={{textAlign:'center',fontSize:12,color: photoMsg['scr_'+k].startsWith('❌')?'var(--red)':'var(--amber)',marginBottom:6,padding:'6px 10px',background: photoMsg['scr_'+k].startsWith('❌')?'rgba(239,68,68,0.1)':'rgba(245,158,11,0.1)',borderRadius:6}}>{photoMsg['scr_'+k]}</div>}
+                      <button className="btn-green" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={gpsL||!!photoMsg['scr_'+k]&&!photoMsg['scr_'+k].startsWith('❌')} onClick={async()=>{
+                        setPhotoMsg(prev=>(({['scr_'+k]:_,...r})=>r)(prev));
                         if(!siPhotos[k]){alert('Upload bukti tanda terima dari SC dulu');return;}
                         setSiPhotos(p=>({...p,[k+'_gps']:true}));
                         const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
                         const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Tiba di SC: ${s.service_center_name}${km?' · '+km+' km':''}`});
-                        const scReceiptPhotoUrl = await uploadPhoto(siPhotos[k], 'sc_receipt');
-                        if (!scReceiptPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
+                        const scReceiptPhotoUrl = await uploadPhoto(siPhotos[k], 'sc_receipt', 0, setUploadMsg('scr_'+k));
+                        if (!scReceiptPhotoUrl) { setUploadMsg('scr_'+k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); return; }
                         onUpdateSI(s.id,{status:'at_service_center',sc_receipt_photo:scReceiptPhotoUrl,sc_delivered_at:new Date().toISOString(),sc_start_location:startLoc||null,sc_arrived_location:loc,sc_distance_km:km});
-                      }}>{gpsL?'📡 GPS...':'✅ Tiba & Sudah Diserahkan ke SC'}</button>
+                      }}>{photoMsg['scr_'+k]&&!photoMsg['scr_'+k].startsWith('❌') ? photoMsg['scr_'+k] : gpsL?'📡 GPS...':'✅ Tiba & Sudah Diserahkan ke SC'}</button>
                     </div>
                   )}
                 </div>
@@ -10176,17 +10193,19 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         <input type="file" accept="image/*" capture="environment" onChange={e=>handleSIPhoto(k,e)}/>
                         {siPhotos[k]&&<img src={siPhotos[k]} style={{width:'100%',maxHeight:160,objectFit:'cover',borderRadius:8,marginTop:6}} alt="bukti"/>}
                       </div>
-                      <button className="btn-green" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={gpsL} onClick={async()=>{
+                      {photoMsg['scp_'+k] && <div style={{textAlign:'center',fontSize:12,color: photoMsg['scp_'+k].startsWith('❌')?'var(--red)':'var(--amber)',marginBottom:6,padding:'6px 10px',background: photoMsg['scp_'+k].startsWith('❌')?'rgba(239,68,68,0.1)':'rgba(245,158,11,0.1)',borderRadius:6}}>{photoMsg['scp_'+k]}</div>}
+                      <button className="btn-green" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={gpsL||!!photoMsg['scp_'+k]&&!photoMsg['scp_'+k].startsWith('❌')} onClick={async()=>{
+                        setPhotoMsg(prev=>(({['scp_'+k]:_,...r})=>r)(prev));
                         if(!siPhotos[k]){alert('Upload foto bukti pengambilan dari SC dulu');return;}
                         setSiPhotos(p=>({...p,[k+'_gps']:true}));
                         const startLoc=siPhotos[k+'_startloc']||getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
                         const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Ambil dari SC: ${scName}${km?' · '+km+' km':''}`});
-                        const scPickupPhotoUrl = await uploadPhoto(siPhotos[k]||null, 'sc_pickup');
-                        if (!scPickupPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
+                        const scPickupPhotoUrl = await uploadPhoto(siPhotos[k]||null, 'sc_pickup', 0, setUploadMsg('scp_'+k));
+                        if (!scPickupPhotoUrl) { setUploadMsg('scp_'+k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); return; }
                         onUpdateSI(s.id,{status:'back_from_sc',sc_picked_up_at:new Date().toISOString(),sc_pickup_photo:scPickupPhotoUrl||null,scp_distance_km:km||null});
-                      }}>{gpsL?'📡 GPS...':'✅ Tiba & Sudah Diambil dari SC'}</button>
+                      }}>{photoMsg['scp_'+k]&&!photoMsg['scp_'+k].startsWith('❌') ? photoMsg['scp_'+k] : gpsL?'📡 GPS...':'✅ Tiba & Sudah Diambil dari SC'}</button>
                     </div>
                   )}
                 </div>
@@ -10234,7 +10253,9 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           <input type="file" accept="image/*" capture="environment" onChange={e=>handleSIPhoto(retKey,e)}/>
                           {siPhotos[retKey]&&<img src={siPhotos[retKey]} style={{width:'100%',maxHeight:180,objectFit:'cover',borderRadius:8,marginTop:6}} alt="bukti"/>}
                         </div>
-                        <button className="btn-green" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={retGpsLoading} onClick={async()=>{
+                        {photoMsg['ret_'+retKey] && <div style={{textAlign:'center',fontSize:12,color: photoMsg['ret_'+retKey].startsWith('❌')?'var(--red)':'var(--amber)',marginBottom:6,padding:'6px 10px',background: photoMsg['ret_'+retKey].startsWith('❌')?'rgba(239,68,68,0.1)':'rgba(245,158,11,0.1)',borderRadius:6}}>{photoMsg['ret_'+retKey]}</div>}
+                        <button className="btn-green" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={retGpsLoading||!!photoMsg['ret_'+retKey]&&!photoMsg['ret_'+retKey].startsWith('❌')} onClick={async()=>{
+                          setPhotoMsg(prev=>(({['ret_'+retKey]:_,...r})=>r)(prev));
                           if(!siPhotos[retKey]){alert('Foto bukti serah terima wajib diupload dulu');return;}
                           setRetGps(true);
                           const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
@@ -10242,11 +10263,11 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           const rKm=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
                           const dest2=s.source_type==='branch'?s.branch_name:s.customer_name;
                           if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`📍 Serah terima ke ${dest2}${rKm?' · '+rKm+' km':''}`});
-                          const retPhotoUrl = await uploadPhoto(siPhotos[retKey], 'si_return');
-                          if (!retPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
+                          const retPhotoUrl = await uploadPhoto(siPhotos[retKey], 'si_return', 0, setUploadMsg('ret_'+retKey));
+                          if (!retPhotoUrl) { setUploadMsg('ret_'+retKey)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); return; }
                           onUpdateSI(s.id,{return_status:'returned',return_photo:retPhotoUrl,returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:loc,return_distance_km:rKm});
                           setRetStep('done');
-                        }}>{retGpsLoading?'📡 GPS...':s.source_type==='branch'?`✅ Sudah Diserahkan ke Cabang ${s.branch_name||''}`:'✅ Konfirmasi Sudah Diserahkan ke Customer'}</button>
+                        }}>{photoMsg['ret_'+retKey]&&!photoMsg['ret_'+retKey].startsWith('❌') ? photoMsg['ret_'+retKey] : retGpsLoading?'📡 GPS...':s.source_type==='branch'?`✅ Sudah Diserahkan ke Cabang ${s.branch_name||''}`:'✅ Konfirmasi Sudah Diserahkan ke Customer'}</button>
                       </div>
                     )
                   )}
