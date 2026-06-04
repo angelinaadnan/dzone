@@ -8934,6 +8934,7 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
   const [note, setNote] = React.useState('');
   const [assigning, setAssigning] = React.useState(false);
   const [gpsLoading, setGpsLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
   const [showWalkIn, setShowWalkIn] = React.useState(false);
 
   const handlePhoto = (e) => {
@@ -8973,6 +8974,7 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
   const markDone = async () => {
     // Foto wajib untuk SEMUA jenis tugas saat selesai di lokasi
     if (!photo && (task.status==='arrived' || task.status==='returning')) { alert('Foto bukti wajib diupload dulu sebelum selesai'); return; }
+    setSaving(true);
     setGpsLoading(true);
     let endLoc = null;
     try { endLoc = await getGPS(); } catch(e) {}
@@ -8990,7 +8992,8 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
       const photoUrl = await uploadPhoto(photo, 'tasks');
       updates.completion_photo = photoUrl;
     }
-    onUpdate(task.id, updates);
+    await onUpdate(task.id, updates);
+    setSaving(false);
   };
 
   return (
@@ -9177,9 +9180,9 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
               </div>
               <input placeholder="Catatan (opsional)" value={note} onChange={e=>setNote(e.target.value)}
                 style={{width:'100%',padding:'8px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',fontSize:13,boxSizing:'border-box',marginBottom:8}}/>
-              <button style={{width:'100%',padding:'12px',background:'var(--green)',color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor:gpsLoading?'default':'pointer',opacity:gpsLoading?0.7:1}}
-                onClick={markDone} disabled={gpsLoading}>
-                {gpsLoading?'📡 Mengambil GPS...':'✅ Selesai'}
+              <button style={{width:'100%',padding:'12px',background:'var(--green)',color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor:(gpsLoading||saving)?'default':'pointer',opacity:(gpsLoading||saving)?0.7:1}}
+                onClick={markDone} disabled={gpsLoading||saving}>
+                {gpsLoading?'📡 Mengambil GPS...':saving?'⏳ Menyimpan...':'✅ Selesai'}
               </button>
             </div>
           )}
@@ -9199,9 +9202,9 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
                 <input type="file" accept="image/*" capture="environment" onChange={handlePhoto}/>
                 {photo && <img src={photo} style={{width:'100%',maxHeight:140,objectFit:'cover',borderRadius:8,marginTop:6}} alt="foto"/>}
               </div>
-              <button style={{width:'100%',padding:'12px',background:'var(--green)',color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor:gpsLoading?'default':'pointer',opacity:gpsLoading?0.7:1}}
-                onClick={markDone} disabled={gpsLoading}>
-                {gpsLoading?'📡 Mengambil GPS...':'✅ Selesai'}
+              <button style={{width:'100%',padding:'12px',background:'var(--green)',color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor:(gpsLoading||saving)?'default':'pointer',opacity:(gpsLoading||saving)?0.7:1}}
+                onClick={markDone} disabled={gpsLoading||saving}>
+                {gpsLoading?'📡 Mengambil GPS...':saving?'⏳ Menyimpan...':'✅ Selesai'}
               </button>
             </div>
           )}
