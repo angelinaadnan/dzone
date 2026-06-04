@@ -9545,6 +9545,11 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
 
   return (
     <div style={{maxWidth:700}}>
+      {/* DEBUG SEMENTARA */}
+      <div style={{fontSize:10,color:'var(--text3)',marginBottom:4,padding:'4px 8px',background:'var(--bg3)',borderRadius:6,wordBreak:'break-all'}}>
+        DBG: tasks={tasks.length} | myTasks={myTasks.length} | active={activeTasks.length} | courier="{courierName}" | len={courierName.length}
+        {tasks.slice(0,3).map(t=><div key={t.id}>→ "{t.assigned_courier}"({t.assigned_courier?.length}) status={t.status}</div>)}
+      </div>
       {/* GPS Check-in Panel */}
       {onCheckin && <CourierCheckinPanel courierName={courierName} checkins={checkins} onCheckin={onCheckin}/>}
 
