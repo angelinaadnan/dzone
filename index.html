@@ -700,7 +700,7 @@ function App() {
       showToast('🧹 Bersihkan attendance...'); await cleanCol('attendance','check_in_photo'); await cleanCol('attendance','check_out_photo');
       showToast('🧹 Bersihkan courier tasks...'); await cleanCol('courier_tasks','completion_photo');
       showToast('🧹 Bersihkan orders...'); await cleanCol('orders','delivery_photo'); await cleanCol('orders','admin_photo'); await cleanCol('orders','tech_photo'); await cleanTextArrayCol('orders','tech_photos'); await cleanCol('orders','npwp_file'); await cleanCol('orders','po_file'); await cleanCol('orders','proforma_file');
-      showToast('🧹 Bersihkan service intakes...'); await cleanCol('service_intakes','pickup_arrival_photo'); await cleanCol('service_intakes','sc_receipt_photo'); await cleanCol('service_intakes','sc_pickup_photo'); await cleanCol('service_intakes','return_photo'); await cleanCol('service_intakes','tech_photo'); await cleanCol('service_intakes','handover_photo');
+      showToast('🧹 Bersihkan service intakes...'); await cleanCol('service_intakes','pickup_arrival_photo'); await cleanCol('service_intakes','sc_receipt_photo'); await cleanCol('service_intakes','sc_pickup_photo'); await cleanCol('service_intakes','return_photo'); await cleanCol('service_intakes','handover_photo');
       showToast('🧹 Bersihkan branch requests...'); await cleanJsonbPhoto('branch_requests','trips','photo');
       showToast('🧹 Bersihkan purchase orders...'); await cleanJsonbPhoto('purchase_orders','pickups','arrival_photo');
       showToast(`✅ Selesai! ${total} foto/dokumen base64 dibersihkan.`, 'success');
@@ -6903,19 +6903,23 @@ function ComponentsForm({value, onChange}) {
   const removeRow = (list, setList, i) => setList(list.filter((_,idx)=>idx!==i));
 
   const iStyle = {padding:'7px 10px',background:'var(--bg)',border:'1px solid var(--border2)',borderRadius:7,color:'var(--text)',fontSize:12,width:'100%'};
-  const renderRows = (list, setList, colorVar) => (
+  const renderRows = (list, setList) => (
     <div>
       {list.map((r,i)=>(
-        <div key={i} style={{display:'grid',gridTemplateColumns:'120px 1fr 1fr 1.5fr 26px',gap:5,marginBottom:6,alignItems:'center'}}>
-          <select style={iStyle} value={r.type} onChange={e=>setRow(list,setList,i,'type',e.target.value)}>
-            {COMPONENT_TYPES.map(t=><option key={t}>{t}</option>)}
-          </select>
-          <input style={iStyle} placeholder="Kapasitas/Spec (mis: 16GB, 512GB)" value={r.spec} onChange={e=>setRow(list,setList,i,'spec',e.target.value)}/>
-          <input style={iStyle} placeholder="Merk (mis: Kingston, Samsung)" value={r.brand} onChange={e=>setRow(list,setList,i,'brand',e.target.value)}/>
-          <input style={iStyle} placeholder="Catatan (mis: slot 1, DDR5-4800, partno...)" value={r.notes||''} onChange={e=>setRow(list,setList,i,'notes',e.target.value)}/>
-          {list.length>1
-            ? <button type="button" style={{background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.3)',color:'var(--red)',borderRadius:6,cursor:'pointer',fontSize:13,width:26,height:26}} onClick={()=>removeRow(list,setList,i)}>✕</button>
-            : <div/>}
+        <div key={i} style={{marginBottom:8,background:'var(--bg)',borderRadius:8,padding:'8px 10px',border:'1px solid var(--border)'}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 26px',gap:5,marginBottom:5,alignItems:'center'}}>
+            <select style={iStyle} value={r.type} onChange={e=>setRow(list,setList,i,'type',e.target.value)}>
+              {COMPONENT_TYPES.map(t=><option key={t}>{t}</option>)}
+            </select>
+            <input style={iStyle} placeholder="Kapasitas/Spec (16GB, 512GB...)" value={r.spec} onChange={e=>setRow(list,setList,i,'spec',e.target.value)}/>
+            {list.length>1
+              ? <button type="button" style={{background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.3)',color:'var(--red)',borderRadius:6,cursor:'pointer',fontSize:13,width:26,height:26}} onClick={()=>removeRow(list,setList,i)}>✕</button>
+              : <div/>}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:5}}>
+            <input style={iStyle} placeholder="Merk (Kingston, Samsung...)" value={r.brand} onChange={e=>setRow(list,setList,i,'brand',e.target.value)}/>
+            <input style={{...iStyle,borderColor:'rgba(99,102,241,0.4)',background:'rgba(99,102,241,0.04)'}} placeholder="📝 Catatan (slot 1, DDR5, partno...)" value={r.notes||''} onChange={e=>setRow(list,setList,i,'notes',e.target.value)}/>
+          </div>
         </div>
       ))}
       <button type="button" className="btn-secondary btn-sm" style={{fontSize:11}} onClick={()=>addRow(list,setList)}>+ Tambah Baris</button>
@@ -6927,12 +6931,12 @@ function ComponentsForm({value, onChange}) {
       <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:'var(--text)'}}>🔧 Log Komponen</div>
       <div style={{marginBottom:12}}>
         <div style={{fontSize:12,fontWeight:600,color:'var(--green)',marginBottom:6}}>🔼 Dipasang ke Unit:</div>
-        {renderRows(masuk, setMasuk, 'var(--green)')}
+        {renderRows(masuk, setMasuk)}
       </div>
       <hr style={{border:'none',borderTop:'1px solid var(--border)',margin:'10px 0'}}/>
       <div>
         <div style={{fontSize:12,fontWeight:600,color:'var(--amber)',marginBottom:6}}>🔽 Dilepas dari Unit:</div>
-        {renderRows(keluar, setKeluar, 'var(--amber)')}
+        {renderRows(keluar, setKeluar)}
       </div>
     </div>
   );
@@ -7061,7 +7065,7 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
                 const siPhotos = siPhotoData[si.id]||[];
                 if(!siPhotos.length){ alert('Upload foto bukti servis selesai dulu (wajib min. 1 foto)'); return; }
                 const uploadedPhotos = await Promise.all(siPhotos.map(p=>uploadPhoto(p, 'tech_done')));
-                const updates = {status:'done', done_at:new Date().toISOString(), tech_photo:uploadedPhotos[0], tech_photos:uploadedPhotos};
+                const updates = {status:'done', done_at:new Date().toISOString()};
                 if(siNote[si.id]) updates.tech_note = siNote[si.id];
                 const comp = siComponents[si.id];
                 if(comp) {
@@ -7150,8 +7154,23 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
 }
 
 // ─── TECHNICIAN SUMMARY ────────────────────────────────────────────
-function SIHistoryRow({si, isDone}) {
+function SIHistoryRow({si, isDone, techName, onUpdateSI}) {
   const [open, setOpen] = React.useState(false);
+  const [editingComp, setEditingComp] = React.useState(null);
+
+  const startEditComp = () => {
+    const comp = si.tech_components || {masuk:[{type:'RAM',spec:'',brand:'',notes:''}],keluar:[{type:'RAM',spec:'',brand:'',notes:''}]};
+    setEditingComp({masuk:[...(comp.masuk||[])],keluar:[...(comp.keluar||[])]});
+  };
+  const cancelEditComp = () => setEditingComp(null);
+  const saveEditComp = async () => {
+    const oldComp = si.tech_components || {};
+    const editEntry = {at:new Date().toISOString(),by:techName,masuk_before:oldComp.masuk||[],keluar_before:oldComp.keluar||[],masuk_after:editingComp.masuk||[],keluar_after:editingComp.keluar||[]};
+    const newComp = {...oldComp,masuk:editingComp.masuk,keluar:editingComp.keluar,edits:[...(oldComp.edits||[]),editEntry]};
+    await onUpdateSI(si.id,{tech_components:newComp});
+    setEditingComp(null);
+  };
+
   return (
     <div style={{borderBottom:'1px solid var(--border)'}}>
       <div style={{padding:'10px 0',display:'flex',gap:12,alignItems:'flex-start',cursor:'pointer'}} onClick={()=>setOpen(o=>!o)}>
@@ -7215,6 +7234,30 @@ function SIHistoryRow({si, isDone}) {
           {isDone && !si.tech_note && (
             <div style={{fontSize:12,color:'var(--text3)',fontStyle:'italic'}}>— Catatan tindakan belum diisi —</div>
           )}
+          {/* Log Komponen */}
+          {editingComp ? (
+            <div style={{marginTop:10}}>
+              <ComponentsForm value={editingComp} onChange={setEditingComp}/>
+              <div style={{display:'flex',gap:8,marginTop:8}}>
+                <button className="btn-secondary btn-sm" onClick={cancelEditComp}>Batal</button>
+                <button className="btn-green btn-sm" onClick={saveEditComp}>💾 Simpan</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <CompLogDisplay comp={si.tech_components} verified={si.tech_components_verified} onVerify={null} supervisorName={null} canVerify={false} showHistory={false}/>
+              {onUpdateSI && si.tech_components && !si.tech_components_verified && (
+                <div style={{marginTop:6,display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{fontSize:11,color:'var(--text3)',fontStyle:'italic'}}>⏳ Menunggu verifikasi supervisor</span>
+                  <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={startEditComp}>✏️ Edit Komponen</button>
+                </div>
+              )}
+              {onUpdateSI && !si.tech_components && !si.tech_components_verified && (
+                <button className="btn-secondary btn-sm" style={{fontSize:11,marginTop:8}} onClick={startEditComp}>+ Isi Log Komponen</button>
+              )}
+              {si.tech_components_verified && <div style={{marginTop:4,fontSize:11,color:'var(--green)'}}>🔒 Log komponen dikunci supervisor</div>}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -7276,7 +7319,7 @@ function TechnicianSummary({orders, serviceIntakes, techName, onUpdate, onUpdate
           {mySI.map(si=>{
             const isDone = si.status==='done'||si.status==='returned';
             return (
-              <SIHistoryRow key={si.id} si={si} isDone={isDone}/>
+              <SIHistoryRow key={si.id} si={si} isDone={isDone} techName={techName} onUpdateSI={onUpdateSI}/>
             );
           })}
         </div>
@@ -13072,7 +13115,7 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
                 <button className="btn-green btn-sm" style={{flex:1}} onClick={async()=>{
                   if(!donePhoto){alert('Upload foto bukti selesai dulu (wajib)');return;}
                   const donePhotoUrl = await uploadPhoto(donePhoto, 'tech_done');
-                  onUpdate(si.id,{status:'done',done_at:new Date().toISOString(),tech_photo:donePhotoUrl});
+                  onUpdate(si.id,{status:'done',done_at:new Date().toISOString()});
                   setShowDoneUpload(false); setDonePhoto(null);
                 }}>✅ Konfirmasi Selesai</button>
                 <button className="btn-secondary btn-sm" onClick={()=>{setShowDoneUpload(false);setDonePhoto(null);}}>Batal</button>
@@ -13245,7 +13288,7 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
               <div style={{display:'flex',gap:8}}>
                 <button className="btn-green btn-sm" style={{flex:1}} onClick={async()=>{
                   const pscDoneUrl = await uploadPhoto(donePhoto||null, 'tech_done');
-                  onUpdate(si.id,{status:'done',done_at:new Date().toISOString(),tech_photo:pscDoneUrl||undefined});
+                  onUpdate(si.id,{status:'done',done_at:new Date().toISOString()});
                   setShowDoneUpload(false); setDonePhoto(null);
                 }}>✅ Konfirmasi Cek OK</button>
                 <button className="btn-secondary btn-sm" onClick={()=>{setShowDoneUpload(false);setDonePhoto(null);}}>Batal</button>
