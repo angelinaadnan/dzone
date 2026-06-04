@@ -3685,14 +3685,64 @@ function fmtComp(rows) {
   return (rows||[]).filter(r=>r.spec||r.brand).map(r=>`${r.type} ${r.spec} ${r.brand}`.trim()).join(', ') || '—';
 }
 
-function CompLogDisplay({comp, verified, onVerify, supervisorName, canVerify, showHistory}) {
+function CompLogDisplay({comp, verified, onVerify, supervisorName, canVerify, showHistory, onSaveNotes}) {
   const [openHistory, setOpenHistory] = React.useState(false);
+  // Local notes state: {masuk: ['','','...'], keluar: ['','...']}
+  const [localNotes, setLocalNotes] = React.useState(null);
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(()=>{
+    if(comp) setLocalNotes({
+      masuk: (comp.masuk||[]).map(r=>r.notes||''),
+      keluar: (comp.keluar||[]).map(r=>r.notes||''),
+    });
+  }, [comp]);
+
   if(!comp || (!comp.masuk?.length && !comp.keluar?.length)) return null;
   const edits = comp.edits || [];
+  const canEditNotes = !!onSaveNotes && !verified;
+
+  const saveNote = async (section, idx, val) => {
+    if (!onSaveNotes) return;
+    setSaving(true);
+    const updatedComp = {
+      ...comp,
+      masuk: (comp.masuk||[]).map((r,i)=> section==='masuk'&&i===idx ? {...r,notes:val} : r),
+      keluar: (comp.keluar||[]).map((r,i)=> section==='keluar'&&i===idx ? {...r,notes:val} : r),
+    };
+    await onSaveNotes(updatedComp);
+    setSaving(false);
+  };
+
+  const renderRow = (r, i, section, color, label) => {
+    const noteVal = localNotes?.[section]?.[i] ?? r.notes ?? '';
+    return (
+      <div key={i} style={{fontSize:12,padding:'4px 0',display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+        <span style={{color,fontWeight:600,width:60,flexShrink:0}}>{label}</span>
+        <span style={{flexShrink:0}}>{r.type} {r.spec} {r.brand}</span>
+        {canEditNotes ? (
+          <input
+            value={noteVal}
+            onChange={e=>{
+              const v = e.target.value;
+              setLocalNotes(n=>({...n,[section]:n[section].map((x,j)=>j===i?v:x)}));
+            }}
+            onBlur={e=>saveNote(section,i,e.target.value)}
+            placeholder="📝 tambah catatan..."
+            style={{flex:1,minWidth:120,padding:'3px 8px',background:'rgba(99,102,241,0.07)',border:'1px solid rgba(99,102,241,0.35)',borderRadius:6,color:'var(--text)',fontSize:11}}
+          />
+        ) : (
+          r.notes ? <span style={{color:'var(--text3)',fontStyle:'italic'}}>· {r.notes}</span> : null
+        )}
+        {saving && <span style={{fontSize:10,color:'var(--text3)'}}>💾</span>}
+      </div>
+    );
+  };
+
   return (
     <div style={{background:'var(--bg3)',borderRadius:8,padding:'10px 12px',marginTop:8,border:'1px solid var(--border2)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-        <div style={{fontSize:12,fontWeight:700,color:'var(--text)'}}>🔧 Log Komponen</div>
+        <div style={{fontSize:12,fontWeight:700,color:'var(--text)'}}>🔧 Log Komponen {canEditNotes&&<span style={{fontSize:10,color:'var(--text3)',fontWeight:400,marginLeft:4}}>— ketik catatan lalu klik di luar</span>}</div>
         {canVerify && (
           <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',userSelect:'none'}}>
             <input type="checkbox" checked={!!verified} onChange={e=>{
@@ -3715,18 +3765,8 @@ function CompLogDisplay({comp, verified, onVerify, supervisorName, canVerify, sh
       </div>
 
       {/* Nilai saat ini */}
-      {comp.masuk?.filter(r=>r.spec||r.brand).map((r,i)=>(
-        <div key={i} style={{fontSize:12,padding:'3px 0',display:'flex',gap:8}}>
-          <span style={{color:'var(--green)',fontWeight:600,width:60,flexShrink:0}}>🔼 Masuk</span>
-          <span>{r.type} {r.spec} {r.brand}{r.notes?<span style={{color:'var(--text3)',marginLeft:6}}>· {r.notes}</span>:null}</span>
-        </div>
-      ))}
-      {comp.keluar?.filter(r=>r.spec||r.brand).map((r,i)=>(
-        <div key={i} style={{fontSize:12,padding:'3px 0',display:'flex',gap:8}}>
-          <span style={{color:'var(--amber)',fontWeight:600,width:60,flexShrink:0}}>🔽 Keluar</span>
-          <span>{r.type} {r.spec} {r.brand}{r.notes?<span style={{color:'var(--text3)',marginLeft:6}}>· {r.notes}</span>:null}</span>
-        </div>
-      ))}
+      {(comp.masuk||[]).filter(r=>r.spec||r.brand).map((r,i)=>renderRow(r,i,'masuk','var(--green)','🔼 Masuk'))}
+      {(comp.keluar||[]).filter(r=>r.spec||r.brand).map((r,i)=>renderRow(r,i,'keluar','var(--amber)','🔽 Keluar'))}
 
       {/* Riwayat edit */}
       {showHistory && edits.length>0 && (
@@ -7156,20 +7196,6 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
 // ─── TECHNICIAN SUMMARY ────────────────────────────────────────────
 function SIHistoryRow({si, isDone, techName, onUpdateSI}) {
   const [open, setOpen] = React.useState(false);
-  const [editingComp, setEditingComp] = React.useState(null);
-
-  const startEditComp = () => {
-    const comp = si.tech_components || {masuk:[{type:'RAM',spec:'',brand:'',notes:''}],keluar:[{type:'RAM',spec:'',brand:'',notes:''}]};
-    setEditingComp({masuk:[...(comp.masuk||[])],keluar:[...(comp.keluar||[])]});
-  };
-  const cancelEditComp = () => setEditingComp(null);
-  const saveEditComp = async () => {
-    const oldComp = si.tech_components || {};
-    const editEntry = {at:new Date().toISOString(),by:techName,masuk_before:oldComp.masuk||[],keluar_before:oldComp.keluar||[],masuk_after:editingComp.masuk||[],keluar_after:editingComp.keluar||[]};
-    const newComp = {...oldComp,masuk:editingComp.masuk,keluar:editingComp.keluar,edits:[...(oldComp.edits||[]),editEntry]};
-    await onUpdateSI(si.id,{tech_components:newComp});
-    setEditingComp(null);
-  };
 
   return (
     <div style={{borderBottom:'1px solid var(--border)'}}>
@@ -7234,30 +7260,14 @@ function SIHistoryRow({si, isDone, techName, onUpdateSI}) {
           {isDone && !si.tech_note && (
             <div style={{fontSize:12,color:'var(--text3)',fontStyle:'italic'}}>— Catatan tindakan belum diisi —</div>
           )}
-          {/* Log Komponen */}
-          {editingComp ? (
-            <div style={{marginTop:10}}>
-              <ComponentsForm value={editingComp} onChange={setEditingComp}/>
-              <div style={{display:'flex',gap:8,marginTop:8}}>
-                <button className="btn-secondary btn-sm" onClick={cancelEditComp}>Batal</button>
-                <button className="btn-green btn-sm" onClick={saveEditComp}>💾 Simpan</button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <CompLogDisplay comp={si.tech_components} verified={si.tech_components_verified} onVerify={null} supervisorName={null} canVerify={false} showHistory={false}/>
-              {onUpdateSI && si.tech_components && !si.tech_components_verified && (
-                <div style={{marginTop:6,display:'flex',alignItems:'center',gap:10}}>
-                  <span style={{fontSize:11,color:'var(--text3)',fontStyle:'italic'}}>⏳ Menunggu verifikasi supervisor</span>
-                  <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={startEditComp}>✏️ Edit Komponen</button>
-                </div>
-              )}
-              {onUpdateSI && !si.tech_components && !si.tech_components_verified && (
-                <button className="btn-secondary btn-sm" style={{fontSize:11,marginTop:8}} onClick={startEditComp}>+ Isi Log Komponen</button>
-              )}
-              {si.tech_components_verified && <div style={{marginTop:4,fontSize:11,color:'var(--green)'}}>🔒 Log komponen dikunci supervisor</div>}
-            </>
-          )}
+          {/* Log Komponen — notes bisa langsung diedit kalau belum diverifikasi */}
+          <CompLogDisplay
+            comp={si.tech_components}
+            verified={si.tech_components_verified}
+            onVerify={null} supervisorName={null} canVerify={false} showHistory={false}
+            onSaveNotes={onUpdateSI && !si.tech_components_verified ? (newComp)=>onUpdateSI(si.id,{tech_components:newComp}) : null}
+          />
+          {si.tech_components_verified && <div style={{marginTop:4,fontSize:11,color:'var(--green)'}}>🔒 Log komponen dikunci supervisor</div>}
         </div>
       )}
     </div>
@@ -7349,13 +7359,12 @@ function TechnicianSummary({orders, serviceIntakes, techName, onUpdate, onUpdate
                 </div>
               ) : (
                 <>
-                  <CompLogDisplay comp={o.tech_components} verified={o.tech_components_verified} onVerify={null} supervisorName={null} canVerify={false} showHistory={false}/>
-                  {o.tech_components && !o.tech_components_verified && (
-                    <div style={{marginTop:6,display:'flex',alignItems:'center',gap:10}}>
-                      <span style={{fontSize:11,color:'var(--text3)',fontStyle:'italic'}}>⏳ Menunggu verifikasi supervisor</span>
-                      <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={()=>startEdit(o.id, o.tech_components)}>✏️ Edit</button>
-                    </div>
-                  )}
+                  <CompLogDisplay
+                    comp={o.tech_components}
+                    verified={o.tech_components_verified}
+                    onVerify={null} supervisorName={null} canVerify={false} showHistory={false}
+                    onSaveNotes={!o.tech_components_verified ? (newComp)=>onUpdate(o.id,{tech_components:newComp}) : null}
+                  />
                   {o.tech_components_verified && <div style={{marginTop:4,fontSize:11,color:'var(--green)'}}>🔒 Dikunci — tidak bisa diedit</div>}
                 </>
               )}
