@@ -3427,7 +3427,9 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
   const [filterTech, setFilterTech] = React.useState('all');
   const [tab, setTab] = React.useState('orders'); // 'orders' | 'service'
 
+  // Always show all known technicians, plus anyone who has historical jobs
   const allTechs = [...new Set([
+    ...TEKNISI_LIST,
     ...techOrders.map(o=>o.tech_name),
     ...techSI.map(si=>si.tech_assigned)
   ].filter(Boolean))];
@@ -3448,9 +3450,16 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
       {/* Filter teknisi */}
       <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
         <button className={filterTech==='all'?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilterTech('all')}>Semua Teknisi</button>
-        {allTechs.map(n=>(
-          <button key={n} className={filterTech===n?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilterTech(n)}>{n}</button>
-        ))}
+        {allTechs.map(n=>{
+          const orderCount = techOrders.filter(o=>o.tech_name===n).length;
+          const siCount    = techSI.filter(si=>si.tech_assigned===n).length;
+          const total      = orderCount + siCount;
+          return (
+            <button key={n} className={filterTech===n?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilterTech(n)}>
+              {n}{total>0?` (${total})`:''}
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab: Orderan vs Servis */}
@@ -3515,7 +3524,9 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                 </div>
                 <div style={{textAlign:'right'}}>
                   {si.tech_assigned && <div style={{fontSize:12,color:'var(--amber)',fontWeight:600}}>🔧 {si.tech_assigned}</div>}
-                  <span className="badge badge-tech" style={{marginTop:4,display:'inline-block'}}>{si.status}</span>
+                  <span className={`badge ${si.status==='done'?'badge-delivered':si.status==='to_technician'?'badge-tech':'badge-prep'}`} style={{marginTop:4,display:'inline-block'}}>
+                    {{'received':'Diterima','to_technician':'Di Teknisi','post_sc_checking':'Cek Pasca SC','to_service_center':'Ke Service Center','at_service_center':'Di Service Center','done':'Selesai','returned':'Dikembalikan'}[si.status]||si.status}
+                  </span>
                 </div>
               </div>
               <CompLogDisplay
@@ -6603,7 +6614,14 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
 
   return (
     <div style={{maxWidth:700}}>
-      <div className="section-title">🔧 Pekerjaan Saya</div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+        <div className="section-title" style={{margin:0}}>🔧 Pekerjaan Saya</div>
+        <div style={{fontSize:12,color:'var(--text3)'}}>
+          {myJobs.length+myServiceJobs.length === 0
+            ? <span style={{color:'var(--green)'}}>✅ Tidak ada pekerjaan aktif</span>
+            : <span style={{color:'var(--amber)'}}>⏳ {myJobs.length+myServiceJobs.length} pekerjaan aktif</span>}
+        </div>
+      </div>
 
       {/* ── Servisan ── */}
       {myServiceJobs.length>0 && (
