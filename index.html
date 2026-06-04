@@ -797,16 +797,24 @@ function CameraCapture({type, onCapture, onClose}) {
   // Stamp waktu + GPS langsung ke foto, lalu kirim ke onCapture
   const confirm = async () => {
     setStamping(true);
-    // Tunggu GPS max 6 detik kalau masih loading
+    // Tunggu GPS max 10 detik kalau masih loading
     if (gpsRef.current?.status==='loading') {
       await new Promise(res => {
         let elapsed=0;
         const t = setInterval(()=>{
           elapsed+=200;
-          if (gpsRef.current?.status!=='loading' || elapsed>=6000) { clearInterval(t); res(); }
+          if (gpsRef.current?.status!=='loading' || elapsed>=10000) { clearInterval(t); res(); }
         }, 200);
       });
     }
+    // ─── GPS WAJIB ─────────────────────────────────────────────────
+    if (!gpsRef.current || gpsRef.current.status!=='ok') {
+      setStamping(false);
+      const errMsg = gpsRef.current?.error || 'GPS tidak terdeteksi';
+      alert('❌ Lokasi GPS wajib untuk absensi!\n\n' + errMsg + '\n\nCara mengaktifkan:\n• Izinkan akses lokasi di browser (Allow Location)\n• Aktifkan GPS / WiFi di HP\n• Buka kamera absensi lagi');
+      return;
+    }
+    // ───────────────────────────────────────────────────────────────
     // Stamp waktu + GPS ke foto
     const stamped = await new Promise(resolve => {
       const img = new Image();
@@ -904,22 +912,45 @@ function CameraCapture({type, onCapture, onClose}) {
           </div>
         )}
         {preview&&!stamping&&(
-          <div style={{display:'flex',gap:12}}>
-            <button onClick={retake}
-              style={{flex:1,padding:'13px',borderRadius:10,background:'rgba(255,255,255,0.12)',color:'#fff',
-                border:'1px solid rgba(255,255,255,0.2)',cursor:'pointer',fontWeight:600,fontSize:14}}>
-              🔄 Foto Ulang
-            </button>
-            <button onClick={confirm}
-              style={{flex:1,padding:'13px',borderRadius:10,background:type==='in'?'#22c55e':'#f97316',
-                color:'#fff',border:'none',cursor:'pointer',fontWeight:700,fontSize:14}}>
-              ✅ Pakai Foto Ini
-            </button>
+          <div>
+            {/* GPS status banner on preview */}
+            {gps?.status==='error'&&(
+              <div style={{marginBottom:10,padding:'10px 14px',background:'rgba(239,68,68,0.25)',border:'1px solid rgba(239,68,68,0.5)',borderRadius:10,textAlign:'center'}}>
+                <div style={{color:'#fca5a5',fontWeight:700,fontSize:13}}>❌ Lokasi GPS tidak tersedia</div>
+                <div style={{color:'rgba(255,255,255,0.7)',fontSize:11,marginTop:3}}>{gps.error}</div>
+                <div style={{color:'rgba(255,255,255,0.55)',fontSize:11,marginTop:4}}>Aktifkan GPS/lokasi lalu foto ulang</div>
+              </div>
+            )}
+            {gps?.status==='loading'&&(
+              <div style={{marginBottom:10,padding:'8px 14px',background:'rgba(245,158,11,0.2)',border:'1px solid rgba(245,158,11,0.4)',borderRadius:10,textAlign:'center'}}>
+                <div style={{color:'#fcd34d',fontSize:12}}>📡 Sedang mencari lokasi GPS...</div>
+              </div>
+            )}
+            {gps?.status==='ok'&&(
+              <div style={{marginBottom:10,padding:'7px 12px',background:'rgba(34,197,94,0.15)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:10}}>
+                <div style={{color:'#4ade80',fontSize:11,fontWeight:600}}>✅ {gps.address||`${gps.lat.toFixed(5)},${gps.lng.toFixed(5)}`} (±{gps.acc}m)</div>
+              </div>
+            )}
+            <div style={{display:'flex',gap:12}}>
+              <button onClick={retake}
+                style={{flex:1,padding:'13px',borderRadius:10,background:'rgba(255,255,255,0.12)',color:'#fff',
+                  border:'1px solid rgba(255,255,255,0.2)',cursor:'pointer',fontWeight:600,fontSize:14}}>
+                🔄 Foto Ulang
+              </button>
+              <button onClick={confirm} disabled={!gps||gps.status==='error'}
+                style={{flex:1,padding:'13px',borderRadius:10,
+                  background:(!gps||gps.status==='error')?'rgba(255,255,255,0.1)':type==='in'?'#22c55e':'#f97316',
+                  color:(!gps||gps.status==='error')?'rgba(255,255,255,0.3)':'#fff',
+                  border:'none',cursor:(!gps||gps.status==='error')?'not-allowed':'pointer',fontWeight:700,fontSize:14,
+                  opacity:(!gps||gps.status==='error')?0.5:1}}>
+                {(!gps||gps.status==='loading')?'📡 Tunggu GPS...':gps.status==='error'?'❌ GPS Diperlukan':'✅ Pakai Foto Ini'}
+              </button>
+            </div>
           </div>
         )}
         {!preview&&!camErr&&!starting&&(
-          <div style={{textAlign:'center',marginTop:10,fontSize:11,color:'rgba(255,255,255,0.4)'}}>
-            Wajib foto live — lokasi & waktu otomatis ter-stamp di foto
+          <div style={{textAlign:'center',marginTop:10,fontSize:11,color:gps?.status==='ok'?'rgba(74,222,128,0.7)':gps?.status==='error'?'rgba(252,165,165,0.8)':'rgba(255,255,255,0.4)'}}>
+            {gps?.status==='ok'?'✅ GPS aktif — foto & lokasi akan ter-stamp':gps?.status==='error'?'❌ GPS wajib! Aktifkan lokasi lalu buka kamera lagi':'📡 Mendeteksi GPS... pastikan lokasi aktif'}
           </div>
         )}
       </div>
