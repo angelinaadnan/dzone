@@ -683,9 +683,9 @@ function App() {
 
     try {
       showToast('🧹 Bersihkan attendance...'); await cleanCol('attendance','check_in_photo'); await cleanCol('attendance','check_out_photo');
-      showToast('🧹 Bersihkan courier tasks...'); await cleanCol('courier_tasks','arrival_photo'); await cleanCol('courier_tasks','departure_photo');
+      showToast('🧹 Bersihkan courier tasks...'); await cleanCol('courier_tasks','completion_photo');
       showToast('🧹 Bersihkan orders...'); await cleanCol('orders','delivery_photo');
-      showToast('🧹 Bersihkan service intakes...'); await cleanCol('service_intakes','intake_photo'); await cleanCol('service_intakes','completion_photo');
+      showToast('🧹 Bersihkan service intakes...'); await cleanCol('service_intakes','pickup_arrival_photo'); await cleanCol('service_intakes','sc_receipt_photo'); await cleanCol('service_intakes','sc_pickup_photo'); await cleanCol('service_intakes','return_photo');
       showToast('🧹 Bersihkan branch requests...'); await cleanJsonbPhoto('branch_requests','trips','photo');
       showToast('🧹 Bersihkan purchase orders...'); await cleanJsonbPhoto('purchase_orders','pickups','arrival_photo');
       showToast(`✅ Selesai! ${total} foto base64 dibersihkan.`, 'success');
