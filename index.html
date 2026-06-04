@@ -187,8 +187,7 @@ async function uploadPhoto(base64DataUrl, folder='misc', retry=0, onStatus=null)
 // Dipakai untuk NPWP & PO file agar tidak disimpan sebagai base64 di DB
 async function uploadDocument(file, folder='docs') {
   if (!file) return null;
-  const toBase64 = (f) => new Promise(res=>{ const r=new FileReader(); r.onloadend=()=>res(r.result); r.readAsDataURL(f); });
-  if (!db) return toBase64(file);
+  if (!db) { console.warn('uploadDocument: db not ready, skipping'); return null; }
   try {
     const isPdf = file.type.includes('pdf');
     const ext = isPdf ? 'pdf' : file.type.includes('png') ? 'png' : 'jpg';
@@ -196,12 +195,12 @@ async function uploadDocument(file, folder='docs') {
     const { error } = await db.storage.from('photos').upload(name, file, {
       contentType: file.type, upsert: false,
     });
-    if (error) { console.warn('uploadDocument storage error:', error.message); return toBase64(file); }
+    if (error) { console.warn('uploadDocument storage error:', error.message); return null; }
     const { data: urlData } = db.storage.from('photos').getPublicUrl(name);
     return urlData.publicUrl;
   } catch(e) {
-    console.warn('uploadDocument fallback to base64:', e);
-    return toBase64(file);
+    console.warn('uploadDocument failed:', e);
+    return null;
   }
 }
 
@@ -700,11 +699,11 @@ function App() {
     try {
       showToast('🧹 Bersihkan attendance...'); await cleanCol('attendance','check_in_photo'); await cleanCol('attendance','check_out_photo');
       showToast('🧹 Bersihkan courier tasks...'); await cleanCol('courier_tasks','completion_photo');
-      showToast('🧹 Bersihkan orders...'); await cleanCol('orders','delivery_photo'); await cleanCol('orders','admin_photo'); await cleanCol('orders','tech_photo'); await cleanTextArrayCol('orders','tech_photos');
+      showToast('🧹 Bersihkan orders...'); await cleanCol('orders','delivery_photo'); await cleanCol('orders','admin_photo'); await cleanCol('orders','tech_photo'); await cleanTextArrayCol('orders','tech_photos'); await cleanCol('orders','npwp_file'); await cleanCol('orders','po_file'); await cleanCol('orders','proforma_file');
       showToast('🧹 Bersihkan service intakes...'); await cleanCol('service_intakes','pickup_arrival_photo'); await cleanCol('service_intakes','sc_receipt_photo'); await cleanCol('service_intakes','sc_pickup_photo'); await cleanCol('service_intakes','return_photo'); await cleanCol('service_intakes','tech_photo'); await cleanCol('service_intakes','handover_photo');
       showToast('🧹 Bersihkan branch requests...'); await cleanJsonbPhoto('branch_requests','trips','photo');
       showToast('🧹 Bersihkan purchase orders...'); await cleanJsonbPhoto('purchase_orders','pickups','arrival_photo');
-      showToast(`✅ Selesai! ${total} foto base64 dibersihkan.`, 'success');
+      showToast(`✅ Selesai! ${total} foto/dokumen base64 dibersihkan.`, 'success');
     } catch(e) { showToast('Error cleanup: '+e.message,'error'); }
     setCleanupRunning(false);
   };
@@ -5110,7 +5109,7 @@ function MyOrders({orders, onSelect, onUpdate, currentUser}) {
     await onUpdate(o.id,{
       status:'delivered',
       delivered_at: new Date().toISOString(),
-      delivery_photo: url||serahPhoto[o.id],
+      delivery_photo: url||null,
       assigned_to:'self_pickup',
       courier_name: currentUser,
       status_note:`Diserahkan langsung oleh ${currentUser}`,
@@ -6132,16 +6131,17 @@ function OpsAssign({orders, onUpdate}) {
                 />
                 {d.photo && <img src={d.photo} style={{width:'100%',maxHeight:140,objectFit:'cover',borderRadius:8,display:'block',border:'2px solid var(--green)'}} alt="bukti"/>}
               </div>
-              <button className="btn-green btn-sm" style={{width:'100%',fontWeight:700,opacity:d.photo?1:0.5}} onClick={()=>{
+              <button className="btn-green btn-sm" style={{width:'100%',fontWeight:700,opacity:d.photo?1:0.5}} onClick={async()=>{
                 if(!d.photo){alert('Upload foto bukti serah terima dulu');return;}
                 const nama = d.name?.trim()||o.customer_name;
                 if(!window.confirm(`Konfirmasi barang sudah diserahkan ke ${nama}? Order akan langsung selesai.`)) return;
+                const photoUrl = await uploadPhoto(d.photo,'delivery');
                 onUpdate(o.id,{
                   status:'delivered',
                   assigned_to:'self_pickup',
                   courier_name:'Ambil Sendiri',
                   delivered_at:new Date().toISOString(),
-                  delivery_photo:d.photo,
+                  delivery_photo:photoUrl||null,
                   status_note:`Pickup sendiri — diterima oleh ${nama}`,
                 });
                 setAssignData(dd=>({...dd,[o.id]:{}}));
@@ -10712,9 +10712,9 @@ function BranchTitipKirimForm({onSave, onCancel, branchName, onToast}) {
         {/* Proforma Invoice — selalu tampil */}
         <div style={{marginBottom:12,padding:'10px 12px',background:'rgba(59,130,246,0.07)',borderRadius:8,border:'1px solid rgba(59,130,246,0.2)'}}>
           <label style={{fontWeight:600,color:'var(--blue)'}}>📎 Proforma Invoice (foto / PDF)</label>
-          <input type="file" accept="image/*,application/pdf" style={{marginTop:6,width:'100%'}} onChange={e=>{
+          <input type="file" accept="image/*,application/pdf" style={{marginTop:6,width:'100%'}} onChange={async e=>{
             const f=e.target.files[0]; if(!f) return;
-            const r=new FileReader(); r.onloadend=()=>set('proforma_file',r.result); r.readAsDataURL(f);
+            set('proforma_file', await uploadDocument(f,'proforma'));
           }}/>
           {form.proforma_file
             ? <div style={{marginTop:4,fontSize:11,color:'var(--green)'}}>✓ Proforma terlampir</div>
