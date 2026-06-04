@@ -3379,6 +3379,15 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                   <span className={`badge ${STATUS_COLORS[o.status]||'badge-new'}`} style={{marginTop:4,display:'inline-block'}}>{STATUS_LABELS[o.status]||o.status}</span>
                 </div>
               </div>
+              {o.tech_note&&<div style={{fontSize:12,color:'var(--text2)',marginTop:6,padding:'6px 10px',background:'var(--bg3)',borderRadius:6,fontStyle:'italic'}}>📝 {o.tech_note}</div>}
+              {SALES_AO.includes(o.sales_name)&&<div style={{fontSize:11,fontWeight:700,color:'var(--teal)',marginTop:4}}>🤝 Pickup — {o.sales_name} · {o.delivery_method}</div>}
+              {((o.tech_photos&&o.tech_photos.length>0)?o.tech_photos:[o.tech_photo]).filter(Boolean).length>0&&(
+                <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>
+                  {((o.tech_photos&&o.tech_photos.length>0)?o.tech_photos:[o.tech_photo]).filter(Boolean).map((p,i)=>(
+                    <img key={i} src={p} style={{width:80,height:60,objectFit:'cover',borderRadius:6,border:'1px solid var(--border2)',cursor:'pointer'}} onClick={()=>window.open(p,'_blank')} alt={`foto ${i+1}`}/>
+                  ))}
+                </div>
+              )}
               <CompLogDisplay
                 comp={o.tech_components}
                 verified={o.tech_components_verified}
@@ -6469,7 +6478,7 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
   const removePhoto   = (id, idx) => setPhotoData(d=>({...d,[id]:(d[id]||[]).filter((_,i)=>i!==idx)}));
   const removeSIPhoto = (id, idx) => setSiPhotoData(d=>({...d,[id]:(d[id]||[]).filter((_,i)=>i!==idx)}));
 
-  const markDone = (o) => {
+  const markDone = async (o) => {
     const photos = photoData[o.id]||[];
     if (!photos.length) { alert('Upload foto instalasi/upgrade dulu (min. 1 foto)'); return; }
     const comp = components[o.id];
@@ -6479,11 +6488,14 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
       recorded_at: new Date().toISOString(),
       recorded_by: techName,
     } : null;
+    // Upload all photos to storage
+    const uploadedPhotos = await Promise.all(photos.map(p=>uploadPhoto(p,'tech_done')));
     onUpdate(o.id,{
       status:'tech_done',
       status_note:'Instalasi selesai. '+(note[o.id]||''),
-      tech_photo:  photos[0],   // backward compat — first photo
-      tech_photos: photos,      // full array
+      tech_note:   note[o.id]||'',
+      tech_photo:  uploadedPhotos[0]||photos[0],
+      tech_photos: uploadedPhotos.map((u,i)=>u||photos[i]),
       ...(validComp && (validComp.masuk.length>0||validComp.keluar.length>0) ? {tech_components: validComp} : {}),
     });
   };
@@ -6574,6 +6586,9 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
                 <div>
                   <div style={{fontWeight:600,fontSize:15}}>{o.customer_name}</div>
                   <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>📞 {o.customer_phone}</div>
+                  {SALES_AO.includes(o.sales_name)&&o.delivery_method==='Di Pickup Sendiri'&&(
+                    <div style={{fontSize:11,fontWeight:700,color:'var(--teal)',marginTop:3}}>🤝 Pickup — serahkan ke {o.sales_name} setelah selesai</div>
+                  )}
                 </div>
                 <span className="badge badge-tech">{STATUS_LABELS.tech}</span>
               </div>
