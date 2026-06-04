@@ -231,13 +231,13 @@ const USER_ACCOUNTS = [
   {name:'TC FAJAR',  role:'cabang',  password:'fajar38'},
   {name:'TC ALDO',   role:'cabang',  password:'aldo39'},
   {name:'TC MAHESA', role:'cabang',  password:'mahesa40'},
-  {name:'TC GITA',   role:'cabang',  password:'gita41'},
+  {name:'GITA',      role:'absensi_only', password:'gitasafitri'},
   {name:'RAFAL',     role:'absensi_only', password:'rafal41'},
 ];
 // Branch groups — PS (Poins) and TC (Dusit) are siloed; cannot see each other's data
 const BRANCH_GROUPS = {
   PS: ['PS TITI','PS DARTIK','PS DWI'],
-  TC: ['TC RIZAL','TC ULIN','TC APRIL','TC LUVI','TC RIA','TC ICHA','TC ARYA','TC DEFA','TC SANDI','TC FAJAR','TC ALDO','TC MAHESA','TC GITA'],
+  TC: ['TC RIZAL','TC ULIN','TC APRIL','TC LUVI','TC RIA','TC ICHA','TC ARYA','TC DEFA','TC SANDI','TC FAJAR','TC ALDO','TC MAHESA'],
 };
 const getBranchGroup   = function(name){ var keys=Object.keys(BRANCH_GROUPS); for(var i=0;i<keys.length;i++){ if(BRANCH_GROUPS[keys[i]].indexOf(name)>=0) return keys[i]; } return null; };
 const getBranchMembers = function(name){ var g=getBranchGroup(name); return g?BRANCH_GROUPS[g]:[name]; };
@@ -946,7 +946,8 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
 
   const myToday   = attendance.find(a=>a.user_name===userName && a.date===todayStr);
   const myHistory = attendance.filter(a=>a.user_name===userName && a.date!==todayStr).slice(0,60);
-  const allUsers  = USER_ACCOUNTS.filter(u=>u.name && u.name!=='Supervisor');
+  const allUsers  = USER_ACCOUNTS.filter(u=>u.name && u.name!=='Supervisor' && u.role!=='absensi_only');
+  const lainnyaUsers = USER_ACCOUNTS.filter(u=>u.role==='absensi_only');
   const dayRecs   = attendance.filter(a=>a.date===selDate&&(canViewAll||a.user_name===userName));
   const getRecord = (name)=>dayRecs.find(a=>a.user_name===name)||null;
 
@@ -1224,6 +1225,59 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
                   </tr>
                 );
               })}
+              {lainnyaUsers.length>0 && (
+                <>
+                  <tr>
+                    <td colSpan={11} style={{padding:'10px 11px',background:'rgba(108,99,255,0.07)',fontWeight:700,fontSize:12,color:'var(--accent2)',borderTop:'2px solid var(--border2)'}}>
+                      🗂 Lainnya ({lainnyaUsers.length} orang)
+                    </td>
+                  </tr>
+                  {lainnyaUsers.map((u,i)=>{
+                    const rec=getRecord(u.name), st=statusOf(rec);
+                    const isSelf=u.name===userName;
+                    return (
+                      <tr key={u.name} style={{borderBottom:'1px solid var(--border)',background:isSelf?'rgba(108,99,255,0.07)':i%2===0?'transparent':'rgba(255,255,255,0.015)'}}>
+                        <td style={{padding:'8px 11px',color:'var(--text3)',fontSize:11}}>—</td>
+                        <td style={{padding:'8px 11px',fontWeight:700,whiteSpace:'nowrap'}}>
+                          {u.name}{isSelf&&<span style={{fontSize:10,color:'var(--accent2)',marginLeft:5}}>▶ saya</span>}
+                        </td>
+                        <td style={{padding:'8px 11px',color:'var(--text2)',fontSize:11,whiteSpace:'nowrap'}}>Lainnya</td>
+                        <td style={{padding:'8px 11px',fontFamily:'DM Mono',fontSize:12,whiteSpace:'nowrap'}}>
+                          {fmtT(rec?.check_in)}
+                          {lateMinutes(rec)>0&&<div style={{fontSize:10,fontWeight:800,color:'var(--red)',marginTop:2}}>⏰ TELAT {lateMinutes(rec)} mnt</div>}
+                        </td>
+                        <td style={{padding:'6px 11px',maxWidth:150}}>
+                          {rec?.check_in_lat
+                            ? <a href={mapsLink(rec.check_in_lat,rec.check_in_lng)} target="_blank" rel="noreferrer" style={{fontSize:11,color:'var(--blue)',textDecoration:'none'}}>
+                                📍 {rec.check_in_address?rec.check_in_address.slice(0,28):`${rec.check_in_lat.toFixed(5)},${rec.check_in_lng.toFixed(5)}`}
+                              </a>
+                            : <span style={{color:'var(--text3)',fontSize:11}}>—</span>}
+                        </td>
+                        <td style={{padding:'5px 11px'}}>
+                          {rec?.check_in_photo
+                            ? <img src={rec.check_in_photo} style={{width:54,height:38,objectFit:'cover',borderRadius:5,border:'1px solid var(--green)',cursor:'pointer'}} onClick={()=>window.open(rec.check_in_photo)} alt="in"/>
+                            : <span style={{color:'var(--text3)',fontSize:11}}>—</span>}
+                        </td>
+                        <td style={{padding:'8px 11px',fontFamily:'DM Mono',fontSize:12,whiteSpace:'nowrap'}}>{fmtT(rec?.check_out)}</td>
+                        <td style={{padding:'6px 11px',maxWidth:150}}>
+                          {rec?.check_out_lat
+                            ? <a href={mapsLink(rec.check_out_lat,rec.check_out_lng)} target="_blank" rel="noreferrer" style={{fontSize:11,color:'var(--blue)',textDecoration:'none'}}>
+                                📍 {rec.check_out_address?rec.check_out_address.slice(0,28):`${rec.check_out_lat.toFixed(5)},${rec.check_out_lng.toFixed(5)}`}
+                              </a>
+                            : <span style={{color:'var(--text3)',fontSize:11}}>—</span>}
+                        </td>
+                        <td style={{padding:'5px 11px'}}>
+                          {rec?.check_out_photo
+                            ? <img src={rec.check_out_photo} style={{width:54,height:38,objectFit:'cover',borderRadius:5,border:'1px solid var(--coral)',cursor:'pointer'}} onClick={()=>window.open(rec.check_out_photo)} alt="out"/>
+                            : <span style={{color:'var(--text3)',fontSize:11}}>—</span>}
+                        </td>
+                        <td style={{padding:'8px 11px',color:'var(--text3)',fontSize:12,whiteSpace:'nowrap'}}>{duration(rec)||'—'}</td>
+                        <td style={{padding:'8px 11px',whiteSpace:'nowrap'}}><span style={{fontSize:12,color:st.color,fontWeight:600}}>{st.label}</span></td>
+                      </tr>
+                    );
+                  })}
+                </>
+              )}
             </tbody>
           </table>
         </div>
