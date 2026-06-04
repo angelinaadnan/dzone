@@ -4973,8 +4973,8 @@ function QuotationPage({quotations, onSave, onUpdate, onSaveOrder, salesName, on
   const [showSigModal, setShowSigModal] = React.useState(false);
   const [sigPreview, setSigPreview] = React.useState(()=>{ try{return localStorage.getItem('sig_'+salesName)||null;}catch(e){return null;} });
 
-  // Semua sales & supervisor bisa lihat semua penawaran
-  const myQ = (quotations||[]);
+  // Supervisor lihat semua, sales hanya lihat punya sendiri
+  const myQ = supervisorMode ? (quotations||[]) : (quotations||[]).filter(q=>q.sales_name===salesName);
 
   const filtered = filterStatus==='all' ? myQ : myQ.filter(q=>q.status===filterStatus);
   const counts = Object.fromEntries(Object.keys(QT_STATUS).map(s=>[s, myQ.filter(q=>q.status===s).length]));
