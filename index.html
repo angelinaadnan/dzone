@@ -174,8 +174,8 @@ const LOGO_SRC = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAArwAAAEcCAYAAAAl
 const DEMO_ORDERS = [];
 
 // ─── HELPERS ───────────────────────────────────────────────────────
-const STATUS_LABELS = { new:'New Order', invoiced:'Invoiced', prep:'In Prep', tech:'With Technician', tech_done:'Tech Selesai', on_delivery:'On Delivery', delivered:'Delivered', cancelled:'Cancelled', cancel_requested:'⏳ Minta Dibatalkan' };
-const STATUS_COLORS = { new:'badge-new', invoiced:'badge-invoiced', prep:'badge-prep', tech:'badge-tech', tech_done:'badge-teal', on_delivery:'badge-delivery', delivered:'badge-delivered', cancelled:'badge-cancelled', cancel_requested:'badge-cancelled' };
+const STATUS_LABELS = { new:'New Order', invoiced:'Invoiced', prep:'In Prep', tech:'With Technician', tech_done:'Tech Selesai', ao_serah:'Siap Serah Terima', on_delivery:'On Delivery', delivered:'Delivered', cancelled:'Cancelled', cancel_requested:'⏳ Minta Dibatalkan' };
+const STATUS_COLORS = { new:'badge-new', invoiced:'badge-invoiced', prep:'badge-prep', tech:'badge-tech', tech_done:'badge-teal', ao_serah:'badge-teal', on_delivery:'badge-delivery', delivered:'badge-delivered', cancelled:'badge-cancelled', cancel_requested:'badge-cancelled' };
 const STATUS_DOTS = { new:'#6c63ff', invoiced:'#3b82f6', prep:'#f59e0b', tech:'#14b8a6', tech_done:'#22c55e', on_delivery:'#f97316', delivered:'#22c55e', cancelled:'#ef4444', cancel_requested:'#ef4444' };
 const ROLES = ['sales','admin','ops','courier','technician','cabang','supervisor','admin_pembelian','admin_online'];
 const ROLE_LABELS = { sales:'📊 Sales', admin:'🗂 Admin', ops:'⚙️ Ops', courier:'🚚 Kurir', technician:'🔧 Teknisi', cabang:'🏢 Cabang', supervisor:'👁 Supervisor', admin_pembelian:'🛒 Admin Pembelian', admin_online:'🌐 Admin Online', absensi_only:'🗓 Staff' };
@@ -4624,11 +4624,84 @@ function QuotationPage({quotations, onSave, onUpdate, onSaveOrder, salesName, on
 // ─── MY ORDERS (Sales view) ────────────────────────────────────────
 function MyOrders({orders, onSelect, onUpdate, currentUser}) {
   const [revisingOrder, setRevisingOrder] = React.useState(null);
+  const [serahPhoto, setSerahPhoto]       = React.useState({}); // {id: base64}
+  const [serahSaving, setSerahSaving]     = React.useState({});
+
+  const isAO = SALES_AO.includes(currentUser);
+  const aoSerahOrders = isAO ? orders.filter(o=>o.status==='ao_serah') : [];
+  const otherOrders   = isAO ? orders.filter(o=>o.status!=='ao_serah') : orders;
+
+  const doSerahTerima = async (o) => {
+    if (!serahPhoto[o.id]) { alert('Wajib upload foto bukti serah terima dulu'); return; }
+    if (!window.confirm(`Konfirmasi barang sudah diserahkan ke ${o.customer_name}?`)) return;
+    setSerahSaving(s=>({...s,[o.id]:true}));
+    const url = await uploadPhoto(serahPhoto[o.id],'delivery');
+    await onUpdate(o.id,{
+      status:'delivered',
+      delivered_at: new Date().toISOString(),
+      delivery_photo: url||serahPhoto[o.id],
+      assigned_to:'self_pickup',
+      courier_name: currentUser,
+      status_note:`Diserahkan langsung oleh ${currentUser}`,
+    });
+    setSerahSaving(s=>({...s,[o.id]:false}));
+    setSerahPhoto(p=>({...p,[o.id]:null}));
+  };
+
   return (
     <div style={{maxWidth:900}}>
       <div className="section-title">📦 My Orders</div>
-      {orders.length===0 && <div className="empty-state"><div className="icon">📭</div><div>Belum ada order</div></div>}
-      {orders.map(o=>(
+
+      {/* ── Siap Serah Terima (Ade/Lili only) ── */}
+      {aoSerahOrders.length>0&&(
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:13,fontWeight:700,color:'var(--teal)',marginBottom:10,padding:'8px 12px',background:'rgba(20,184,166,0.07)',border:'1px solid rgba(20,184,166,0.2)',borderRadius:8}}>
+            🤝 {aoSerahOrders.length} Order Siap Diserahkan ke Customer — Butuh Foto Bukti
+          </div>
+          {aoSerahOrders.map(o=>(
+            <div key={o.id} className="card" style={{marginBottom:12,borderLeft:'4px solid var(--teal)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600,fontSize:15}}>{o.customer_name}</div>
+                  <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{fmtDate(o.date)} · {o.invoice_number||'—'}</div>
+                  <div style={{fontSize:12,marginTop:4}}>{(o.goods||[]).map(g=>`${g.qty}× ${g.name}`).join(', ')}</div>
+                  {o.customer_address&&<div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>📍 {o.customer_address}</div>}
+                  {o.tech_name&&<div style={{fontSize:11,color:'var(--teal)',marginTop:2}}>🔧 Selesai dari Teknisi {o.tech_name}</div>}
+                </div>
+                <div style={{fontFamily:'Syne',fontWeight:800,fontSize:15,color:'var(--accent2)',flexShrink:0}}>{fmtCurrency(totalOrder(o.goods))}</div>
+              </div>
+              {/* Serah terima area */}
+              <div style={{marginTop:12,padding:'12px',background:'rgba(20,184,166,0.06)',border:'1px solid rgba(20,184,166,0.2)',borderRadius:8}}>
+                <div style={{fontSize:12,fontWeight:700,color:'var(--teal)',marginBottom:8}}>📸 Foto Bukti Serah Terima <span style={{color:'var(--red)'}}>*</span></div>
+                <input type="file" accept="image/*" capture="environment"
+                  onChange={e=>{
+                    const f=e.target.files[0]; if(!f) return;
+                    const r=new FileReader();
+                    r.onloadend=()=>setSerahPhoto(p=>({...p,[o.id]:r.result}));
+                    r.readAsDataURL(f);
+                  }}
+                  style={{marginBottom:8,display:'block'}}
+                />
+                {serahPhoto[o.id]&&(
+                  <img src={serahPhoto[o.id]} style={{width:'100%',maxHeight:160,objectFit:'cover',borderRadius:8,border:'2px solid var(--teal)',marginBottom:10,display:'block'}} alt="bukti"/>
+                )}
+                <button
+                  className="btn-primary"
+                  style={{width:'100%',background:'var(--teal)',borderColor:'var(--teal)',fontWeight:700,opacity:serahPhoto[o.id]?1:0.4}}
+                  disabled={serahSaving[o.id]}
+                  onClick={()=>doSerahTerima(o)}
+                >
+                  {serahSaving[o.id]?'Menyimpan...':'✅ Konfirmasi Serah Terima'}
+                </button>
+              </div>
+            </div>
+          ))}
+          <hr className="divider"/>
+        </div>
+      )}
+
+      {otherOrders.length===0&&aoSerahOrders.length===0 && <div className="empty-state"><div className="icon">📭</div><div>Belum ada order</div></div>}
+      {otherOrders.map(o=>(
         <div key={o.id} className="card" style={{marginBottom:8,cursor:'pointer'}} onClick={()=>onSelect(o)}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
             <div style={{fontFamily:'DM Mono',fontSize:11,color:'var(--text3)',flexShrink:0}}>#{o.id?.slice(-6)}</div>
@@ -5140,25 +5213,74 @@ function AdminInvoicing({orders, onUpdate, onSelect}) {
 
 // ─── ADMIN ONLINE INVOICING ────────────────────────────────────────
 function AdminOnlineInvoicing({orders, onUpdate, onSelect}) {
-  // Hanya tampilkan order dari sales yang di-routing ke Admin Online (Ade, Lili, dst)
   const pending = orders.filter(o=>o.status==='new' && SALES_AO.includes(o.sales_name));
+  // Pickup orders from Ade/Lili that finished tech — waiting to route to ao_serah
+  const techDonePickup = orders.filter(o=>
+    o.status==='tech_done' && SALES_AO.includes(o.sales_name) && o.delivery_method==='Di Pickup Sendiri'
+  );
   const [photoData, setPhotoData] = useState({});
   const [invoiceNum, setInvoiceNum] = useState({});
+  const [techPick, setTechPick]   = useState({}); // {id: techName} for pickup+install routing
+
   const handlePhoto = (id,e) => {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => setPhotoData(d=>({...d,[id]:reader.result}));
     reader.readAsDataURL(file);
   };
+
+  const handleInvoiceRoute = async (o, route) => {
+    if (!invoiceNum[o.id]) { alert('Isi No. Invoice dulu'); return; }
+    if (route==='tech' && !techPick[o.id]) { alert('Pilih nama teknisi dulu'); return; }
+    const url = await uploadPhoto(photoData[o.id]||null,'invoice');
+    const base = {invoice_number:invoiceNum[o.id], admin_photo:url||null};
+    if (route==='tech') {
+      onUpdate(o.id,{...base, status:'tech', tech_name:techPick[o.id], assigned_to:'tech',
+        status_note:`Invoice ${invoiceNum[o.id]} — perlu instalasi, ke Teknisi ${techPick[o.id]}`});
+    } else {
+      onUpdate(o.id,{...base, status:'ao_serah',
+        status_note:`Invoice ${invoiceNum[o.id]} — siap serah terima oleh ${o.sales_name}`});
+    }
+  };
+
+  const inp12 = {padding:'6px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12};
+
   return (
     <div style={{maxWidth:900}}>
       <div className="section-title">🧾 Invoicing <span style={{fontSize:12,fontWeight:400,color:'var(--blue)'}}>Admin Online</span> <span style={{fontSize:14,fontWeight:400,color:'var(--text2)',fontFamily:'DM Sans'}}>({pending.length} pending)</span></div>
       <div style={{marginBottom:14,padding:'8px 14px',background:'rgba(99,102,241,0.07)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:8,fontSize:12,color:'var(--accent)'}}>
         📌 Menampilkan order dari: <b>{SALES_AO.join(', ')}</b>
       </div>
+
+      {/* ── Teknisi Selesai — Pickup Ade/Lili ── */}
+      {techDonePickup.length>0&&(
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:13,fontWeight:700,color:'var(--teal)',marginBottom:10}}>🔧 Teknisi Selesai — Siap Diserahkan ({techDonePickup.length})</div>
+          {techDonePickup.map(o=>(
+            <div key={o.id} className="card" style={{marginBottom:10,borderLeft:'3px solid var(--teal)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
+                <div>
+                  <div style={{fontWeight:600}}>{o.customer_name}</div>
+                  <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{o.sales_name} · {fmtDate(o.date)} · {o.delivery_method}</div>
+                  {o.tech_name&&<div style={{fontSize:12,color:'var(--teal)',marginTop:2}}>🔧 Teknisi: {o.tech_name}</div>}
+                  <div style={{fontSize:12,marginTop:4}}>{(o.goods||[]).map(g=>`${g.qty}× ${g.name}`).join(', ')}</div>
+                </div>
+                <button className="btn-green btn-sm" style={{fontWeight:700}} onClick={()=>
+                  onUpdate(o.id,{status:'ao_serah', status_note:`Teknisi selesai — siap diserahkan oleh ${o.sales_name}`})
+                }>✅ Siap Diserahkan ke {o.sales_name}</button>
+              </div>
+            </div>
+          ))}
+          <hr className="divider"/>
+        </div>
+      )}
+
       {pending.length===0 && <div className="empty-state"><div className="icon">✅</div><div>Semua order sudah diproses</div></div>}
-      {pending.map(o=>(
-        <div key={o.id} className="card" style={{marginBottom:12,borderLeft:o.faktur_pajak?'4px solid var(--blue)':''}}>
+      {pending.map(o=>{
+        const isPickup = o.delivery_method==='Di Pickup Sendiri';
+        return (
+        <div key={o.id} className="card" style={{marginBottom:12,borderLeft:isPickup?'4px solid var(--teal)':o.faktur_pajak?'4px solid var(--blue)':''}}>
+          {isPickup&&<div style={{fontSize:11,fontWeight:700,color:'var(--teal)',marginBottom:8}}>🤝 PICKUP SENDIRI — Serah terima oleh {o.sales_name}</div>}
           <div style={{display:'flex',alignItems:'flex-start',gap:14,flexWrap:'wrap'}}>
             <div style={{flex:1}}>
               <div style={{fontWeight:600,fontSize:15}}>{o.customer_name}</div>
@@ -5192,6 +5314,8 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect}) {
                 </div>
               )}
               {o.info_tambahan && <div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {o.info_tambahan}</div>}
+
+              {/* Invoice number + foto */}
               <div style={{marginTop:10,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
                 <input
                   placeholder="No. Invoice..."
@@ -5204,21 +5328,60 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect}) {
                 </label>
                 {photoData[o.id] && <span style={{fontSize:11,color:'var(--green)'}}>✓ foto ready</span>}
               </div>
+
+              {/* ── PICKUP: routing buttons ── */}
+              {isPickup&&(
+                <div style={{marginTop:12,padding:'12px',background:'rgba(20,184,166,0.06)',border:'1px solid rgba(20,184,166,0.2)',borderRadius:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--teal)',marginBottom:10}}>Pilih alur pengiriman:</div>
+                  <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                    {/* Perlu Install */}
+                    <div style={{flex:1,minWidth:180,padding:'10px',background:'var(--bg3)',borderRadius:8,border:'1px solid var(--border)'}}>
+                      <div style={{fontSize:11,fontWeight:700,marginBottom:6}}>🔧 Perlu Instalasi</div>
+                      <select style={{...inp12,width:'100%',marginBottom:8}} value={techPick[o.id]||''} onChange={e=>setTechPick(p=>({...p,[o.id]:e.target.value}))}>
+                        <option value="">— Pilih Teknisi —</option>
+                        {TEKNISI_LIST.map(t=><option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <button className="btn-secondary btn-sm" style={{width:'100%'}} onClick={()=>handleInvoiceRoute(o,'tech')}>
+                        → Kirim ke Teknisi
+                      </button>
+                    </div>
+                    {/* Langsung Serah */}
+                    <div style={{flex:1,minWidth:160,padding:'10px',background:'rgba(20,184,166,0.07)',borderRadius:8,border:'1px solid rgba(20,184,166,0.25)',display:'flex',flexDirection:'column',justifyContent:'space-between'}}>
+                      <div style={{fontSize:11,fontWeight:700,marginBottom:6,color:'var(--teal)'}}>📦 Tidak Perlu Instalasi</div>
+                      <div style={{fontSize:11,color:'var(--text2)',marginBottom:8}}>Langsung diserahkan oleh {o.sales_name}</div>
+                      <button className="btn-primary btn-sm" style={{width:'100%',background:'var(--teal)',borderColor:'var(--teal)'}} onClick={()=>handleInvoiceRoute(o,'ao_serah')}>
+                        → Langsung Serah Terima
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
-              <div style={{fontFamily:'Syne',fontWeight:800,fontSize:16,color:'var(--accent2)'}}>{fmtCurrency(totalOrder(o.goods))}</div>
-              <button className="btn-blue btn-sm" onClick={()=>onSelect(o)}>Lihat Detail</button>
-              <button className="btn-green btn-sm" onClick={async()=>{
-                if (!invoiceNum[o.id]) { alert('Isi No. Invoice dulu'); return; }
-                const invPhotoUrl2 = await uploadPhoto(photoData[o.id]||null, 'invoice');
-                onUpdate(o.id,{status:'invoiced',status_note:`Invoice ${invoiceNum[o.id]} dibuat`,invoice_number:invoiceNum[o.id],admin_photo:invPhotoUrl2||null});
-              }}>✓ Invoice Dibuat</button>
-            </div>
+
+            {/* Right column — only for non-pickup orders */}
+            {!isPickup&&(
+              <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
+                <div style={{fontFamily:'Syne',fontWeight:800,fontSize:16,color:'var(--accent2)'}}>{fmtCurrency(totalOrder(o.goods))}</div>
+                <button className="btn-blue btn-sm" onClick={()=>onSelect(o)}>Lihat Detail</button>
+                <button className="btn-green btn-sm" onClick={async()=>{
+                  if (!invoiceNum[o.id]) { alert('Isi No. Invoice dulu'); return; }
+                  const url2 = await uploadPhoto(photoData[o.id]||null,'invoice');
+                  onUpdate(o.id,{status:'invoiced',status_note:`Invoice ${invoiceNum[o.id]} dibuat`,invoice_number:invoiceNum[o.id],admin_photo:url2||null});
+                }}>✓ Invoice Dibuat</button>
+              </div>
+            )}
+            {isPickup&&(
+              <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end',minWidth:80}}>
+                <div style={{fontFamily:'Syne',fontWeight:800,fontSize:16,color:'var(--accent2)'}}>{fmtCurrency(totalOrder(o.goods))}</div>
+                <button className="btn-blue btn-sm" onClick={()=>onSelect(o)}>Lihat Detail</button>
+              </div>
+            )}
           </div>
         </div>
-      ))}
+        );
+      })}
       <hr className="divider"/>
-      <div style={{color:'var(--text2)',fontSize:13}}>Invoice sudah dibuat: {orders.filter(o=>['invoiced','prep','tech','tech_done','on_delivery','delivered'].includes(o.status)&&SALES_AO.includes(o.sales_name)).length} order</div>
+      <div style={{color:'var(--text2)',fontSize:13}}>Invoice sudah dibuat: {orders.filter(o=>['invoiced','prep','tech','tech_done','ao_serah','on_delivery','delivered'].includes(o.status)&&SALES_AO.includes(o.sales_name)).length} order</div>
     </div>
   );
 }
@@ -5288,7 +5451,7 @@ function OpsQueue({orders, onUpdate, onSelect}) {
 // ─── OPS TECH READY (Siap ke Kurir) ───────────────────────────────
 const KURIR_LIST = ['Putra','Asep','Gilang','Adit','Hendro','Munji','Sadam','Nikam'];
 function OpsTechReady({orders, onUpdate, onSelect}) {
-  const techDone = orders.filter(o=>o.status==='tech_done');
+  const techDone = orders.filter(o=>o.status==='tech_done' && !(SALES_AO.includes(o.sales_name) && o.delivery_method==='Di Pickup Sendiri'));
   const [selected, setSelected] = useState({});
   const [mode, setMode] = useState({}); // {id: 'kurir'|'self'}
   const [selfPhoto, setSelfPhoto] = useState({});
