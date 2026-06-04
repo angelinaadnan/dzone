@@ -146,11 +146,11 @@ try {
 // ─── UPLOAD FOTO KE SUPABASE STORAGE ──────────────────────────────
 // Semua foto di-upload ke bucket 'photos', database hanya simpan URL.
 // Jika upload gagal, fallback ke base64 (tidak crash).
-async function uploadPhoto(base64DataUrl, folder='misc') {
+async function uploadPhoto(base64DataUrl, folder='misc', retry=0) {
   if (!base64DataUrl) return null;
   // Kalau sudah URL (bukan base64), langsung return
   if (!base64DataUrl.startsWith('data:')) return base64DataUrl;
-  if (!db) return base64DataUrl; // fallback jika db belum siap
+  if (!db) return null;
   try {
     const res  = await fetch(base64DataUrl);
     const blob = await res.blob();
@@ -159,11 +159,22 @@ async function uploadPhoto(base64DataUrl, folder='misc') {
     const { error } = await db.storage.from('photos').upload(name, blob, {
       contentType: blob.type, upsert: false,
     });
-    if (error) { console.warn('Storage upload error:', error.message); return null; }
+    if (error) {
+      console.warn('Storage upload error:', error.message);
+      if (retry < 2) {
+        await new Promise(r=>setTimeout(r, 1500*(retry+1)));
+        return uploadPhoto(base64DataUrl, folder, retry+1);
+      }
+      return null; // gagal setelah 3x coba
+    }
     const { data: urlData } = db.storage.from('photos').getPublicUrl(name);
     return urlData.publicUrl;
   } catch(e) {
     console.warn('uploadPhoto failed:', e);
+    if (retry < 2) {
+      await new Promise(r=>setTimeout(r, 1500*(retry+1)));
+      return uploadPhoto(base64DataUrl, folder, retry+1);
+    }
     return null;
   }
 }
@@ -9501,6 +9512,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
     const startLoc = getLastCheckin();
     let loc=null; try{loc=await getGPS();}catch(e){}
     const photoUrl = await uploadPhoto(orderPhoto[o.id], 'delivery');
+    if (!photoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); setOrderDelivering(d=>({...d,[o.id]:false})); return; }
     const updates={status:'delivered',status_note:'Terkirim. '+(orderNote[o.id]||''),delivery_photo:photoUrl,delivered_at:new Date().toISOString()};
     if(loc) updates.end_location=loc;
     if(startLoc&&loc) updates.distance_km=parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2));
@@ -9926,6 +9938,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           const kmTotal=startLoc&&endLoc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng).toFixed(2)):null;
                           if(onCheckin&&endLoc) onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:`✅ Tiba jemput supplier: ${po.supplier_name}${kmTotal?' · '+kmTotal+' km':''}`});
                           const supPhotoUrl = await uploadPhoto(siPhotos[supPk], 'supplier');
+                          if (!supPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
                           const updatedPickups=(po.pickups||[]).map(t=>t.no===p.no?{...t,status:'done',arrival_photo:supPhotoUrl,start_location:startLoc,end_location:endLoc,distance_km:kmTotal,done_at:new Date().toISOString()}:t);
                           onUpdatePO(po.id,{pickups:updatedPickups,pickup:null});
                         }}>{isGpsLoading?'📡 GPS...':'✅ Tiba & Sudah Dijemput dari Supplier'}</button>
@@ -9986,6 +9999,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
                           if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`📍 Tiba di cabang: ${r.branch_name}${km?' · '+km+' km':''}`});
                           const branchPhotoUrl = await uploadPhoto(branchPhotos[bk]||null, 'branch');
+                          if (!branchPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
                           const updatedTrips=(r.trips||[]).map(t=>t.no===trip.no?{...t,status:'delivered',delivered_at:new Date().toISOString(),photo:branchPhotoUrl||null,start_location:startLoc||null,arrived_location:loc,distance_km:km}:t);
                           const allDone=updatedTrips.every(t=>t.status==='delivered');
                           const pendingItems=(r.items||[]).filter(it=>!updatedTrips.find(t=>t.status==='delivered'&&(t.items||[]).find(ti=>ti.name===it.name)));
@@ -10041,6 +10055,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Tiba & jemput di cabang: ${s.branch_name}${km?' · '+km+' km':''}`});
                         const pickupPhotoUrl = await uploadPhoto(siPhotos[k], 'si_pickup');
+                        if (!pickupPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
                         onUpdateSI(s.id,{courier_picked_up:true,courier_picked_up_at:new Date().toISOString(),pickup_arrival_photo:pickupPhotoUrl,pickup_start_location:startLoc||null,pickup_arrived_location:loc,pickup_distance_km:km});
                       }}>{gpsL?'📡 GPS...':'✅ Tiba & Sudah Dijemput dari Cabang'}</button>
                     </div>
@@ -10091,6 +10106,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Tiba di SC: ${s.service_center_name}${km?' · '+km+' km':''}`});
                         const scReceiptPhotoUrl = await uploadPhoto(siPhotos[k], 'sc_receipt');
+                        if (!scReceiptPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
                         onUpdateSI(s.id,{status:'at_service_center',sc_receipt_photo:scReceiptPhotoUrl,sc_delivered_at:new Date().toISOString(),sc_start_location:startLoc||null,sc_arrived_location:loc,sc_distance_km:km});
                       }}>{gpsL?'📡 GPS...':'✅ Tiba & Sudah Diserahkan ke SC'}</button>
                     </div>
@@ -10168,6 +10184,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Ambil dari SC: ${scName}${km?' · '+km+' km':''}`});
                         const scPickupPhotoUrl = await uploadPhoto(siPhotos[k]||null, 'sc_pickup');
+                        if (!scPickupPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
                         onUpdateSI(s.id,{status:'back_from_sc',sc_picked_up_at:new Date().toISOString(),sc_pickup_photo:scPickupPhotoUrl||null,scp_distance_km:km||null});
                       }}>{gpsL?'📡 GPS...':'✅ Tiba & Sudah Diambil dari SC'}</button>
                     </div>
@@ -10226,6 +10243,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           const dest2=s.source_type==='branch'?s.branch_name:s.customer_name;
                           if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`📍 Serah terima ke ${dest2}${rKm?' · '+rKm+' km':''}`});
                           const retPhotoUrl = await uploadPhoto(siPhotos[retKey], 'si_return');
+                          if (!retPhotoUrl) { alert('❌ Foto gagal diupload (cek koneksi internet). Coba foto ulang lalu submit lagi.'); return; }
                           onUpdateSI(s.id,{return_status:'returned',return_photo:retPhotoUrl,returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:loc,return_distance_km:rKm});
                           setRetStep('done');
                         }}>{retGpsLoading?'📡 GPS...':s.source_type==='branch'?`✅ Sudah Diserahkan ke Cabang ${s.branch_name||''}`:'✅ Konfirmasi Sudah Diserahkan ke Customer'}</button>
