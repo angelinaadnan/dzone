@@ -738,7 +738,7 @@ function App() {
 
   const loadAttendance = async (retry=0) => {
     if (!db) return;
-    const {data,error} = await db.from('attendance').select('*').order('date',{ascending:false}).limit(1000);
+    const {data,error} = await db.from('attendance').select('*').order('check_in',{ascending:false}).limit(1000);
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
