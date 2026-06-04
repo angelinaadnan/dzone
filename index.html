@@ -603,9 +603,12 @@ function App() {
 
   if (!role) return <LoginScreen onLogin={doLogin} demoMode={demoMode}/>;
 
+  const BRANCH_REQUEST_ALLOWED = ['TC RIZAL','TC LUVI'];
   const navItems = role==='supervisor' && userName==='Santo'
     ? [...ROLE_NAV[role], {id:'branch_request',icon:'📦',label:'Request Barang'}]
-    : ROLE_NAV[role];
+    : role==='cabang'
+      ? ROLE_NAV[role].filter(n=>n.id!=='branch_request'||BRANCH_REQUEST_ALLOWED.includes(userName))
+      : ROLE_NAV[role];
 
   return (
     <div style={{display:'flex',minHeight:'100vh'}}>
@@ -661,9 +664,9 @@ function App() {
         {role==='ops' && page==='op_orders' && <SupervisorOrders orders={orders} onSelect={setSelectedOrder} onUpdate={updateOrder} currentUser={userName} allowRevisi={false} hideNew={true}/>}
         {role==='ops' && page==='op_tasks' && <OpsTaskManager tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} opsName={userName} onSaveServiceIntake={saveServiceIntake} allIntakes={serviceIntakes}/>}
         {role==='ops' && page==='op_branch' && <OpsBranchManager requests={branchRequests} onUpdate={updateBranchRequest}/>}
-        {role==='supervisor' && userName==='Santo' && page==='branch_request' && <BranchRequestPage requests={branchRequests} onSave={saveBranchRequest} branchName={userName} branchMembers={[]}/>}
+        {role==='supervisor' && userName==='Santo' && page==='branch_request' && <BranchRequestPage requests={branchRequests} onSave={saveBranchRequest} onUpdate={updateBranchRequest} branchName={userName} branchMembers={[]}/>}
         {role==='cabang' && page==='branch_dashboard' && <BranchDashboard requests={branchRequests} intakes={serviceIntakes} orders={orders} branchName={userName} branchMembers={getBranchMembers(userName)} onNavigate={setPage}/>}
-        {role==='cabang' && page==='branch_request' && <BranchRequestPage requests={branchRequests} onSave={saveBranchRequest} branchName={userName} branchMembers={getBranchMembers(userName)}/>}
+        {role==='cabang' && page==='branch_request' && <BranchRequestPage requests={branchRequests} onSave={saveBranchRequest} onUpdate={updateBranchRequest} branchName={userName} branchMembers={getBranchMembers(userName)}/>}
         {role==='cabang' && page==='branch_service' && <BranchServicePage intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} branchName={userName} branchMembers={getBranchMembers(userName)}/>}
         {role==='cabang' && page==='branch_titip_kirim' && <BranchTitipKirimPage orders={orders} onSave={saveOrder} branchName={userName} branchMembers={getBranchMembers(userName)} onToast={showToast}/>}
         {role==='cabang' && page==='branch_history' && <BranchHistory requests={branchRequests} intakes={serviceIntakes} orders={orders} branchName={userName} branchMembers={getBranchMembers(userName)}/>}
@@ -10119,9 +10122,10 @@ function BranchTitipKirimPage({orders, onSave, branchName, branchMembers, onToas
   );
 }
 
-function BranchRequestForm({onSave, onCancel, branchName}) {
-  const [items, setItems] = React.useState([{name:'',qty:1,notes:''}]);
-  const [notes, setNotes] = React.useState('');
+function BranchRequestForm({onSave, onUpdate, onCancel, branchName, initialData}) {
+  const isEdit = !!initialData;
+  const [items, setItems] = React.useState(isEdit ? (initialData.items||[{name:'',qty:1,notes:''}]) : [{name:'',qty:1,notes:''}]);
+  const [notes, setNotes] = React.useState(isEdit ? (initialData.notes||'') : '');
   const [saving, setSaving] = React.useState(false);
 
   const addItem = () => setItems(prev=>[...prev,{name:'',qty:1,notes:''}]);
@@ -10133,14 +10137,18 @@ function BranchRequestForm({onSave, onCancel, branchName}) {
   const handleSave = async () => {
     if (items.some(it=>!it.name.trim())) { alert('Nama barang wajib diisi'); return; }
     setSaving(true);
-    await onSave({branch_name:branchName, created_by:branchName, items, notes, status:'pending'});
+    if (isEdit) {
+      await onUpdate(initialData.id, {items, notes});
+    } else {
+      await onSave({branch_name:branchName, created_by:branchName, items, notes, status:'pending'});
+    }
     setSaving(false);
     onCancel();
   };
 
   return (
     <div className="card" style={{maxWidth:620}}>
-      <div style={{fontWeight:700,fontSize:16,marginBottom:16}}>📦 Request Barang ke Ops</div>
+      <div style={{fontWeight:700,fontSize:16,marginBottom:16}}>{isEdit?'✏️ Edit Request Barang':'📦 Request Barang ke Ops'}</div>
       <div style={{marginBottom:4,fontSize:12,color:'var(--text2)',fontWeight:600}}>Daftar Barang yang Dibutuhkan:</div>
       {items.map((it,i)=>(
         <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 60px 1fr auto',gap:8,marginBottom:8,alignItems:'center'}}>
@@ -10160,21 +10168,23 @@ function BranchRequestForm({onSave, onCancel, branchName}) {
       <div style={{display:'flex',gap:10}}>
         <button className="btn-secondary" style={{flex:1}} onClick={onCancel}>Batal</button>
         <button className="btn-primary" style={{flex:2}} onClick={handleSave} disabled={saving}>
-          {saving?'Mengirim...':'📤 Kirim Request ke Ops'}
+          {saving?'Menyimpan...':(isEdit?'💾 Simpan Perubahan':'📤 Kirim Request ke Ops')}
         </button>
       </div>
     </div>
   );
 }
 
-function BranchRequestPage({requests, onSave, branchName, branchMembers}) {
+function BranchRequestPage({requests, onSave, onUpdate, branchName, branchMembers}) {
   const members = branchMembers || [branchName];
   const [showForm, setShowForm] = React.useState(false);
+  const [editReq, setEditReq] = React.useState(null);
   const myReqs = requests.filter(r=>members.includes(r.branch_name));
   const pendingCount = myReqs.filter(r=>r.status==='pending').length;
   const partialCount = myReqs.filter(r=>r.status==='partial').length;
 
   if (showForm) return <BranchRequestForm onSave={onSave} onCancel={()=>setShowForm(false)} branchName={branchName}/>;
+  if (editReq) return <BranchRequestForm onUpdate={onUpdate} onCancel={()=>setEditReq(null)} branchName={branchName} initialData={editReq}/>;
 
   // helper: compute per-item delivery state from trips
   const getItemState = (itemName, trips) => {
@@ -10220,9 +10230,14 @@ function BranchRequestPage({requests, onSave, branchName, branchMembers}) {
               <div style={{fontSize:11,color:'var(--text3)'}}>{fmtDateTime(r.created_at)}</div>
               {r.notes&&<div style={{fontSize:12,color:'var(--text2)',marginTop:3,fontStyle:'italic'}}>📝 {r.notes}</div>}
             </div>
-            <span className={`badge ${allDone?'badge-delivered':inProgressCount>0||deliveredCount>0?'badge-delivery':'badge-new'}`}>
-              {allDone?'✅ Semua Diterima':inProgressCount>0?'🚚 Sedang Dikirim':deliveredCount>0?`📦 ${deliveredCount}/${totalItems} Diterima`:'⏳ Menunggu Ops'}
-            </span>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              {r.status==='pending'&&onUpdate&&(
+                <button className="btn-secondary btn-sm" onClick={()=>setEditReq(r)} style={{fontSize:11,padding:'4px 10px'}}>✏️ Edit</button>
+              )}
+              <span className={`badge ${allDone?'badge-delivered':inProgressCount>0||deliveredCount>0?'badge-delivery':'badge-new'}`}>
+                {allDone?'✅ Semua Diterima':inProgressCount>0?'🚚 Sedang Dikirim':deliveredCount>0?`📦 ${deliveredCount}/${totalItems} Diterima`:'⏳ Menunggu Ops'}
+              </span>
+            </div>
           </div>
 
           {/* ── Progress bar ── */}
