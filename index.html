@@ -681,11 +681,27 @@ function App() {
       }
     };
 
+    // Helper: null base64 entries inside a text[] array column
+    const cleanTextArrayCol = async (table, col) => {
+      const {data} = await db.from(table).select(`id,${col}`).not(col,'is',null).limit(200);
+      if (!data?.length) return;
+      for (const row of data) {
+        const arr = row[col];
+        if (!Array.isArray(arr)) continue;
+        const hasB64 = arr.some(v=>typeof v==='string'&&v.startsWith('data:'));
+        if (!hasB64) continue;
+        const cleaned = arr.map(v=>(typeof v==='string'&&v.startsWith('data:'))?null:v);
+        await db.from(table).update({[col]:cleaned}).eq('id',row.id);
+        total++;
+        await sleep(200);
+      }
+    };
+
     try {
       showToast('🧹 Bersihkan attendance...'); await cleanCol('attendance','check_in_photo'); await cleanCol('attendance','check_out_photo');
       showToast('🧹 Bersihkan courier tasks...'); await cleanCol('courier_tasks','completion_photo');
-      showToast('🧹 Bersihkan orders...'); await cleanCol('orders','delivery_photo');
-      showToast('🧹 Bersihkan service intakes...'); await cleanCol('service_intakes','pickup_arrival_photo'); await cleanCol('service_intakes','sc_receipt_photo'); await cleanCol('service_intakes','sc_pickup_photo'); await cleanCol('service_intakes','return_photo');
+      showToast('🧹 Bersihkan orders...'); await cleanCol('orders','delivery_photo'); await cleanCol('orders','admin_photo'); await cleanCol('orders','tech_photo'); await cleanTextArrayCol('orders','tech_photos');
+      showToast('🧹 Bersihkan service intakes...'); await cleanCol('service_intakes','pickup_arrival_photo'); await cleanCol('service_intakes','sc_receipt_photo'); await cleanCol('service_intakes','sc_pickup_photo'); await cleanCol('service_intakes','return_photo'); await cleanCol('service_intakes','tech_photo'); await cleanCol('service_intakes','handover_photo');
       showToast('🧹 Bersihkan branch requests...'); await cleanJsonbPhoto('branch_requests','trips','photo');
       showToast('🧹 Bersihkan purchase orders...'); await cleanJsonbPhoto('purchase_orders','pickups','arrival_photo');
       showToast(`✅ Selesai! ${total} foto base64 dibersihkan.`, 'success');
@@ -6974,8 +6990,8 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
       status:'tech_done',
       status_note:'Instalasi selesai. '+(note[o.id]||''),
       tech_note:   note[o.id]||'',
-      tech_photo:  uploadedPhotos[0]||photos[0],
-      tech_photos: uploadedPhotos.map((u,i)=>u||photos[i]),
+      tech_photo:  uploadedPhotos[0]||null,
+      tech_photos: uploadedPhotos.map(u=>u||null),
       ...(validComp && (validComp.masuk.length>0||validComp.keluar.length>0) ? {tech_components: validComp} : {}),
     });
   };
