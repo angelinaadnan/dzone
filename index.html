@@ -178,7 +178,7 @@ const STATUS_LABELS = { new:'New Order', invoiced:'Invoiced', prep:'In Prep', te
 const STATUS_COLORS = { new:'badge-new', invoiced:'badge-invoiced', prep:'badge-prep', tech:'badge-tech', tech_done:'badge-teal', on_delivery:'badge-delivery', delivered:'badge-delivered', cancelled:'badge-cancelled', cancel_requested:'badge-cancelled' };
 const STATUS_DOTS = { new:'#6c63ff', invoiced:'#3b82f6', prep:'#f59e0b', tech:'#14b8a6', tech_done:'#22c55e', on_delivery:'#f97316', delivered:'#22c55e', cancelled:'#ef4444', cancel_requested:'#ef4444' };
 const ROLES = ['sales','admin','ops','courier','technician','cabang','supervisor','admin_pembelian','admin_online'];
-const ROLE_LABELS = { sales:'📊 Sales', admin:'🗂 Admin', ops:'⚙️ Ops', courier:'🚚 Kurir', technician:'🔧 Teknisi', cabang:'🏢 Cabang', supervisor:'👁 Supervisor', admin_pembelian:'🛒 Admin Pembelian', admin_online:'🌐 Admin Online' };
+const ROLE_LABELS = { sales:'📊 Sales', admin:'🗂 Admin', ops:'⚙️ Ops', courier:'🚚 Kurir', technician:'🔧 Teknisi', cabang:'🏢 Cabang', supervisor:'👁 Supervisor', admin_pembelian:'🛒 Admin Pembelian', admin_online:'🌐 Admin Online', absensi_only:'🗓 Staff' };
 
 // ─── DAFTAR AKUN — edit di sini untuk tambah / ubah / hapus akun ──
 const USER_ACCOUNTS = [
@@ -232,6 +232,7 @@ const USER_ACCOUNTS = [
   {name:'TC ALDO',   role:'cabang',  password:'aldo39'},
   {name:'TC MAHESA', role:'cabang',  password:'mahesa40'},
   {name:'TC GITA',   role:'cabang',  password:'gita41'},
+  {name:'RAFAL',     role:'absensi_only', password:'rafal41'},
 ];
 // Branch groups — PS (Poins) and TC (Dusit) are siloed; cannot see each other's data
 const BRANCH_GROUPS = {
@@ -253,6 +254,7 @@ const ROLE_NAV = {
   cabang:         [{id:'branch_dashboard',icon:'📊',label:'Dashboard'},{id:'branch_request',icon:'📦',label:'Request Barang'},{id:'branch_service',icon:'🔧',label:'Servis'},{id:'branch_titip_kirim',icon:'📬',label:'Titip Kirim'},{id:'branch_history',icon:'📋',label:'Riwayat'},{id:'absensi',icon:'🗓',label:'Absensi'}],
   admin_pembelian:[{id:'pesan_barang',icon:'🛒',label:'Pesan Barang'},{id:'absensi',icon:'🗓',label:'Absensi'}],
   admin_online:   [{id:'ao_invoicing',icon:'🧾',label:'Invoicing'},{id:'ao_orders',icon:'📋',label:'All Orders'},{id:'ao_tech_request',icon:'🔧',label:'Minta Teknisi'},{id:'pesan_barang',icon:'🛒',label:'Pesan Barang'},{id:'absensi',icon:'🗓',label:'Absensi'}],
+  absensi_only:   [{id:'absensi',icon:'🗓',label:'Absensi'}],
   supervisor:     [{id:'sup_dashboard',icon:'📊',label:'Dashboard'},{id:'sup_new_order',icon:'📝',label:'New Order'},{id:'sup_quotations',icon:'📄',label:'Penawaran'},{id:'sup_orders',icon:'📦',label:'Orderan'},{id:'sup_service',icon:'🛠',label:'Servis'},{id:'sup_branch',icon:'🏢',label:'Cabang'},{id:'sup_tasks',icon:'✅',label:'To Do List'},{id:'sup_tech',icon:'🔧',label:'Teknisi'},{id:'sup_kurir',icon:'🚚',label:'Kurir'},{id:'pesan_barang',icon:'🛒',label:'Pesan Barang'},{id:'absensi',icon:'🗓',label:'Absensi'}],
 };
 
@@ -924,6 +926,7 @@ function CameraCapture({type, onCapture, onClose}) {
 function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
   const todayStr  = new Date().toISOString().slice(0,10);
   const isSuper   = role === 'supervisor';
+  const canViewAll = isSuper && ['Angel','Liana','Santo'].includes(userName);
   const [selDate,    setSelDate]    = React.useState(todayStr);
   const [exportFrom, setExportFrom] = React.useState(todayStr.slice(0,7)+'-01');
   const [exportTo,   setExportTo]   = React.useState(todayStr);
@@ -944,7 +947,7 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
   const myToday   = attendance.find(a=>a.user_name===userName && a.date===todayStr);
   const myHistory = attendance.filter(a=>a.user_name===userName && a.date!==todayStr).slice(0,60);
   const allUsers  = USER_ACCOUNTS.filter(u=>u.name && u.name!=='Supervisor');
-  const dayRecs   = attendance.filter(a=>a.date===selDate);
+  const dayRecs   = attendance.filter(a=>a.date===selDate&&(canViewAll||a.user_name===userName));
   const getRecord = (name)=>dayRecs.find(a=>a.user_name===name)||null;
 
   const statusOf = (rec) => {
@@ -1001,9 +1004,14 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
 
   // ── Excel export ──────────────────────────────────────────────────
   const exportExcel = (scope) => {
+    if (!canViewAll) { alert('Hanya Angel, Liana, Santo yang bisa export Excel'); return; }
     let recs = scope==='day'
       ? dayRecs
-      : attendance.filter(a=>a.date>=exportFrom&&a.date<=exportTo&&(isSuper||a.user_name===userName));
+      : attendance.filter(a=>a.date>=exportFrom&&a.date<=exportTo);
+    if (!recs.length) { alert('Tidak ada data'); return; }
+    const wb = XLSX.utils.book_new();
+
+    // ── Sheet 1: Detail lengkap ──
     const rows = recs.map(a=>({
       'Tanggal'         : a.date,
       'Nama'            : a.user_name,
@@ -1013,7 +1021,7 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
       'Batas Masuk'     : '09:45',
       'Telat (menit)'   : lateMinutes(a)||0,
       'Durasi'          : duration(a)||'-',
-      'Status'          : statusOf(a).label.replace(/[✅🟡⚠❌⏰]/g,'').trim(),
+      'Status'          : statusOf(a).label.replace(/[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,'').trim(),
       'GPS Masuk'       : (a.check_in_lat&&a.check_in_lng)?`${a.check_in_lat.toFixed(6)}, ${a.check_in_lng.toFixed(6)}`:'',
       'Alamat Masuk'    : a.check_in_address||'',
       'GPS Pulang'      : (a.check_out_lat&&a.check_out_lng)?`${a.check_out_lat.toFixed(6)}, ${a.check_out_lng.toFixed(6)}`:'',
@@ -1022,14 +1030,51 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
       'Foto Masuk'      : a.check_in_photo?'Ada':'-',
       'Foto Pulang'     : a.check_out_photo?'Ada':'-',
     }));
-    if (!rows.length) { alert('Tidak ada data'); return; }
-    const ws=XLSX.utils.json_to_sheet(rows);
-    ws['!cols']=[10,18,16,12,12,10,12,10,18,24,30,24,30,24,12,12].map(w=>({wch:w}));
-    const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,'Absensi');
-    const fname=scope==='day'?`Absensi_${selDate}.xlsx`:
-      (isSuper?`Absensi_${exportFrom}_sd_${exportTo}.xlsx`:`Absensi_${userName}_${exportFrom}_sd_${exportTo}.xlsx`);
-    XLSX.writeFile(wb,fname);
+    const ws1 = XLSX.utils.json_to_sheet(rows);
+    ws1['!cols']=[10,18,16,12,12,10,12,10,18,24,30,24,30,24,12,12].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, ws1, 'Detail');
+
+    // ── Sheet 2: Pivot per orang (format ringkas) ──
+    const allDates = [...new Set(recs.map(a=>a.date))].sort();
+    const allNames = [...new Set(recs.map(a=>a.user_name))].sort();
+    // Header row 1: Nama orang (merged 3 cols each)
+    const hdr1 = ['Tanggal'];
+    allNames.forEach(n=>{ hdr1.push(n); hdr1.push(''); hdr1.push(''); });
+    // Header row 2: sub-cols
+    const hdr2 = [''];
+    allNames.forEach(()=>{ hdr2.push('Jam Masuk'); hdr2.push('Jam Pulang'); hdr2.push('Telat'); });
+    // Data rows
+    const pivotRows = [hdr1, hdr2];
+    const fmtDateShort = (d) => {
+      const dt = new Date(d+'T00:00:00');
+      return String(dt.getDate()).padStart(2,'0')+'-'+dt.toLocaleString('id-ID',{month:'short'});
+    };
+    allDates.forEach(date => {
+      const row = [fmtDateShort(date)];
+      allNames.forEach(name => {
+        const rec = recs.find(a=>a.date===date&&a.user_name===name);
+        row.push(rec?fmtT(rec.check_in):'-');
+        row.push(rec?fmtT(rec.check_out):'-');
+        const late = rec?lateMinutes(rec):0;
+        row.push(late>0?late+' mnt':'-');
+      });
+      pivotRows.push(row);
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet(pivotRows);
+    // Column widths
+    const pivotCols = [{wch:10}];
+    allNames.forEach(()=>{ pivotCols.push({wch:11},{wch:11},{wch:9}); });
+    ws2['!cols'] = pivotCols;
+    // Merge header cells for each name (span 3 cols)
+    ws2['!merges'] = allNames.map((_,i)=>({
+      s:{r:0,c:1+i*3}, e:{r:0,c:3+i*3}
+    }));
+    XLSX.utils.book_append_sheet(wb, ws2, 'Ringkasan');
+
+    const fname = scope==='day'
+      ? `Absensi_${selDate}.xlsx`
+      : `Absensi_${exportFrom}_sd_${exportTo}.xlsx`;
+    XLSX.writeFile(wb, fname);
   };
 
   // ── Location chip (small) ─────────────────────────────────────────
@@ -1045,7 +1090,7 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
   };
 
   // ── Supervisor view ───────────────────────────────────────────────
-  if (isSuper) {
+  if (canViewAll) {
     // Sort: belum absen → masih kerja → sudah pulang
     const sortedUsers = [...allUsers].sort((a,b)=>{
       const ra=getRecord(a.name), rb=getRecord(b.name);
