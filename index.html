@@ -3643,13 +3643,13 @@ function CompLogDisplay({comp, verified, onVerify, supervisorName, canVerify, sh
       {comp.masuk?.filter(r=>r.spec||r.brand).map((r,i)=>(
         <div key={i} style={{fontSize:12,padding:'3px 0',display:'flex',gap:8}}>
           <span style={{color:'var(--green)',fontWeight:600,width:60,flexShrink:0}}>🔼 Masuk</span>
-          <span>{r.type} {r.spec} {r.brand}</span>
+          <span>{r.type} {r.spec} {r.brand}{r.notes?<span style={{color:'var(--text3)',marginLeft:6}}>· {r.notes}</span>:null}</span>
         </div>
       ))}
       {comp.keluar?.filter(r=>r.spec||r.brand).map((r,i)=>(
         <div key={i} style={{fontSize:12,padding:'3px 0',display:'flex',gap:8}}>
           <span style={{color:'var(--amber)',fontWeight:600,width:60,flexShrink:0}}>🔽 Keluar</span>
-          <span>{r.type} {r.spec} {r.brand}</span>
+          <span>{r.type} {r.spec} {r.brand}{r.notes?<span style={{color:'var(--text3)',marginLeft:6}}>· {r.notes}</span>:null}</span>
         </div>
       ))}
 
@@ -5177,10 +5177,10 @@ function exportServiceToExcel(intakes, installOrders) {
       };
       const comp = si.tech_components;
       if (comp && ((comp.masuk||[]).filter(r=>r.spec||r.brand).length || (comp.keluar||[]).filter(r=>r.spec||r.brand).length)) {
-        (comp.masuk||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...base, 'Aksi Komponen':'✅ DIPASANG', 'Jenis Komponen':r.type||'', 'Spesifikasi':r.spec||'', 'Merk/Model':r.brand||''}));
-        (comp.keluar||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...base, 'Aksi Komponen':'🔴 DILEPAS',  'Jenis Komponen':r.type||'', 'Spesifikasi':r.spec||'', 'Merk/Model':r.brand||''}));
+        (comp.masuk||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...base, 'Aksi Komponen':'✅ DIPASANG', 'Jenis Komponen':r.type||'', 'Spesifikasi':r.spec||'', 'Merk/Model':r.brand||'', 'Catatan Komponen':r.notes||''}));
+        (comp.keluar||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...base, 'Aksi Komponen':'🔴 DILEPAS',  'Jenis Komponen':r.type||'', 'Spesifikasi':r.spec||'', 'Merk/Model':r.brand||'', 'Catatan Komponen':r.notes||''}));
       } else {
-        rows.push({...base, 'Aksi Komponen':'—', 'Jenis Komponen':'—', 'Spesifikasi':'—', 'Merk/Model':'—'});
+        rows.push({...base, 'Aksi Komponen':'—', 'Jenis Komponen':'—', 'Spesifikasi':'—', 'Merk/Model':'—', 'Catatan Komponen':'—'});
       }
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -5208,10 +5208,10 @@ function exportServiceToExcel(intakes, installOrders) {
       };
       const comp = o.tech_components;
       if (comp && ((comp.masuk||[]).filter(r=>r.spec||r.brand).length || (comp.keluar||[]).filter(r=>r.spec||r.brand).length)) {
-        (comp.masuk||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...base, 'Aksi Komponen':'✅ DIPASANG', 'Jenis Komponen':r.type||'', 'Spesifikasi':r.spec||'', 'Merk/Model':r.brand||''}));
-        (comp.keluar||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...base, 'Aksi Komponen':'🔴 DILEPAS',  'Jenis Komponen':r.type||'', 'Spesifikasi':r.spec||'', 'Merk/Model':r.brand||''}));
+        (comp.masuk||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...base, 'Aksi Komponen':'✅ DIPASANG', 'Jenis Komponen':r.type||'', 'Spesifikasi':r.spec||'', 'Merk/Model':r.brand||'', 'Catatan Komponen':r.notes||''}));
+        (comp.keluar||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...base, 'Aksi Komponen':'🔴 DILEPAS',  'Jenis Komponen':r.type||'', 'Spesifikasi':r.spec||'', 'Merk/Model':r.brand||'', 'Catatan Komponen':r.notes||''}));
       } else {
-        rows.push({...base, 'Aksi Komponen':'—', 'Jenis Komponen':'—', 'Spesifikasi':'—', 'Merk/Model':'—'});
+        rows.push({...base, 'Aksi Komponen':'—', 'Jenis Komponen':'—', 'Spesifikasi':'—', 'Merk/Model':'—', 'Catatan Komponen':'—'});
       }
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -5414,10 +5414,10 @@ function exportTechToExcel(orders, serviceIntakes) {
       };
       const comp = o.tech_components;
       if (comp && (comp.masuk?.length || comp.keluar?.length)) {
-        (comp.masuk||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...baseRow, 'Aksi':'Dipasang', 'Komponen':r.type, 'Spesifikasi':r.spec, 'Merk':r.brand}));
-        (comp.keluar||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...baseRow, 'Aksi':'Dilepas', 'Komponen':r.type, 'Spesifikasi':r.spec, 'Merk':r.brand}));
+        (comp.masuk||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...baseRow, 'Aksi':'Dipasang', 'Komponen':r.type, 'Spesifikasi':r.spec, 'Merk':r.brand, 'Catatan':r.notes||''}));
+        (comp.keluar||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...baseRow, 'Aksi':'Dilepas', 'Komponen':r.type, 'Spesifikasi':r.spec, 'Merk':r.brand, 'Catatan':r.notes||''}));
       } else {
-        rows.push({...baseRow, 'Aksi':'—', 'Komponen':'—', 'Spesifikasi':'—', 'Merk':'—'});
+        rows.push({...baseRow, 'Aksi':'—', 'Komponen':'—', 'Spesifikasi':'—', 'Merk':'—', 'Catatan':'—'});
       }
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -5442,10 +5442,10 @@ function exportTechToExcel(orders, serviceIntakes) {
       };
       const comp = si.tech_components;
       if (comp && (comp.masuk?.length || comp.keluar?.length)) {
-        (comp.masuk||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...baseRow, 'Aksi':'Dipasang', 'Komponen':r.type, 'Spesifikasi':r.spec, 'Merk':r.brand}));
-        (comp.keluar||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...baseRow, 'Aksi':'Dilepas', 'Komponen':r.type, 'Spesifikasi':r.spec, 'Merk':r.brand}));
+        (comp.masuk||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...baseRow, 'Aksi':'Dipasang', 'Komponen':r.type, 'Spesifikasi':r.spec, 'Merk':r.brand, 'Catatan':r.notes||''}));
+        (comp.keluar||[]).filter(r=>r.spec||r.brand).forEach(r => rows.push({...baseRow, 'Aksi':'Dilepas', 'Komponen':r.type, 'Spesifikasi':r.spec, 'Merk':r.brand, 'Catatan':r.notes||''}));
       } else {
-        rows.push({...baseRow, 'Aksi':'—', 'Komponen':'—', 'Spesifikasi':'—', 'Merk':'—'});
+        rows.push({...baseRow, 'Aksi':'—', 'Komponen':'—', 'Spesifikasi':'—', 'Merk':'—', 'Catatan':'—'});
       }
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -6812,7 +6812,7 @@ function CourierSummary({orders, courierTasks, courierName, checkins, purchaseOr
 
 // ─── TECHNICIAN JOBS ──────────────────────────────────────────────
 const COMPONENT_TYPES = ['RAM','SSD SATA','SSD NVMe','HDD','Baterai','LCD','Keyboard','Charger','VGA Card','Thermal Paste','Lainnya'];
-const emptyCompRow = () => ({type:'RAM', spec:'', brand:''});
+const emptyCompRow = () => ({type:'RAM', spec:'', brand:'', notes:''});
 
 function ComponentsForm({value, onChange}) {
   const masuk = value?.masuk||[];
@@ -6830,12 +6830,13 @@ function ComponentsForm({value, onChange}) {
   const renderRows = (list, setList, colorVar) => (
     <div>
       {list.map((r,i)=>(
-        <div key={i} style={{display:'grid',gridTemplateColumns:'120px 1fr 1fr 26px',gap:5,marginBottom:6,alignItems:'center'}}>
+        <div key={i} style={{display:'grid',gridTemplateColumns:'120px 1fr 1fr 1.5fr 26px',gap:5,marginBottom:6,alignItems:'center'}}>
           <select style={iStyle} value={r.type} onChange={e=>setRow(list,setList,i,'type',e.target.value)}>
             {COMPONENT_TYPES.map(t=><option key={t}>{t}</option>)}
           </select>
           <input style={iStyle} placeholder="Kapasitas/Spec (mis: 16GB, 512GB)" value={r.spec} onChange={e=>setRow(list,setList,i,'spec',e.target.value)}/>
           <input style={iStyle} placeholder="Merk (mis: Kingston, Samsung)" value={r.brand} onChange={e=>setRow(list,setList,i,'brand',e.target.value)}/>
+          <input style={iStyle} placeholder="Catatan (mis: slot 1, DDR5-4800, partno...)" value={r.notes||''} onChange={e=>setRow(list,setList,i,'notes',e.target.value)}/>
           {list.length>1
             ? <button type="button" style={{background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.3)',color:'var(--red)',borderRadius:6,cursor:'pointer',fontSize:13,width:26,height:26}} onClick={()=>removeRow(list,setList,i)}>✕</button>
             : <div/>}
