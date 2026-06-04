@@ -419,6 +419,23 @@ function App() {
         } else if (a.type === 'task_patch') {
           await db.from('courier_tasks').update({...a.patch, [a.photoField]: url}).eq('id', a.id);
           setCourierTasks(prev => prev.map(t => t.id===a.id ? {...t, ...a.patch, [a.photoField]: url} : t));
+        } else if (a.type === 'si_photo_only') {
+          await db.from('service_intakes').update({[a.photoField]: url}).eq('id', a.id);
+          setServiceIntakes(prev => prev.map(s => s.id===a.id ? {...s, [a.photoField]: url} : s));
+        } else if (a.type === 'po_pickup_photo') {
+          const po = purchaseOrdersRef.current.find(p => p.id===a.poId);
+          if (po) {
+            const updatedPickups = (po.pickups||[]).map(t => t.no===a.pickupNo ? {...t, arrival_photo: url} : t);
+            await db.from('purchase_orders').update({pickups: updatedPickups}).eq('id', a.poId);
+            setPurchaseOrders(prev => prev.map(p => p.id===a.poId ? {...p, pickups: updatedPickups} : p));
+          }
+        } else if (a.type === 'branch_trip_photo') {
+          const req = branchRequestsRef.current.find(r => r.id===a.reqId);
+          if (req) {
+            const updatedTrips = (req.trips||[]).map(t => t.no===a.tripNo ? {...t, photo: url} : t);
+            await db.from('branch_requests').update({trips: updatedTrips}).eq('id', a.reqId);
+            setBranchRequests(prev => prev.map(r => r.id===a.reqId ? {...r, trips: updatedTrips} : r));
+          }
         } else if (a.type === 'branch_patch') {
           const req = branchRequestsRef.current.find(r => r.id===a.reqId);
           if (req) {
@@ -10038,8 +10055,10 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           const supPhotoUrl = await uploadPhoto(siPhotos[supPk], 'supplier', 0, setUploadMsg(supPk));
                           if (!supPhotoUrl) {
                             if (onQueuePhoto) {
-                              onQueuePhoto(siPhotos[supPk], 'supplier', {type:'po_pickup', poId:po.id, pickupNo:p.no, photoField:'arrival_photo', pickupPatch:{status:'done',start_location:startLoc,end_location:endLoc,distance_km:kmTotal,done_at:new Date().toISOString()}});
-                              setUploadMsg(supPk)('📱 Tersimpan di HP, upload otomatis saat sinyal kembali');
+                              const updatedPickups=(po.pickups||[]).map(t=>t.no===p.no?{...t,status:'done',arrival_photo:null,start_location:startLoc,end_location:endLoc,distance_km:kmTotal,done_at:new Date().toISOString()}:t);
+                              onUpdatePO(po.id,{pickups:updatedPickups,pickup:null});
+                              onQueuePhoto(siPhotos[supPk],'supplier',{type:'po_pickup_photo',poId:po.id,pickupNo:p.no});
+                              setUploadMsg(supPk)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
                             } else { setUploadMsg(supPk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
                             return;
                           }
@@ -10107,8 +10126,12 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           const branchPhotoUrl = await uploadPhoto(branchPhotos[bk]||null, 'branch', 0, setUploadMsg(bk));
                           if (!branchPhotoUrl) {
                             if (onQueuePhoto) {
-                              onQueuePhoto(branchPhotos[bk], 'branch', {type:'branch_patch', reqId:r.id, tripNo:trip.no, photoField:'photo', tripPatch:{status:'delivered',delivered_at:new Date().toISOString(),start_location:startLoc||null,arrived_location:loc,distance_km:km}});
-                              setUploadMsg(bk)('📱 Tersimpan di HP, upload otomatis saat sinyal kembali');
+                              const updatedTrips=(r.trips||[]).map(t=>t.no===trip.no?{...t,status:'delivered',delivered_at:new Date().toISOString(),photo:null,start_location:startLoc||null,arrived_location:loc,distance_km:km}:t);
+                              const allDone=updatedTrips.every(t=>t.status==='delivered');
+                              const pendingIt=(r.items||[]).filter(it=>!updatedTrips.find(t=>t.status==='delivered'&&(t.items||[]).find(ti=>ti.name===it.name)));
+                              onUpdateBranch(r.id,{trips:updatedTrips,status:allDone&&pendingIt.length===0?'completed':'partial'});
+                              onQueuePhoto(branchPhotos[bk],'branch',{type:'branch_trip_photo',reqId:r.id,tripNo:trip.no});
+                              setUploadMsg(bk)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
                             } else { setUploadMsg(bk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
                             return;
                           }
@@ -10170,8 +10193,11 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Tiba & jemput di cabang: ${s.branch_name}${km?' · '+km+' km':''}`});
                         const pickupPhotoUrl = await uploadPhoto(siPhotos[k], 'si_pickup', 0, setUploadMsg('sip_'+k));
                         if (!pickupPhotoUrl) {
-                          if (onQueuePhoto) { onQueuePhoto(siPhotos[k],'si_pickup',{type:'si_patch',id:s.id,photoField:'pickup_arrival_photo',patch:{courier_picked_up:true,courier_picked_up_at:new Date().toISOString(),pickup_start_location:startLoc||null,pickup_arrived_location:loc,pickup_distance_km:km}}); setUploadMsg('sip_'+k)('📱 Tersimpan di HP, upload otomatis saat sinyal kembali'); }
-                          else { setUploadMsg('sip_'+k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
+                          if (onQueuePhoto) {
+                            onUpdateSI(s.id,{courier_picked_up:true,courier_picked_up_at:new Date().toISOString(),pickup_arrival_photo:null,pickup_start_location:startLoc||null,pickup_arrived_location:loc,pickup_distance_km:km});
+                            onQueuePhoto(siPhotos[k],'si_pickup',{type:'si_photo_only',id:s.id,photoField:'pickup_arrival_photo'});
+                            setUploadMsg('sip_'+k)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+                          } else { setUploadMsg('sip_'+k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
                           return;
                         }
                         onUpdateSI(s.id,{courier_picked_up:true,courier_picked_up_at:new Date().toISOString(),pickup_arrival_photo:pickupPhotoUrl,pickup_start_location:startLoc||null,pickup_arrived_location:loc,pickup_distance_km:km});
@@ -10227,8 +10253,11 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Tiba di SC: ${s.service_center_name}${km?' · '+km+' km':''}`});
                         const scReceiptPhotoUrl = await uploadPhoto(siPhotos[k], 'sc_receipt', 0, setUploadMsg('scr_'+k));
                         if (!scReceiptPhotoUrl) {
-                          if (onQueuePhoto) { onQueuePhoto(siPhotos[k],'sc_receipt',{type:'si_patch',id:s.id,photoField:'sc_receipt_photo',patch:{status:'at_service_center',sc_delivered_at:new Date().toISOString(),sc_start_location:startLoc||null,sc_arrived_location:loc,sc_distance_km:km}}); setUploadMsg('scr_'+k)('📱 Tersimpan di HP, upload otomatis saat sinyal kembali'); }
-                          else { setUploadMsg('scr_'+k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
+                          if (onQueuePhoto) {
+                            onUpdateSI(s.id,{status:'at_service_center',sc_receipt_photo:null,sc_delivered_at:new Date().toISOString(),sc_start_location:startLoc||null,sc_arrived_location:loc,sc_distance_km:km});
+                            onQueuePhoto(siPhotos[k],'sc_receipt',{type:'si_photo_only',id:s.id,photoField:'sc_receipt_photo'});
+                            setUploadMsg('scr_'+k)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+                          } else { setUploadMsg('scr_'+k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
                           return;
                         }
                         onUpdateSI(s.id,{status:'at_service_center',sc_receipt_photo:scReceiptPhotoUrl,sc_delivered_at:new Date().toISOString(),sc_start_location:startLoc||null,sc_arrived_location:loc,sc_distance_km:km});
@@ -10311,8 +10340,11 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Ambil dari SC: ${scName}${km?' · '+km+' km':''}`});
                         const scPickupPhotoUrl = await uploadPhoto(siPhotos[k]||null, 'sc_pickup', 0, setUploadMsg('scp_'+k));
                         if (!scPickupPhotoUrl) {
-                          if (onQueuePhoto) { onQueuePhoto(siPhotos[k],'sc_pickup',{type:'si_patch',id:s.id,photoField:'sc_pickup_photo',patch:{status:'back_from_sc',sc_picked_up_at:new Date().toISOString(),scp_distance_km:km||null}}); setUploadMsg('scp_'+k)('📱 Tersimpan di HP, upload otomatis saat sinyal kembali'); }
-                          else { setUploadMsg('scp_'+k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
+                          if (onQueuePhoto) {
+                            onUpdateSI(s.id,{status:'back_from_sc',sc_picked_up_at:new Date().toISOString(),sc_pickup_photo:null,scp_distance_km:km||null});
+                            onQueuePhoto(siPhotos[k],'sc_pickup',{type:'si_photo_only',id:s.id,photoField:'sc_pickup_photo'});
+                            setUploadMsg('scp_'+k)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+                          } else { setUploadMsg('scp_'+k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
                           return;
                         }
                         onUpdateSI(s.id,{status:'back_from_sc',sc_picked_up_at:new Date().toISOString(),sc_pickup_photo:scPickupPhotoUrl||null,scp_distance_km:km||null});
@@ -10376,8 +10408,12 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`📍 Serah terima ke ${dest2}${rKm?' · '+rKm+' km':''}`});
                           const retPhotoUrl = await uploadPhoto(siPhotos[retKey], 'si_return', 0, setUploadMsg('ret_'+retKey));
                           if (!retPhotoUrl) {
-                            if (onQueuePhoto) { onQueuePhoto(siPhotos[retKey],'si_return',{type:'si_patch',id:s.id,photoField:'return_photo',patch:{return_status:'returned',returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:loc,return_distance_km:rKm}}); setUploadMsg('ret_'+retKey)('📱 Tersimpan di HP, upload otomatis saat sinyal kembali'); }
-                            else { setUploadMsg('ret_'+retKey)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
+                            if (onQueuePhoto) {
+                              onUpdateSI(s.id,{return_status:'returned',return_photo:null,returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:loc,return_distance_km:rKm});
+                              onQueuePhoto(siPhotos[retKey],'si_return',{type:'si_photo_only',id:s.id,photoField:'return_photo'});
+                              setUploadMsg('ret_'+retKey)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+                              setRetStep('done');
+                            } else { setUploadMsg('ret_'+retKey)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
                             return;
                           }
                           onUpdateSI(s.id,{return_status:'returned',return_photo:retPhotoUrl,returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:loc,return_distance_km:rKm});
