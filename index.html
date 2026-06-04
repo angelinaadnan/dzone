@@ -353,10 +353,17 @@ function App() {
     setLoading(false);
   };
 
-  const loadServiceIntakes = async () => {
+  const loadServiceIntakes = async (retry=0) => {
     if (!db) return;
     const {data,error} = await db.from('service_intakes').select('*').order('created_at',{ascending:false});
-    if (!error && data) setServiceIntakes(data);
+    if (error) {
+      if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
+        await new Promise(r=>setTimeout(r, 2000*(retry+1)));
+        return loadServiceIntakes(retry+1);
+      }
+      showToast('Error service intakes: '+error.message, 'error'); return;
+    }
+    if (data) setServiceIntakes(data);
   };
 
   const saveServiceIntake = async (intake) => {
@@ -400,10 +407,17 @@ function App() {
     if (data) setCourierTasks(data);
   };
 
-  const loadBranchRequests = async () => {
+  const loadBranchRequests = async (retry=0) => {
     if (!db) return;
     const {data,error} = await db.from('branch_requests').select('*').order('created_at',{ascending:false});
-    if (!error && data) setBranchRequests(data);
+    if (error) {
+      if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
+        await new Promise(r=>setTimeout(r, 2000*(retry+1)));
+        return loadBranchRequests(retry+1);
+      }
+      showToast('Error branch requests: '+error.message, 'error'); return;
+    }
+    if (data) setBranchRequests(data);
   };
 
   const saveBranchRequest = async (req) => {
@@ -428,10 +442,17 @@ function App() {
     showToast('Diperbarui!');
   };
 
-  const loadPurchaseOrders = async () => {
+  const loadPurchaseOrders = async (retry=0) => {
     if (!db) return;
     const {data,error} = await db.from('purchase_orders').select('*').order('created_at',{ascending:false});
-    if (!error && data) setPurchaseOrders(data);
+    if (error) {
+      if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
+        await new Promise(r=>setTimeout(r, 2000*(retry+1)));
+        return loadPurchaseOrders(retry+1);
+      }
+      showToast('Error purchase orders: '+error.message, 'error'); return;
+    }
+    if (data) setPurchaseOrders(data);
   };
 
   const savePurchaseOrder = async (po) => {
@@ -456,10 +477,17 @@ function App() {
     showToast('Diperbarui!');
   };
 
-  const loadQuotations = async () => {
+  const loadQuotations = async (retry=0) => {
     if (!db) return;
     const {data,error} = await db.from('quotations').select('*').order('created_at',{ascending:false});
-    if (!error && data) setQuotations(data);
+    if (error) {
+      if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
+        await new Promise(r=>setTimeout(r, 2000*(retry+1)));
+        return loadQuotations(retry+1);
+      }
+      showToast('Error quotations: '+error.message, 'error'); return;
+    }
+    if (data) setQuotations(data);
   };
 
   const saveQuotation = async (q) => {
@@ -525,10 +553,17 @@ function App() {
     showToast('Tugas diperbarui!');
   };
 
-  const loadCourierCheckins = async () => {
+  const loadCourierCheckins = async (retry=0) => {
     if (!db) return;
     const {data,error} = await db.from('courier_checkins').select('*').order('created_at',{ascending:false}).limit(500);
-    if (!error && data) setCourierCheckins(data);
+    if (error) {
+      if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
+        await new Promise(r=>setTimeout(r, 2000*(retry+1)));
+        return loadCourierCheckins(retry+1);
+      }
+      showToast('Error checkins: '+error.message, 'error'); return;
+    }
+    if (data) setCourierCheckins(data);
   };
 
   const saveCheckin = async (checkin) => {
@@ -545,10 +580,17 @@ function App() {
     return data;
   };
 
-  const loadAttendance = async () => {
+  const loadAttendance = async (retry=0) => {
     if (!db) return;
     const {data,error} = await db.from('attendance').select('*').order('check_in',{ascending:false}).limit(1000);
-    if (!error && data) setAttendance(data);
+    if (error) {
+      if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
+        await new Promise(r=>setTimeout(r, 2000*(retry+1)));
+        return loadAttendance(retry+1);
+      }
+      showToast('Error attendance: '+error.message, 'error'); return;
+    }
+    if (data) setAttendance(data);
   };
   const saveAttendance = async (rec) => {
     if (!db) {
