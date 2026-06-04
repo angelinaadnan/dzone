@@ -10138,7 +10138,14 @@ function BranchRequestForm({onSave, onUpdate, onCancel, branchName, initialData}
     if (items.some(it=>!it.name.trim())) { alert('Nama barang wajib diisi'); return; }
     setSaving(true);
     if (isEdit) {
-      await onUpdate(initialData.id, {items, notes});
+      const prevHistory = initialData.edit_history || [];
+      const snapshot = {
+        edited_at: new Date().toISOString(),
+        edited_by: branchName,
+        items: initialData.items,
+        notes: initialData.notes || '',
+      };
+      await onUpdate(initialData.id, {items, notes, edit_history: [...prevHistory, snapshot]});
     } else {
       await onSave({branch_name:branchName, created_by:branchName, items, notes, status:'pending'});
     }
@@ -10362,6 +10369,31 @@ function BranchRequestPage({requests, onSave, onUpdate, branchName, branchMember
               ))}
               <div style={{fontSize:11,color:'var(--text3)',marginTop:6}}>Ops akan menjadwalkan trip berikutnya untuk sisa barang ini.</div>
             </div>
+          )}
+
+          {/* ── Riwayat Edit ── */}
+          {(r.edit_history||[]).length>0&&(
+            <details style={{marginTop:10}}>
+              <summary style={{fontSize:11,fontWeight:700,color:'var(--text3)',cursor:'pointer',userSelect:'none',padding:'6px 0',textTransform:'uppercase',letterSpacing:'.04em'}}>
+                🕓 Riwayat Perubahan ({r.edit_history.length}x diedit)
+              </summary>
+              <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}}>
+                {[...r.edit_history].reverse().map((h,hi)=>(
+                  <div key={hi} style={{padding:'10px 12px',borderRadius:8,background:'rgba(139,92,246,0.06)',border:'1px solid rgba(139,92,246,0.18)'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                      <span style={{fontSize:11,fontWeight:700,color:'#a78bfa'}}>✏️ Versi #{r.edit_history.length - hi}</span>
+                      <span style={{fontSize:10,color:'var(--text3)'}}>{fmtDateTime(h.edited_at)} · {h.edited_by}</span>
+                    </div>
+                    {(h.items||[]).map((it,ii)=>(
+                      <div key={ii} style={{fontSize:11,color:'var(--text2)',padding:'2px 0'}}>
+                        • {it.name} ×{it.qty}{it.notes?' ('+it.notes+')':''}
+                      </div>
+                    ))}
+                    {h.notes&&<div style={{fontSize:11,color:'var(--text3)',marginTop:4,fontStyle:'italic'}}>📝 {h.notes}</div>}
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
         </div>
         );
