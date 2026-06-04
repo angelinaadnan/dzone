@@ -1681,6 +1681,72 @@ function PesanBarangForm({onSave, onCancel, createdBy}) {
   );
 }
 
+function LukasNoteSection({po, onUpdate, userName, role}) {
+  const isLukas = userName === 'Lukas';
+  const canReadMark = ['admin','ops','admin_pembelian'].includes(role);
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(po.lukas_note||'');
+  const [saving, setSaving] = React.useState(false);
+
+  const inp = {width:'100%',padding:'9px 11px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',fontSize:13,boxSizing:'border-box',resize:'vertical',minHeight:70};
+
+  const saveNote = async () => {
+    setSaving(true);
+    await onUpdate(po.id, {lukas_note: draft.trim()||null, lukas_note_read_at:null, lukas_note_read_by:null});
+    setSaving(false); setEditing(false);
+  };
+
+  const markRead = async () => {
+    await onUpdate(po.id, {lukas_note_read_at: new Date().toISOString(), lukas_note_read_by: userName});
+  };
+
+  if (!isLukas && !po.lukas_note) return null;
+
+  return (
+    <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)'}}>
+      <div style={{fontSize:12,fontWeight:700,color:'var(--amber)',marginBottom:8}}>💬 Catatan Lukas</div>
+      {isLukas && !editing && (
+        <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
+          {po.lukas_note
+            ? <div style={{flex:1,fontSize:13,color:'var(--text)',fontStyle:'italic',padding:'8px 10px',background:'rgba(245,158,11,0.08)',borderRadius:8,border:'1px solid rgba(245,158,11,0.2)'}}>
+                {po.lukas_note}
+              </div>
+            : <div style={{flex:1,fontSize:12,color:'var(--text3)',fontStyle:'italic'}}>Belum ada catatan tambahan</div>}
+          <button className="btn-secondary btn-sm" style={{color:'var(--amber)',flexShrink:0}} onClick={()=>{setDraft(po.lukas_note||'');setEditing(true);}}>
+            ✏️ {po.lukas_note?'Edit':'Tambah'}
+          </button>
+        </div>
+      )}
+      {isLukas && editing && (
+        <div>
+          <textarea style={inp} value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Tulis catatan tambahan untuk admin..."/>
+          <div style={{display:'flex',gap:8,marginTop:8}}>
+            <button className="btn-secondary btn-sm" onClick={()=>setEditing(false)}>Batal</button>
+            <button className="btn-amber btn-sm" style={{flex:1}} onClick={saveNote} disabled={saving}>{saving?'Menyimpan...':'💾 Simpan Catatan'}</button>
+          </div>
+        </div>
+      )}
+      {!isLukas && po.lukas_note && (
+        <div>
+          <div style={{fontSize:13,color:'var(--text)',fontStyle:'italic',padding:'8px 10px',background:'rgba(245,158,11,0.08)',borderRadius:8,border:'1px solid rgba(245,158,11,0.2)',marginBottom:8}}>
+            {po.lukas_note}
+          </div>
+          {canReadMark && (
+            po.lukas_note_read_at
+              ? <div style={{fontSize:11,color:'var(--green)',fontWeight:600}}>✅ Sudah dibaca oleh {po.lukas_note_read_by} · {fmtDateTime(po.lukas_note_read_at)}</div>
+              : <button className="btn-secondary btn-sm" style={{color:'var(--green)',borderColor:'rgba(34,197,94,0.3)'}} onClick={markRead}>✅ Tandai Sudah Dibaca</button>
+          )}
+          {!canReadMark && (
+            po.lukas_note_read_at
+              ? <div style={{fontSize:11,color:'var(--green)',fontWeight:600}}>✅ Sudah dibaca · {fmtDateTime(po.lukas_note_read_at)}</div>
+              : <div style={{fontSize:11,color:'var(--red)',fontWeight:600}}>🔴 Belum dibaca admin</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PurchaseOrderCard({po, onUpdate, userName, canMark, role}) {
   const [expanded, setExpanded] = React.useState(false);
   const [addingTrip, setAddingTrip] = React.useState(false);
@@ -1821,6 +1887,14 @@ function PurchaseOrderCard({po, onUpdate, userName, canMark, role}) {
             {po.expected_date&&<span> · 📅 Estimasi tiba: {fmtDate(po.expected_date)}</span>}
           </div>
           {po.notes&&<div style={{fontSize:12,color:'var(--text2)',marginTop:3,fontStyle:'italic'}}>📝 {po.notes}</div>}
+          {po.lukas_note&&(
+            <div style={{marginTop:4,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+              <span style={{fontSize:12,color:'var(--amber)',fontStyle:'italic'}}>💬 {po.lukas_note}</span>
+              {po.lukas_note_read_at
+                ? <span style={{fontSize:10,color:'var(--green)',fontWeight:600}}>✅ Sudah dibaca {po.lukas_note_read_by} · {fmtDateTime(po.lukas_note_read_at)}</span>
+                : <span style={{fontSize:10,color:'var(--red)',fontWeight:600}}>🔴 Belum dibaca admin</span>}
+            </div>
+          )}
           <div style={{fontSize:12,marginTop:5,display:'flex',gap:12,flexWrap:'wrap'}}>
             <span style={{color:arrivedCount>0&&!allArrived?'var(--amber)':allArrived?'var(--green)':'var(--text2)'}}>
               {totalRecvAll>0&&!allArrived
@@ -2171,6 +2245,10 @@ function PurchaseOrderCard({po, onUpdate, userName, canMark, role}) {
               ))}
             </div>
           )}
+
+          {/* ── Lukas Notes Section ── */}
+          <LukasNoteSection po={po} onUpdate={onUpdate} userName={userName} role={role}/>
+
         </div>
       )}
     </div>
