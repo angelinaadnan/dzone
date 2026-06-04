@@ -367,7 +367,7 @@ function App() {
 
   // npwp_file & po_file dikecualikan dari query utama karena base64 besar → timeout & egress tinggi
   // File di-load on-demand via loadOrderFiles(id) saat user mau lihat lampiran
-  const ORDER_COLS = 'id,created_at,date,status,status_history,sales_name,customer_name,customer_phone,customer_address,goods,goods_ready,goods_status,payment_status,delivery_method,notes,invoice_number,invoice_materai,admin_photo,tech_note,tech_photo,tech_photos,tech_components,tech_components_verified,tech_name,assigned_to,courier_name,delivery_note,delivered_at,delivery_photo,distance_km,end_location,in_transit,faktur_pajak,npwp,has_po,po_number,info_tambahan,source_branch,source_type,tracking,cancel_reason,cancel_prev_status,faktur_checked,faktur_checked_at,faktur_checked_by,revisions';
+  const ORDER_COLS = 'id,created_at,date,status,status_history,sales_name,customer_name,customer_phone,customer_address,goods,goods_ready,goods_status,payment_status,delivery_method,invoice_number,invoice_materai,admin_photo,tech_note,tech_photo,tech_photos,tech_components,tech_components_verified,tech_name,assigned_to,courier_name,delivery_note,delivered_at,delivery_photo,distance_km,end_location,in_transit,faktur_pajak,npwp,has_po,po_number,info_tambahan,source_branch,source_type,tracking,cancel_reason,cancel_prev_status,faktur_checked,faktur_checked_at,faktur_checked_by,revisions';
 
   const loadOrders = async (retry=0) => {
     if (!db) return;
