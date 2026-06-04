@@ -6544,7 +6544,8 @@ function ComponentsForm({value, onChange}) {
 }
 
 function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName, onSelect}) {
-  const myJobs = orders.filter(o=>o.tech_name===techName && o.status==='tech');
+  // Tampilkan semua order yang di-assign ke teknisi ini dan belum selesai/dikirim
+  const myJobs = orders.filter(o=>o.tech_name===techName && !['tech_done','on_delivery','delivered','cancelled','ao_serah'].includes(o.status));
   // Servisan yang di-assign ke teknisi ini
   const myServiceJobs = (serviceIntakes||[]).filter(si=>si.tech_assigned===techName && ['to_technician','post_sc_checking'].includes(si.status));
   const [photoData, setPhotoData]     = useState({}); // instalasi/upgrade photos
