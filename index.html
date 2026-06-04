@@ -917,11 +917,16 @@ function App() {
   if (!role) return <LoginScreen onLogin={doLogin} demoMode={demoMode}/>;
 
   const BRANCH_REQUEST_ALLOWED = ['TC RIZAL','TC LUVI'];
-  const navItems = role==='supervisor' && userName==='Santo'
+  const PESAN_BARANG_ALLOWED_SALES = ['Aldi','Eliwaty','Tio'];
+  const canAccessPesanBarang = ['admin','ops','admin_pembelian','admin_online','supervisor'].includes(role)
+    || (role==='sales' && PESAN_BARANG_ALLOWED_SALES.includes(userName));
+
+  const navItems = (role==='supervisor' && userName==='Santo'
     ? [...ROLE_NAV[role], {id:'branch_request',icon:'📦',label:'Request Barang'}]
     : role==='cabang'
       ? ROLE_NAV[role].filter(n=>n.id!=='branch_request'||BRANCH_REQUEST_ALLOWED.includes(userName))
-      : ROLE_NAV[role];
+      : ROLE_NAV[role]
+  ).filter(n => n.id!=='pesan_barang' || canAccessPesanBarang);
 
   return (
     <div style={{display:'flex',minHeight:'100vh'}}>
@@ -1009,7 +1014,7 @@ function App() {
         {role==='admin_online' && page==='ao_orders' && <AdminOnlineOrders orders={orders} onSelect={setSelectedOrder}/>}
         {role==='admin_online' && page==='ao_tech_request' && <AdminOnlineTechRequest intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} createdBy={userName}/>}
         {role==='admin_online' && page==='ao_tasks' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName} createdByRole="admin_online"/>}
-        {['sales','admin','ops','supervisor','admin_pembelian','admin_online'].includes(role) && page==='pesan_barang' && <PesanBarangPage orders={purchaseOrders} onSave={savePurchaseOrder} onUpdate={updatePurchaseOrder} createdBy={userName} role={role}/>}
+        {canAccessPesanBarang && page==='pesan_barang' && <PesanBarangPage orders={purchaseOrders} onSave={savePurchaseOrder} onUpdate={updatePurchaseOrder} createdBy={userName} role={role}/>}
         {page==='absensi' && <AbsensiPage attendance={attendance} onSave={saveAttendance} onUpdate={updateAttendance} userName={userName} role={role} demoMode={demoMode}/>}
       </main>
 
