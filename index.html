@@ -9491,7 +9491,11 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
     });
   }, [allSlots.map(s=>s.id).join(',')]);
 
-  const orderedSlots = unifiedOrder.map(id=>allSlots.find(s=>s.id===id)).filter(Boolean);
+  // Fallback ke allSlots jika unifiedOrder belum diinisialisasi (render pertama sebelum useEffect)
+  // Mencegah list kosong sementara saat data baru load
+  const orderedSlots = unifiedOrder.length > 0
+    ? unifiedOrder.map(id=>allSlots.find(s=>s.id===id)).filter(Boolean)
+    : allSlots;
 
   // Tipe tugas yang sifatnya AMBIL (tidak perlu cek packing — barang belum ada di tangan)
   const PICKUP_TASK_TYPES = new Set(['Ambil Giro / Cek','Jemput Barang Supplier','Urus Servisan']);
