@@ -912,7 +912,7 @@ function App() {
         {role==='admin_online' && page==='ao_orders' && <AdminOnlineOrders orders={orders} onSelect={setSelectedOrder}/>}
         {role==='admin_online' && page==='ao_tech_request' && <AdminOnlineTechRequest intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} createdBy={userName}/>}
         {role==='admin_online' && page==='ao_tasks' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName} createdByRole="admin_online"/>}
-        {['sales','admin','ops','supervisor','admin_pembelian','admin_online'].includes(role) && page==='pesan_barang' && <PesanBarangPage orders={purchaseOrders} onSave={savePurchaseOrder} onUpdate={updatePurchaseOrder} onDelete={deletePurchaseOrder} createdBy={userName} role={role}/>}
+        {['sales','admin','ops','supervisor','admin_pembelian','admin_online'].includes(role) && page==='pesan_barang' && <PesanBarangPage orders={purchaseOrders} onSave={savePurchaseOrder} onUpdate={updatePurchaseOrder} createdBy={userName} role={role}/>}
         {page==='absensi' && <AbsensiPage attendance={attendance} onSave={saveAttendance} onUpdate={updateAttendance} userName={userName} role={role} demoMode={demoMode}/>}
       </main>
 
@@ -1855,12 +1855,16 @@ function ServiceIntakeEntry({onSave, createdByRole, createdBy, onDone, allIntake
 
 
 // ─── PESAN BARANG ──────────────────────────────────────────────────
-function PesanBarangForm({onSave, onCancel, createdBy}) {
-  const [supplier, setSupplier] = React.useState('');
-  const [supplierAddress, setSupplierAddress] = React.useState('');
-  const [expectedDate, setExpectedDate] = React.useState('');
-  const [notes, setNotes] = React.useState('');
-  const [items, setItems] = React.useState([{name:'',qty:'',unit:'pcs',price:'',notes:''}]);
+function PesanBarangForm({onSave, onCancel, createdBy, editData=null, onUpdate=null}) {
+  const isEdit = !!editData;
+  const [supplier, setSupplier] = React.useState(editData?.supplier_name||'');
+  const [supplierAddress, setSupplierAddress] = React.useState(editData?.supplier_address||'');
+  const [expectedDate, setExpectedDate] = React.useState(editData?.expected_date||'');
+  const [notes, setNotes] = React.useState(editData?.notes||'');
+  const [items, setItems] = React.useState(
+    editData?.items?.length ? editData.items.map(it=>({name:it.name||'',qty:it.qty||'',unit:it.unit||'pcs',price:it.price||'',notes:it.notes||''}))
+    : [{name:'',qty:'',unit:'pcs',price:'',notes:''}]
+  );
   const [saving, setSaving] = React.useState(false);
 
   const addItem = () => setItems(p=>[...p,{name:'',qty:'',unit:'pcs',price:'',notes:''}]);
@@ -1872,15 +1876,26 @@ function PesanBarangForm({onSave, onCancel, createdBy}) {
     const validItems = items.filter(it=>it.name.trim()&&it.qty);
     if (validItems.length===0) { alert('Minimal 1 item dengan nama dan qty'); return; }
     setSaving(true);
-    await onSave({
-      supplier_name: supplier.trim(),
-      supplier_address: supplierAddress.trim()||null,
-      expected_date: expectedDate||null,
-      notes: notes.trim()||null,
-      items: validItems.map(it=>({...it,qty:Number(it.qty),price:Number(it.price||0),arrived:false,arrived_at:null,arrived_by:null})),
-      status: 'pending',
-      created_by: createdBy,
-    });
+    if (isEdit && onUpdate) {
+      // Edit: pertahankan received_qty & arrived info dari item lama
+      const mergedItems = validItems.map((it,i)=>{
+        const old = editData.items?.[i]||{};
+        return {...it, qty:Number(it.qty), price:Number(it.price||0),
+          arrived: old.arrived||false, arrived_at: old.arrived_at||null, arrived_by: old.arrived_by||null,
+          received_qty: old.received_qty||0 };
+      });
+      await onUpdate(editData.id, {
+        supplier_name: supplier.trim(), supplier_address: supplierAddress.trim()||null,
+        expected_date: expectedDate||null, notes: notes.trim()||null, items: mergedItems,
+      });
+    } else {
+      await onSave({
+        supplier_name: supplier.trim(), supplier_address: supplierAddress.trim()||null,
+        expected_date: expectedDate||null, notes: notes.trim()||null,
+        items: validItems.map(it=>({...it,qty:Number(it.qty),price:Number(it.price||0),arrived:false,arrived_at:null,arrived_by:null})),
+        status: 'pending', created_by: createdBy,
+      });
+    }
     setSaving(false);
     onCancel();
   };
@@ -2086,7 +2101,7 @@ function LukasNoteSection({po, onUpdate, userName, role}) {
   );
 }
 
-function PurchaseOrderCard({po, onUpdate, onDelete, userName, canMark, role}) {
+function PurchaseOrderCard({po, onUpdate, onEdit, userName, canMark, role}) {
   const [expanded, setExpanded] = React.useState(false);
   const [addingTrip, setAddingTrip] = React.useState(false);
   const [tripMethod, setTripMethod] = React.useState('');
@@ -2257,11 +2272,11 @@ function PurchaseOrderCard({po, onUpdate, onDelete, userName, canMark, role}) {
             </span>
           )}
           <span style={{fontSize:11,color:'var(--text3)'}}>{expanded?'▲ Tutup':'▼ Detail'}</span>
-          {onDelete && po.status==='pending' && (po.created_by===userName || ['admin','ops'].includes(role)) && (
+          {po.status==='pending' && (po.created_by===userName || ['admin','ops'].includes(role)) && (
             <button
-              onClick={e=>{e.stopPropagation();if(window.confirm('Hapus pesanan ini? Tindakan ini tidak bisa dibatalkan.'))onDelete(po.id);}}
-              style={{background:'transparent',border:'1px solid var(--red)',color:'var(--red)',borderRadius:6,padding:'2px 8px',fontSize:12,cursor:'pointer',marginTop:2}}
-              title="Hapus pesanan">✕ Hapus</button>
+              onClick={e=>{e.stopPropagation(); onEdit&&onEdit(po);}}
+              style={{background:'transparent',border:'1px solid var(--accent2)',color:'var(--accent2)',borderRadius:6,padding:'2px 8px',fontSize:12,cursor:'pointer',marginTop:2}}
+              title="Edit pesanan">✏️ Edit</button>
           )}
         </div>
       </div>
@@ -2602,8 +2617,9 @@ function PurchaseOrderCard({po, onUpdate, onDelete, userName, canMark, role}) {
   );
 }
 
-function PesanBarangPage({orders, onSave, onUpdate, onDelete, createdBy, role}) {
+function PesanBarangPage({orders, onSave, onUpdate, createdBy, role}) {
   const [showForm, setShowForm] = React.useState(false);
+  const [editingPO, setEditingPO] = React.useState(null);
   const [filter, setFilter] = React.useState('all');
   const [search, setSearch] = React.useState('');
 
@@ -2619,6 +2635,7 @@ function PesanBarangPage({orders, onSave, onUpdate, onDelete, createdBy, role}) 
   };
 
   if (showForm) return <PesanBarangForm onSave={onSave} onCancel={()=>setShowForm(false)} createdBy={createdBy}/>;
+  if (editingPO) return <PesanBarangForm editData={editingPO} onUpdate={onUpdate} onSave={onSave} onCancel={()=>setEditingPO(null)} createdBy={createdBy}/>;
 
   return (
     <div style={{maxWidth:860}}>
@@ -2647,7 +2664,7 @@ function PesanBarangPage({orders, onSave, onUpdate, onDelete, createdBy, role}) 
 
       {filtered.length===0 && <div className="empty-state"><div className="icon">🛒</div><div>Belum ada pesanan</div></div>}
       {filtered.map(po=>(
-        <PurchaseOrderCard key={po.id} po={po} onUpdate={onUpdate} onDelete={onDelete} userName={createdBy} canMark={canMark} role={role}/>
+        <PurchaseOrderCard key={po.id} po={po} onUpdate={onUpdate} onEdit={setEditingPO} userName={createdBy} canMark={canMark} role={role}/>
       ))}
     </div>
   );
