@@ -362,7 +362,7 @@ function App() {
 
   const showToast = (msg, type='success') => {
     setToast({msg,type});
-    setTimeout(()=>setToast(null),3000);
+    setTimeout(()=>setToast(null), type==='error' ? 10000 : 3000);
   };
 
   const loadOrders = async (retry=0) => {
