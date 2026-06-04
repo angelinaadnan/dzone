@@ -1683,7 +1683,7 @@ function PesanBarangForm({onSave, onCancel, createdBy}) {
 
 function LukasNoteSection({po, onUpdate, userName, role}) {
   const isLukas = userName === 'Lukas';
-  const canReadMark = ['admin','ops','admin_pembelian'].includes(role);
+  const canReadMark = ['admin','admin_pembelian','admin_online'].includes(role);
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(po.lukas_note||'');
   const [saving, setSaving] = React.useState(false);
