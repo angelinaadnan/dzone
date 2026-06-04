@@ -282,7 +282,7 @@ const ROLE_NAV = {
   technician:     [{id:'summary',icon:'📊',label:'Ringkasan'},{id:'my_jobs',icon:'🔧',label:'My Jobs'},{id:'absensi',icon:'🗓',label:'Absensi'}],
   cabang:         [{id:'branch_dashboard',icon:'📊',label:'Dashboard'},{id:'branch_request',icon:'📦',label:'Request Barang'},{id:'branch_service',icon:'🔧',label:'Servis'},{id:'branch_titip_kirim',icon:'📬',label:'Titip Kirim'},{id:'branch_history',icon:'📋',label:'Riwayat'},{id:'absensi',icon:'🗓',label:'Absensi'}],
   admin_pembelian:[{id:'pesan_barang',icon:'🛒',label:'Pesan Barang'},{id:'absensi',icon:'🗓',label:'Absensi'}],
-  admin_online:   [{id:'ao_invoicing',icon:'🧾',label:'Invoicing'},{id:'ao_orders',icon:'📋',label:'All Orders'},{id:'ao_tech_request',icon:'🔧',label:'Minta Teknisi'},{id:'pesan_barang',icon:'🛒',label:'Pesan Barang'},{id:'absensi',icon:'🗓',label:'Absensi'}],
+  admin_online:   [{id:'ao_invoicing',icon:'🧾',label:'Invoicing'},{id:'ao_orders',icon:'📋',label:'All Orders'},{id:'ao_tech_request',icon:'🔧',label:'Minta Teknisi'},{id:'ao_tasks',icon:'✅',label:'To Do List'},{id:'pesan_barang',icon:'🛒',label:'Pesan Barang'},{id:'absensi',icon:'🗓',label:'Absensi'}],
   absensi_only:   [{id:'absensi',icon:'🗓',label:'Absensi'}],
   supervisor:     [{id:'sup_dashboard',icon:'📊',label:'Dashboard'},{id:'sup_new_order',icon:'📝',label:'New Order'},{id:'sup_quotations',icon:'📄',label:'Penawaran'},{id:'sup_orders',icon:'📦',label:'Orderan'},{id:'sup_service',icon:'🛠',label:'Servis'},{id:'sup_branch',icon:'🏢',label:'Cabang'},{id:'sup_tasks',icon:'✅',label:'To Do List'},{id:'sup_tech',icon:'🔧',label:'Teknisi'},{id:'sup_kurir',icon:'🚚',label:'Kurir'},{id:'pesan_barang',icon:'🛒',label:'Pesan Barang'},{id:'absensi',icon:'🗓',label:'Absensi'}],
 };
@@ -801,6 +801,7 @@ function App() {
         {role==='admin_online' && page==='ao_invoicing' && <AdminOnlineInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
         {role==='admin_online' && page==='ao_orders' && <AdminOnlineOrders orders={orders} onSelect={setSelectedOrder}/>}
         {role==='admin_online' && page==='ao_tech_request' && <AdminOnlineTechRequest intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} createdBy={userName}/>}
+        {role==='admin_online' && page==='ao_tasks' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName} createdByRole="admin_online"/>}
         {['sales','admin','ops','supervisor','admin_pembelian','admin_online'].includes(role) && page==='pesan_barang' && <PesanBarangPage orders={purchaseOrders} onSave={savePurchaseOrder} onUpdate={updatePurchaseOrder} onDelete={deletePurchaseOrder} createdBy={userName} role={role}/>}
         {page==='absensi' && <AbsensiPage attendance={attendance} onSave={saveAttendance} onUpdate={updateAttendance} userName={userName} role={role} demoMode={demoMode}/>}
       </main>
