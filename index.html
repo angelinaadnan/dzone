@@ -477,6 +477,14 @@ function App() {
     showToast('Diperbarui!');
   };
 
+  const deletePurchaseOrder = async (id) => {
+    if (!db) { setPurchaseOrders(prev=>prev.filter(p=>p.id!==id)); showToast('Pesanan dihapus (demo)'); return; }
+    const {error} = await db.from('purchase_orders').delete().eq('id',id);
+    if (error) { showToast('Error hapus: '+error.message,'error'); return; }
+    setPurchaseOrders(prev=>prev.filter(p=>p.id!==id));
+    showToast('Pesanan berhasil dihapus!');
+  };
+
   const loadQuotations = async (retry=0) => {
     if (!db) return;
     const {data,error} = await db.from('quotations').select('*').order('created_at',{ascending:false});
@@ -755,7 +763,7 @@ function App() {
         {role==='admin_online' && page==='ao_invoicing' && <AdminOnlineInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
         {role==='admin_online' && page==='ao_orders' && <AdminOnlineOrders orders={orders} onSelect={setSelectedOrder}/>}
         {role==='admin_online' && page==='ao_tech_request' && <AdminOnlineTechRequest intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} createdBy={userName}/>}
-        {['sales','admin','ops','supervisor','admin_pembelian','admin_online'].includes(role) && page==='pesan_barang' && <PesanBarangPage orders={purchaseOrders} onSave={savePurchaseOrder} onUpdate={updatePurchaseOrder} createdBy={userName} role={role}/>}
+        {['sales','admin','ops','supervisor','admin_pembelian','admin_online'].includes(role) && page==='pesan_barang' && <PesanBarangPage orders={purchaseOrders} onSave={savePurchaseOrder} onUpdate={updatePurchaseOrder} onDelete={deletePurchaseOrder} createdBy={userName} role={role}/>}
         {page==='absensi' && <AbsensiPage attendance={attendance} onSave={saveAttendance} onUpdate={updateAttendance} userName={userName} role={role} demoMode={demoMode}/>}
       </main>
 
@@ -1929,7 +1937,7 @@ function LukasNoteSection({po, onUpdate, userName, role}) {
   );
 }
 
-function PurchaseOrderCard({po, onUpdate, userName, canMark, role}) {
+function PurchaseOrderCard({po, onUpdate, onDelete, userName, canMark, role}) {
   const [expanded, setExpanded] = React.useState(false);
   const [addingTrip, setAddingTrip] = React.useState(false);
   const [tripMethod, setTripMethod] = React.useState('');
@@ -2100,6 +2108,12 @@ function PurchaseOrderCard({po, onUpdate, userName, canMark, role}) {
             </span>
           )}
           <span style={{fontSize:11,color:'var(--text3)'}}>{expanded?'▲ Tutup':'▼ Detail'}</span>
+          {onDelete && po.status==='pending' && (po.created_by===userName || ['admin','ops'].includes(role)) && (
+            <button
+              onClick={e=>{e.stopPropagation();if(window.confirm('Hapus pesanan ini? Tindakan ini tidak bisa dibatalkan.'))onDelete(po.id);}}
+              style={{background:'transparent',border:'1px solid var(--red)',color:'var(--red)',borderRadius:6,padding:'2px 8px',fontSize:12,cursor:'pointer',marginTop:2}}
+              title="Hapus pesanan">✕ Hapus</button>
+          )}
         </div>
       </div>
 
@@ -2439,7 +2453,7 @@ function PurchaseOrderCard({po, onUpdate, userName, canMark, role}) {
   );
 }
 
-function PesanBarangPage({orders, onSave, onUpdate, createdBy, role}) {
+function PesanBarangPage({orders, onSave, onUpdate, onDelete, createdBy, role}) {
   const [showForm, setShowForm] = React.useState(false);
   const [filter, setFilter] = React.useState('all');
   const [search, setSearch] = React.useState('');
@@ -2484,7 +2498,7 @@ function PesanBarangPage({orders, onSave, onUpdate, createdBy, role}) {
 
       {filtered.length===0 && <div className="empty-state"><div className="icon">🛒</div><div>Belum ada pesanan</div></div>}
       {filtered.map(po=>(
-        <PurchaseOrderCard key={po.id} po={po} onUpdate={onUpdate} userName={createdBy} canMark={canMark} role={role}/>
+        <PurchaseOrderCard key={po.id} po={po} onUpdate={onUpdate} onDelete={onDelete} userName={createdBy} canMark={canMark} role={role}/>
       ))}
     </div>
   );
