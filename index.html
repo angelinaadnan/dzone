@@ -7262,12 +7262,11 @@ function SIHistoryRow({si, isDone, techName, onUpdateSI}) {
           {isDone && !si.tech_note && (
             <div style={{fontSize:12,color:'var(--text3)',fontStyle:'italic'}}>— Catatan tindakan belum diisi —</div>
           )}
-          {/* Log Komponen — notes bisa langsung diedit kalau belum diverifikasi */}
+          {/* Log Komponen — read only untuk teknisi */}
           <CompLogDisplay
             comp={si.tech_components}
             verified={si.tech_components_verified}
             onVerify={null} supervisorName={null} canVerify={false} showHistory={false}
-            onSaveNotes={onUpdateSI && !si.tech_components_verified ? (newComp)=>onUpdateSI(si.id,{tech_components:newComp}) : null}
           />
           {si.tech_components_verified && <div style={{marginTop:4,fontSize:11,color:'var(--green)'}}>🔒 Log komponen dikunci supervisor</div>}
         </div>
@@ -7365,7 +7364,6 @@ function TechnicianSummary({orders, serviceIntakes, techName, onUpdate, onUpdate
                     comp={o.tech_components}
                     verified={o.tech_components_verified}
                     onVerify={null} supervisorName={null} canVerify={false} showHistory={false}
-                    onSaveNotes={!o.tech_components_verified ? (newComp)=>onUpdate(o.id,{tech_components:newComp}) : null}
                   />
                   {o.tech_components_verified && <div style={{marginTop:4,fontSize:11,color:'var(--green)'}}>🔒 Dikunci — tidak bisa diedit</div>}
                 </>
