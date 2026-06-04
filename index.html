@@ -6031,7 +6031,8 @@ function CourierDeliveries({orders, onUpdate, courierName, onSelect, checkins, o
     let loc = null;
     try { loc = await getGPS(); } catch(e) {
       const isDenied = e.code===1 || (e.message||'').toLowerCase().includes('denied');
-      setCheckinGpsErr(isDenied ? 'denied' : (e.message||'GPS gagal'));
+      const isTimeout = e.code===3 || (e.message||'').toLowerCase().includes('timeout');
+      setCheckinGpsErr(isDenied ? 'denied' : isTimeout ? 'Timeout — coba di luar gedung / aktifkan WiFi' : (e.message||'GPS gagal'));
       setCheckinLoading(false); return;
     }
     await onCheckin({courier_name: courierName, lat: loc.lat, lng: loc.lng, note: checkinNote||'Check-in Deliveries'});
@@ -7546,13 +7547,23 @@ function CancelRequestsPanel({orders, serviceIntakes, courierTasks, onUpdateOrde
 }
 
 // ─── GPS HELPER ────────────────────────────────────────────────────
-const getGPS = () => new Promise((resolve, reject) =>
-  navigator.geolocation.getCurrentPosition(
-    pos => resolve({lat: pos.coords.latitude, lng: pos.coords.longitude, time: new Date().toISOString()}),
-    err => reject(err),
-    {timeout:10000, enableHighAccuracy:true}
-  )
-);
+const getGPS = (highAcc=false) => new Promise((resolve, reject) => {
+  if (!navigator.geolocation) { reject(new Error('GPS tidak tersedia di browser ini')); return; }
+  const ok = pos => resolve({
+    lat: pos.coords.latitude,
+    lng: pos.coords.longitude,
+    acc: Math.round(pos.coords.accuracy||0),
+    time: new Date().toISOString()
+  });
+  // Coba cepat (network/WiFi) dulu — lebih andal di dalam gedung
+  navigator.geolocation.getCurrentPosition(ok, err => {
+    if (err.code === 1) { reject(err); return; } // Izin ditolak — langsung gagal
+    // Timeout / unavailable → retry lebih longgar dengan cached position
+    navigator.geolocation.getCurrentPosition(ok, reject,
+      {timeout:20000, enableHighAccuracy:false, maximumAge:120000}
+    );
+  }, {timeout:8000, enableHighAccuracy:false, maximumAge:30000});
+});
 
 // ─── COURIER TASK SYSTEM ───────────────────────────────────────────
 const TASK_TYPES = ['Urus Servisan','Antar Barang ke Cabang','Ambil Giro / Cek','Antar Dokumen','Jemput Barang Supplier','Lainnya'];
