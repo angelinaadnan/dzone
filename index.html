@@ -738,7 +738,8 @@ function App() {
 
   const loadAttendance = async (retry=0) => {
     if (!db) return;
-    const {data,error} = await db.from('attendance').select('*').order('check_in',{ascending:false}).limit(1000);
+    const attCols = 'id,created_at,user_name,role,date,check_in,check_out,check_in_photo,check_out_photo,check_in_lat,check_in_lng,check_in_acc,check_in_address,check_out_lat,check_out_lng,check_out_acc,check_out_address,notes';
+    const {data,error} = await db.from('attendance').select(attCols).order('date',{ascending:false}).order('check_in',{ascending:false,nullsFirst:false}).limit(1000);
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
@@ -1024,12 +1025,12 @@ function CameraCapture({type, onCapture, onClose}) {
         }, 200);
       });
     }
-    // ─── GPS WAJIB ─────────────────────────────────────────────────
-    if (!gpsRef.current || gpsRef.current.status!=='ok') {
-      setStamping(false);
+    // ─── GPS (opsional — tampilkan peringatan jika tidak tersedia) ──
+    const gpsOk = gpsRef.current?.status === 'ok';
+    if (!gpsOk) {
       const errMsg = gpsRef.current?.error || 'GPS tidak terdeteksi';
-      alert('❌ Lokasi GPS wajib untuk absensi!\n\n' + errMsg + '\n\nCara mengaktifkan:\n• Izinkan akses lokasi di browser (Allow Location)\n• Aktifkan GPS / WiFi di HP\n• Buka kamera absensi lagi');
-      return;
+      const lanjut = window.confirm('⚠️ Lokasi GPS tidak tersedia:\n' + errMsg + '\n\nAbsensi tetap akan tersimpan tanpa data lokasi.\nLanjutkan?');
+      if (!lanjut) { setStamping(false); return; }
     }
     // ───────────────────────────────────────────────────────────────
     // Stamp waktu + GPS ke foto
@@ -1405,9 +1406,6 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
             {myToday?.check_out_photo&&<img src={myToday.check_out_photo} style={{width:80,height:60,objectFit:'cover',borderRadius:6,border:'2px solid var(--coral)',cursor:'pointer'}} onClick={()=>window.open(myToday.check_out_photo)} alt="out"/>}
           </div>
           {/* Check-in/out flows */}
-          {!myToday?.check_in && photoStep!=='in' && (
-            <button className="btn-green btn-sm" onClick={()=>{setPhotoStep('in');setShowCamera('in');}}>🟢 Check In Sekarang</button>
-          )}
           {!myToday?.check_in && (
             <button className="btn-green btn-sm" onClick={()=>setShowCamera('in')} disabled={loading}>
               {loading?'⏳ Menyimpan...':'🟢 Check In Sekarang'}
