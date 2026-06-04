@@ -639,6 +639,60 @@ function App() {
     showToast('Pesanan berhasil dihapus!');
   };
 
+  // ── CLEANUP BASE64 ─────────────────────────────────────────────────
+  const [cleanupRunning, setCleanupRunning] = React.useState(false);
+  const runBase64Cleanup = async () => {
+    if (!db || cleanupRunning) return;
+    setCleanupRunning(true);
+    showToast('🧹 Mulai bersihkan data besar...', 'success');
+    let total = 0;
+    const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+    // Helper: null simple column in batches
+    const cleanCol = async (table, col) => {
+      for (let i=0; i<50; i++) {
+        const {data} = await db.from(table).select('id').like(col,'data:%').limit(5);
+        if (!data?.length) break;
+        for (const row of data) {
+          await db.from(table).update({[col]:null}).eq('id',row.id);
+          total++;
+        }
+        await sleep(300);
+      }
+    };
+
+    // Helper: null photo inside JSONB array
+    const cleanJsonbPhoto = async (table, jsonbCol, photoField) => {
+      for (let i=0; i<30; i++) {
+        const {data} = await db.from(table).select(`id,${jsonbCol}`).limit(2);
+        if (!data?.length) break;
+        let anyUpdated = false;
+        for (const row of (data||[])) {
+          const arr = row[jsonbCol];
+          if (!Array.isArray(arr)) continue;
+          const hasB64 = arr.some(x=>(x[photoField]||'').startsWith('data:'));
+          if (!hasB64) continue;
+          const updated = arr.map(x=>(x[photoField]||'').startsWith('data:')?{...x,[photoField]:null}:x);
+          await db.from(table).update({[jsonbCol]:updated}).eq('id',row.id);
+          total++; anyUpdated = true;
+        }
+        if (!anyUpdated) break;
+        await sleep(400);
+      }
+    };
+
+    try {
+      showToast('🧹 Bersihkan attendance...'); await cleanCol('attendance','check_in_photo'); await cleanCol('attendance','check_out_photo');
+      showToast('🧹 Bersihkan courier tasks...'); await cleanCol('courier_tasks','arrival_photo'); await cleanCol('courier_tasks','departure_photo');
+      showToast('🧹 Bersihkan orders...'); await cleanCol('orders','delivery_photo');
+      showToast('🧹 Bersihkan service intakes...'); await cleanCol('service_intakes','intake_photo'); await cleanCol('service_intakes','completion_photo');
+      showToast('🧹 Bersihkan branch requests...'); await cleanJsonbPhoto('branch_requests','trips','photo');
+      showToast('🧹 Bersihkan purchase orders...'); await cleanJsonbPhoto('purchase_orders','pickups','arrival_photo');
+      showToast(`✅ Selesai! ${total} foto base64 dibersihkan.`, 'success');
+    } catch(e) { showToast('Error cleanup: '+e.message,'error'); }
+    setCleanupRunning(false);
+  };
+
   const loadQuotations = async (retry=0) => {
     if (!db) return;
     const {data,error} = await db.from('quotations').select('*').order('created_at',{ascending:false});
@@ -885,6 +939,12 @@ function App() {
           <div style={{color:'var(--text2)'}}>{ROLE_LABELS[role]}</div>
           <div style={{fontWeight:600,marginTop:2}}>{userName}</div>
           <button className="btn-secondary btn-sm" style={{marginTop:10,width:'100%'}} onClick={doLogout}>Logout</button>
+          {role==='admin' && (
+            <button onClick={runBase64Cleanup} disabled={cleanupRunning}
+              style={{marginTop:6,width:'100%',padding:'6px',fontSize:11,borderRadius:6,border:'1px solid var(--amber)',background:'transparent',color: cleanupRunning?'var(--text3)':'var(--amber)',cursor:cleanupRunning?'not-allowed':'pointer'}}>
+              {cleanupRunning?'⏳ Membersihkan...':'🧹 Bersihkan DB'}
+            </button>
+          )}
         </div>
       </aside>
 
