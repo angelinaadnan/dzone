@@ -856,8 +856,8 @@ function CameraCapture({type, onCapture, onClose}) {
         <div style={{display:'flex',gap:10,alignItems:'center'}}>
           {!preview&&!camErr&&!starting&&(
             <button onClick={()=>startCam(!facingFront)}
-              style={{background:'rgba(255,255,255,0.15)',color:'#fff',border:'none',borderRadius:20,padding:'5px 12px',cursor:'pointer',fontSize:12}}>
-              🔄 Balik
+              style={{background:'rgba(255,255,255,0.2)',color:'#fff',border:'1px solid rgba(255,255,255,0.3)',borderRadius:20,padding:'7px 14px',cursor:'pointer',fontSize:12,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
+              🔄 {facingFront?'Kamera Belakang':'Kamera Depan'}
             </button>
           )}
           <button onClick={()=>{stopAll();onClose();}}
