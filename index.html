@@ -3951,6 +3951,8 @@ function CompLogDisplay({comp, verified, onVerify, supervisorName, canVerify, sh
       {(comp.masuk||[]).filter(r=>r.spec||r.brand).map((r,i)=>renderRow(r,i,'masuk','var(--green)','🔼 Masuk'))}
       {(comp.keluar||[]).filter(r=>r.spec||r.brand).map((r,i)=>renderRow(r,i,'keluar','var(--amber)','🔽 Keluar'))}
 
+      {verified && <div style={{fontSize:10,color:'var(--text3)',marginTop:6}}>🔒 Log dikunci · {fmtDateTime(verified.at)}</div>}
+
       {/* Riwayat edit */}
       {showHistory && edits.length>0 && (
         <div style={{marginTop:8,borderTop:'1px solid var(--border)',paddingTop:8}}>
@@ -3973,7 +3975,6 @@ function CompLogDisplay({comp, verified, onVerify, supervisorName, canVerify, sh
         </div>
       )}
 
-      {verified && <div style={{fontSize:10,color:'var(--text3)',marginTop:6}}>🔒 Log dikunci · {fmtDateTime(verified.at)}</div>}
     </div>
   );
 }
