@@ -3119,6 +3119,7 @@ function SupervisorServiceCard({si, allIntakes}) {
   const [showHistory, setShowHistory] = React.useState(false);
   const [showReceipt, setShowReceipt] = React.useState(false);
   const [showSNHistory, setShowSNHistory] = React.useState(false);
+  const [showScPhoto, setShowScPhoto] = React.useState(false);
 
   // Count how many times this S/N has been serviced (excluding current)
   const snRepeatCount = si.serial_number && allIntakes
@@ -3153,11 +3154,22 @@ function SupervisorServiceCard({si, allIntakes}) {
         <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
           <span className={`badge ${STATUS_SI[si.status]?.cls||'badge-new'}`} style={{whiteSpace:'nowrap'}}>{STATUS_SI[si.status]?.label||si.status}</span>
           <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={()=>setShowReceipt(true)}>📄 Tanda Terima</button>
+          {si.sc_receipt_photo && (
+            <button className="btn-secondary btn-sm" style={{fontSize:11,color:'var(--blue)'}} onClick={()=>setShowScPhoto(p=>!p)}>
+              {showScPhoto ? '▲ Tutup' : '📸 Nota SC'}
+            </button>
+          )}
           <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={()=>setShowHistory(h=>!h)}>
             {showHistory?'▲ Tutup':'📋 History'}
           </button>
         </div>
       </div>
+      {showScPhoto && si.sc_receipt_photo && (
+        <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border)'}}>
+          <div style={{fontSize:11,fontWeight:600,color:'var(--blue)',marginBottom:6}}>📄 Tanda Terima SC — {si.service_center_name}</div>
+          <img src={si.sc_receipt_photo} style={{width:'100%',maxHeight:320,objectFit:'contain',borderRadius:8,background:'var(--bg2)',border:'1px solid var(--border)'}} alt="Nota SC"/>
+        </div>
+      )}
       {showSNHistory && si.serial_number && allIntakes && (
         <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)'}}>
           <div style={{fontSize:12,fontWeight:600,color:'var(--amber)',marginBottom:8}}>📊 Riwayat S/N: {si.serial_number}</div>
@@ -13005,6 +13017,17 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
   // Catatan Ops
   const [showNoteEdit, setShowNoteEdit] = React.useState(false);
   const [noteText, setNoteText] = React.useState(si.ops_note||'');
+  // SC nota / tanda terima upload
+  const [scNotaUploading, setScNotaUploading] = React.useState(false);
+  const handleScNotaUpload = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    setScNotaUploading(true);
+    const url = await uploadDocument(file, 'sc_nota');
+    if (url) { onUpdate(si.id, {sc_receipt_photo: url}); }
+    else { alert('Gagal upload foto. Coba lagi.'); }
+    setScNotaUploading(false);
+    e.target.value = '';
+  };
   const inputSm = {padding:'6px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,width:'100%',boxSizing:'border-box'};
 
   // Batal confirm handler — used from multiple statuses
@@ -13235,7 +13258,19 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
       {si.status==='at_service_center' && (
         <div style={{paddingTop:10,borderTop:'1px solid var(--border)'}}>
           <div style={{fontSize:13,marginBottom:8}}>🏪 Di <b>{si.service_center_name}</b></div>
-          {si.sc_receipt_photo && <img src={si.sc_receipt_photo} style={{width:'100%',maxHeight:140,objectFit:'cover',borderRadius:8,marginBottom:10}} alt="bukti SC"/>}
+          {/* Foto / Nota SC */}
+          <div style={{marginBottom:10}}>
+            {si.sc_receipt_photo && (
+              <div style={{marginBottom:6}}>
+                <div style={{fontSize:11,color:'var(--text3)',marginBottom:4}}>📄 Tanda Terima SC:</div>
+                <img src={si.sc_receipt_photo} style={{width:'100%',maxHeight:220,objectFit:'contain',borderRadius:8,background:'var(--bg2)',border:'1px solid var(--border)'}} alt="Tanda Terima SC"/>
+              </div>
+            )}
+            <label style={{cursor:scNotaUploading?'not-allowed':'pointer',display:'inline-flex',alignItems:'center',gap:5,padding:'5px 10px',background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.3)',borderRadius:6,fontSize:12,color:'var(--accent)',marginTop:4}}>
+              {scNotaUploading ? '⏳ Uploading...' : (si.sc_receipt_photo ? '🔄 Ganti Foto Nota SC' : '📄 Upload Tanda Terima SC')}
+              <input type="file" accept="image/*" style={{display:'none'}} onChange={handleScNotaUpload} disabled={scNotaUploading}/>
+            </label>
+          </div>
           <div style={{fontSize:12,fontWeight:600,marginBottom:6,color:'var(--amber)'}}>SC sudah selesai? Assign kurir untuk ambil:</div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {KURIR_LIST.map(n=>(
