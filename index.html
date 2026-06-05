@@ -580,10 +580,15 @@ function App() {
     const since = new Date(); since.setMonth(since.getMonth() - monthsBack);
     // npwp_file & po_file di-exclude — di-load on-demand via loadOrderFiles (lazy)
     const orderCols = 'id,created_at,updated_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status';
-    const {data,error} = await db.from('orders').select(orderCols)
+    let ordersQ = db.from('orders').select(orderCols)
       .gte('created_at', since.toISOString())
       .order('created_at',{ascending:false})
       .limit(500);
+    // Filter per-user untuk role non-admin — hanya load order yang relevan
+    if (role==='technician') ordersQ = ordersQ.eq('tech_name', userName);
+    else if (role==='courier') ordersQ = ordersQ.eq('courier_name', userName);
+    else if (role==='sales') ordersQ = ordersQ.eq('sales_name', userName);
+    const {data,error} = await ordersQ;
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
@@ -610,10 +615,14 @@ function App() {
     if (!db) return;
     const monthsBack = ['admin','ops','supervisor'].includes(role) ? 6 : 3;
     const since = new Date(); since.setMonth(since.getMonth() - monthsBack);
-    const {data,error} = await db.from('service_intakes').select('*')
+    let siQ = db.from('service_intakes').select('*')
       .gte('created_at', since.toISOString())
       .order('created_at',{ascending:false})
       .limit(300);
+    // Filter per-user untuk role non-admin
+    if (role==='technician') siQ = siQ.eq('tech_assigned', userName);
+    else if (role==='courier') siQ = siQ.or(`assigned_courier.eq.${userName},sc_delivery_courier.eq.${userName},sc_pickup_courier.eq.${userName}`);
+    const {data,error} = await siQ;
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
@@ -658,7 +667,9 @@ function App() {
     if (!db) return;
     const cols = 'id,created_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo';
     const since30 = new Date(); since30.setDate(since30.getDate()-30);
-    const {data,error} = await db.from('courier_tasks').select(cols).gte('created_at',since30.toISOString()).order('created_at',{ascending:false}).limit(200);
+    let tasksQ = db.from('courier_tasks').select(cols).gte('created_at',since30.toISOString()).order('created_at',{ascending:false}).limit(200);
+    if (role==='courier') tasksQ = tasksQ.eq('assigned_courier', userName);
+    const {data,error} = await tasksQ;
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
@@ -915,7 +926,9 @@ function App() {
   const loadCourierCheckins = async (retry=0) => {
     if (!db) return;
     const since14 = new Date(); since14.setDate(since14.getDate()-14);
-    const {data,error} = await db.from('courier_checkins').select('*').gte('created_at',since14.toISOString()).order('created_at',{ascending:false}).limit(500);
+    let checkinsQ = db.from('courier_checkins').select('*').gte('created_at',since14.toISOString()).order('created_at',{ascending:false}).limit(500);
+    if (role==='courier') checkinsQ = checkinsQ.eq('courier_name', userName);
+    const {data,error} = await checkinsQ;
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
@@ -959,7 +972,10 @@ function App() {
     if (!db) return;
     // Coba select semua kolom
     const since30d = new Date(); since30d.setDate(since30d.getDate()-30);
-    const {data,error} = await db.from('attendance').select('*').gte('check_in',since30d.toISOString()).order('check_in',{ascending:false}).limit(1000);
+    const needAllAttendance = ['admin','ops','supervisor','absensi_only'].includes(role);
+    let attendQ = db.from('attendance').select('*').gte('check_in',since30d.toISOString()).order('check_in',{ascending:false}).limit(1000);
+    if (!needAllAttendance) attendQ = attendQ.eq('user_name', userName);
+    const {data,error} = await attendQ;
     if (!error) { if (data) setAttendance(data); return; }
     const isTimeout = (error.message||'').includes('timeout') || (error.message||'').includes('canceling');
     // Jika timeout dan masih ada retry, coba lagi
@@ -970,7 +986,9 @@ function App() {
     // Fallback: select tanpa foto (hindari base64 besar)
     if (isTimeout) {
       const safeCols = 'id,created_at,user_name,role,date,check_in,check_out,check_in_lat,check_in_lng,check_out_lat,check_out_lng,notes';
-      const {data:d2, error:e2} = await db.from('attendance').select(safeCols).gte('check_in',since30d.toISOString()).order('check_in',{ascending:false}).limit(1000);
+      let fallbackQ = db.from('attendance').select(safeCols).gte('check_in',since30d.toISOString()).order('check_in',{ascending:false}).limit(1000);
+      if (!needAllAttendance) fallbackQ = fallbackQ.eq('user_name', userName);
+      const {data:d2, error:e2} = await fallbackQ;
       if (!e2 && d2) { setAttendance(d2); showToast('⚠ Data foto absensi tidak termuat (ada data besar di DB)', 'error'); return; }
     }
     showToast('Error attendance: '+error.message, 'error');
