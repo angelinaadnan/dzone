@@ -1131,8 +1131,8 @@ function App() {
         {role==='supervisor' && page==='sup_service' && <SupervisorService intakes={serviceIntakes} orders={orders}/>}
         {role==='supervisor' && page==='sup_branch' && <SupervisorBranch requests={branchRequests}/>}
         {role==='supervisor' && page==='sup_tasks' && <SupervisorTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName}/>}
-        {role==='supervisor' && page==='sup_tech' && <SupervisorTech orders={orders} serviceIntakes={serviceIntakes} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} supervisorName={userName}/>}
-        {role==='ops' && page==='op_tech_log' && <SupervisorTech orders={orders} serviceIntakes={serviceIntakes} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} supervisorName={userName}/>}
+        {role==='supervisor' && page==='sup_tech' && <SupervisorTech orders={orders} serviceIntakes={serviceIntakes} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} supervisorName={userName} canVerify={true}/>}
+        {role==='ops' && page==='op_tech_log' && <SupervisorTech orders={orders} serviceIntakes={serviceIntakes} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} supervisorName={userName} canVerify={false}/>}
         {role==='supervisor' && page==='sup_kurir' && <CourierDailyMonitor orders={orders} courierTasks={courierTasks} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes}/>}
         {role==='supervisor' && page==='sup_minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName} createdByRole="supervisor"/>}
         {role==='admin_online' && page==='ao_invoicing' && <AdminOnlineInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
@@ -3978,7 +3978,7 @@ function CompLogDisplay({comp, verified, onVerify, supervisorName, canVerify, sh
   );
 }
 
-function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, supervisorName}) {
+function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, supervisorName, canVerify=false}) {
   const techOrders = orders.filter(o=>o.tech_name || ['tech','tech_done'].includes(o.status));
   const techSI = (serviceIntakes||[]).filter(si=>si.tech_assigned);
   const [filterTech, setFilterTech] = React.useState('all');
@@ -4059,7 +4059,7 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                 verified={o.tech_components_verified}
                 onVerify={val=>verifyComp(o.id, val)}
                 supervisorName={supervisorName}
-                canVerify={true}
+                canVerify={canVerify}
                 showHistory={true}
                 onSaveNotes={!o.tech_components_verified ? (newComp)=>onUpdate(o.id,{tech_components:newComp}) : null}
               />
@@ -4092,7 +4092,7 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                 verified={si.tech_components_verified}
                 onVerify={val=>verifySIComp(si.id, val)}
                 supervisorName={supervisorName}
-                canVerify={true}
+                canVerify={canVerify}
                 showHistory={true}
                 onSaveNotes={!si.tech_components_verified ? (newComp)=>onUpdateSI(si.id,{tech_components:newComp}) : null}
               />
