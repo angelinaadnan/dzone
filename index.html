@@ -634,7 +634,11 @@ function App() {
       showToast('Updated (demo)');
       return;
     }
-    const {error} = await db.from('service_intakes').update(updates).eq('id',id);
+    let {error} = await db.from('service_intakes').update(updates).eq('id',id);
+    if (error && (error.message||'').toLowerCase().includes('column')) {
+      const safe = Object.fromEntries(Object.entries(updates).filter(([k])=>!['tech_note_edits'].includes(k)));
+      ({error} = await db.from('service_intakes').update(safe).eq('id',id));
+    }
     if (error) { showToast('Error: '+error.message,'error'); return; }
     await loadServiceIntakes();
     showToast('Status servis diperbarui!');
@@ -1023,7 +1027,11 @@ function App() {
       showToast('Updated (demo mode)');
       return updated;
     }
-    const {data,error} = await db.from('orders').update(updated).eq('id',id).select().single();
+    let {data,error} = await db.from('orders').update(updated).eq('id',id).select().single();
+    if (error && (error.message||'').toLowerCase().includes('column')) {
+      const safeUpdated = Object.fromEntries(Object.entries(updated).filter(([k])=>!['tech_note_edits'].includes(k)));
+      ({data,error} = await db.from('orders').update(safeUpdated).eq('id',id).select().single());
+    }
     if (error) { showToast('Error: '+error.message,'error'); return null; }
     await loadOrders();
     showToast('Status updated!');
@@ -3979,6 +3987,66 @@ function CompLogDisplay({comp, verified, onVerify, supervisorName, canVerify, sh
   );
 }
 
+function TechNoteEditBox({note, edits=[], onSave, editorName}) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [openHistory, setOpenHistory] = React.useState(false);
+
+  const startEdit = () => { setDraft(note||''); setEditing(true); };
+  const cancel = () => { setEditing(false); setDraft(''); };
+  const save = async () => {
+    if (draft.trim() === (note||'').trim()) { cancel(); return; }
+    setSaving(true);
+    const newEdits = [...edits, {by: editorName, at: new Date().toISOString(), before: note||'', after: draft.trim()}];
+    await onSave({tech_note: draft.trim(), tech_note_edits: newEdits});
+    setSaving(false);
+    setEditing(false);
+  };
+
+  return (
+    <div style={{marginTop:6}}>
+      {editing ? (
+        <div style={{background:'var(--bg3)',borderRadius:8,padding:'10px 12px',border:'1px solid var(--border2)'}}>
+          <textarea rows={3} value={draft} onChange={e=>setDraft(e.target.value)}
+            style={{width:'100%',background:'var(--bg)',border:'1px solid var(--border2)',borderRadius:6,padding:'6px 10px',color:'var(--text)',fontSize:13,resize:'vertical',boxSizing:'border-box'}}
+            placeholder="Catatan teknisi..."
+          />
+          <div style={{display:'flex',gap:6,marginTop:6}}>
+            <button className="btn-primary btn-sm" onClick={save} disabled={saving}>{saving?'Menyimpan...':'💾 Simpan'}</button>
+            <button className="btn-secondary btn-sm" onClick={cancel}>Batal</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
+          <div style={{flex:1,fontSize:12,color:'var(--text2)',padding:'6px 10px',background:'var(--bg3)',borderRadius:6,fontStyle:'italic',minHeight:28}}>
+            {note ? <>📝 {note}</> : <span style={{color:'var(--text3)'}}>— belum ada catatan —</span>}
+          </div>
+          <button className="btn-secondary btn-sm" onClick={startEdit} style={{flexShrink:0}}>✏️ Edit</button>
+        </div>
+      )}
+      {edits.length>0 && (
+        <div style={{marginTop:4}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={()=>setOpenHistory(h=>!h)}>
+            <span style={{fontSize:11,color:'var(--blue)',fontWeight:600}}>🕐 {edits.length}x riwayat edit catatan {openHistory?'▲':'▼'}</span>
+          </div>
+          {openHistory && (
+            <div style={{marginTop:4}}>
+              {[...edits].reverse().map((e,i)=>(
+                <div key={i} style={{fontSize:11,padding:'6px 8px',background:'var(--bg3)',borderRadius:6,marginBottom:4,borderLeft:'2px solid var(--blue)'}}>
+                  <div style={{fontWeight:600,color:'var(--text2)',marginBottom:3}}>✏️ {fmtDateTime(e.at)} · {e.by}</div>
+                  <div style={{color:'var(--red)',marginBottom:2}}>Sebelum: <span style={{color:'var(--text3)',fontStyle:'italic'}}>{e.before||'—'}</span></div>
+                  <div style={{color:'var(--green)'}}>Sesudah: <span style={{color:'var(--text3)',fontStyle:'italic'}}>{e.after||'—'}</span></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, supervisorName, canVerify=false}) {
   const techOrders = orders.filter(o=>o.tech_name || ['tech','tech_done'].includes(o.status));
   const techSI = (serviceIntakes||[]).filter(si=>si.tech_assigned);
@@ -4046,7 +4114,7 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                   <span className={`badge ${STATUS_COLORS[o.status]||'badge-new'}`} style={{marginTop:4,display:'inline-block'}}>{STATUS_LABELS[o.status]||o.status}</span>
                 </div>
               </div>
-              {o.tech_note&&<div style={{fontSize:12,color:'var(--text2)',marginTop:6,padding:'6px 10px',background:'var(--bg3)',borderRadius:6,fontStyle:'italic'}}>📝 {o.tech_note}</div>}
+              <TechNoteEditBox note={o.tech_note} edits={o.tech_note_edits||[]} editorName={supervisorName} onSave={upd=>onUpdate(o.id,upd)}/>
               {SALES_AO.includes(o.sales_name)&&<div style={{fontSize:11,fontWeight:700,color:'var(--teal)',marginTop:4}}>🤝 Pickup — {o.sales_name} · {o.delivery_method}</div>}
               {((o.tech_photos&&o.tech_photos.length>0)?o.tech_photos:[o.tech_photo]).filter(Boolean).length>0&&(
                 <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:8}}>
@@ -4079,7 +4147,6 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                   <div style={{fontWeight:600,fontSize:14}}>{si.customer_name}</div>
                   <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{si.unit_type}{si.serial_number?' · '+si.serial_number:''}</div>
                   <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{fmtDate(si.created_at)}</div>
-                  {si.tech_note && <div style={{fontSize:12,color:'var(--text2)',marginTop:4,fontStyle:'italic'}}>📝 {si.tech_note}</div>}
                 </div>
                 <div style={{textAlign:'right'}}>
                   {si.tech_assigned && <div style={{fontSize:12,color:'var(--amber)',fontWeight:600}}>🔧 {si.tech_assigned}</div>}
@@ -4088,6 +4155,7 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                   </span>
                 </div>
               </div>
+              <TechNoteEditBox note={si.tech_note} edits={si.tech_note_edits||[]} editorName={supervisorName} onSave={upd=>onUpdateSI(si.id,upd)}/>
               <CompLogDisplay
                 comp={si.tech_components}
                 verified={si.tech_components_verified}
