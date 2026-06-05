@@ -13457,8 +13457,14 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
       {/* Kurir sedang ambil dari SC */}
       {si.status==='sc_pickup_assigned' && (
         <div style={{paddingTop:10,borderTop:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-          <div style={{fontSize:13}}>🚗 Kurir ambil dari SC: <b>{si.sc_pickup_courier}</b></div>
-          <div style={{fontSize:11,color:'var(--text3)'}}>Menunggu konfirmasi kurir...</div>
+          <div>
+            <div style={{fontSize:13}}>🚗 Kurir ambil dari SC: <b>{si.sc_pickup_courier}</b></div>
+            <div style={{fontSize:11,color:'var(--text3)'}}>Menunggu konfirmasi kurir...</div>
+          </div>
+          <button className="btn-secondary btn-sm" style={{color:'var(--red)'}}
+            onClick={()=>{ if(window.confirm('Batalkan penugasan kurir ini?')) onUpdate(si.id,{status:'at_service_center',sc_pickup_courier:null}); }}>
+            ✕ Batal Atur Kurir
+          </button>
         </div>
       )}
 
