@@ -322,6 +322,19 @@ function distanceKm(lat1,lng1,lat2,lng2) {
   const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
+// Jarak jalan raya via OSRM (akurat seperti Google Maps), fallback ke Haversine×1.2
+async function getRoadDistanceKm(lat1,lng1,lat2,lng2) {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(()=>ctrl.abort(), 5000);
+    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`,{signal:ctrl.signal});
+    clearTimeout(timer);
+    if (!res.ok) throw new Error('osrm '+res.status);
+    const json = await res.json();
+    if (json.routes?.[0]) return parseFloat((json.routes[0].distance/1000).toFixed(2));
+  } catch(e) { console.warn('OSRM fallback:',e.message); }
+  return parseFloat((distanceKm(lat1,lng1,lat2,lng2)*1.2).toFixed(2));
+}
 
 // ─── MAIN APP ──────────────────────────────────────────────────────
 function App() {
@@ -6591,7 +6604,7 @@ function CourierDeliveries({orders, onUpdate, courierName, onSelect, checkins, o
       delivered_at: new Date().toISOString(),
     };
     if (loc) updates.end_location = loc;
-    if (startLoc && loc) updates.distance_km = parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2));
+    if (startLoc && loc) updates.distance_km = await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng);
     await onUpdate(o.id, updates);
     if (loc) onCheckin({courier_name: courierName, lat: loc.lat, lng: loc.lng, note: `✅ Terkirim ke ${o.customer_name}${updates.distance_km?' · '+updates.distance_km+' km':''}`});
     setDelivering(d=>({...d,[o.id]:false}));
@@ -9546,12 +9559,12 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
     try { endLoc = await getGPS(); } catch(e) {}
     setGpsLoading(false);
     const updates = {status:'done', completed_at:new Date().toISOString(), completed_by:courierName, end_location:endLoc};
-    // Hitung km: berangkat → tiba
+    // Hitung km via OSRM: berangkat → tiba
     let km = 0;
     if (task.start_location && task.arrived_location)
-      km += distanceKm(task.start_location.lat, task.start_location.lng, task.arrived_location.lat, task.arrived_location.lng);
+      km += await getRoadDistanceKm(task.start_location.lat, task.start_location.lng, task.arrived_location.lat, task.arrived_location.lng);
     if (task.return_location && endLoc)
-      km += distanceKm(task.return_location.lat, task.return_location.lng, endLoc.lat, endLoc.lng);
+      km += await getRoadDistanceKm(task.return_location.lat, task.return_location.lng, endLoc.lat, endLoc.lng);
     if (km > 0) updates.distance_km = parseFloat(km.toFixed(2));
     if (note && !task.completion_note) updates.completion_note = note;
     if (photo && !task.completion_photo) {
@@ -9942,14 +9955,15 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
     const photoUrl = await uploadPhoto(orderPhoto[o.id], 'delivery', 0, setUploadMsg('ord_'+o.id));
     if (!photoUrl) {
       if (onQueuePhoto) {
-        onQueuePhoto(orderPhoto[o.id], 'delivery', {type:'order_patch', id:o.id, photoField:'delivery_photo', patch:{status:'delivered',status_note:'Terkirim. '+(orderNote[o.id]||''),delivered_at:new Date().toISOString(),...(loc?{end_location:loc}:{}),...(startLoc&&loc?{distance_km:parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2))}:{})}});
+        const offlineKm = startLoc&&loc ? await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng) : null;
+        onQueuePhoto(orderPhoto[o.id], 'delivery', {type:'order_patch', id:o.id, photoField:'delivery_photo', patch:{status:'delivered',status_note:'Terkirim. '+(orderNote[o.id]||''),delivered_at:new Date().toISOString(),...(loc?{end_location:loc}:{}),...(offlineKm?{distance_km:offlineKm}:{})}});
         setUploadMsg('ord_'+o.id)('📱 Tersimpan di HP, upload otomatis saat sinyal kembali');
       } else { setPhotoMsg(p=>({...p,['ord_err_'+o.id]:'❌ Foto gagal diupload. Pastikan internet aktif lalu coba lagi.'})); }
       setOrderDelivering(d=>({...d,[o.id]:false})); return;
     }
     const updates={status:'delivered',status_note:'Terkirim. '+(orderNote[o.id]||''),delivery_photo:photoUrl,delivered_at:new Date().toISOString()};
     if(loc) updates.end_location=loc;
-    if(startLoc&&loc) updates.distance_km=parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2));
+    if(startLoc&&loc) updates.distance_km = await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng);
     await onUpdateOrder(o.id,updates);
     if(loc&&onCheckin) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Terkirim ke ${o.customer_name}${updates.distance_km?' · '+updates.distance_km+' km':''}`});
     setOrderDelivering(d=>({...d,[o.id]:false}));
@@ -10376,7 +10390,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           setPoKm(prev=>({...prev,[po.id+'_'+p.no]:{loading:true}}));
                           const startLoc=getLastCheckin(); let endLoc=null; try{endLoc=await getGPS();}catch(e){}
                           setPoKm(prev=>({...prev,[po.id+'_'+p.no]:{loading:false}}));
-                          const kmTotal=startLoc&&endLoc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng).toFixed(2)):null;
+                          const kmTotal=startLoc&&endLoc?await getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):null;
                           if(onCheckin&&endLoc) onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:`✅ Tiba jemput supplier: ${po.supplier_name}${kmTotal?' · '+kmTotal+' km':''}`});
                           const supPhotoUrl = await uploadPhoto(siPhotos[supPk], 'supplier', 0, setUploadMsg(supPk));
                           if (!supPhotoUrl) {
@@ -10575,7 +10589,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         setSiPhotos(p=>({...p,[k+'_gps']:true}));
                         const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
-                        const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
+                        const km=startLoc&&loc?await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng):null;
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Tiba di SC: ${s.service_center_name}${km?' · '+km+' km':''}`});
                         const scReceiptPhotoUrl = await uploadPhoto(siPhotos[k], 'sc_receipt', 0, setUploadMsg('scr_'+k));
                         if (!scReceiptPhotoUrl) {
@@ -10662,7 +10676,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         setSiPhotos(p=>({...p,[k+'_gps']:true}));
                         const startLoc=siPhotos[k+'_startloc']||getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
-                        const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
+                        const km=startLoc&&loc?await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng):null;
                         if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Ambil dari SC: ${scName}${km?' · '+km+' km':''}`});
                         const scPickupPhotoUrl = await uploadPhoto(siPhotos[k]||null, 'sc_pickup', 0, setUploadMsg('scp_'+k));
                         if (!scPickupPhotoUrl) {
