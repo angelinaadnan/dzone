@@ -320,20 +320,29 @@ function totalOrder(goods) { return (goods||[]).reduce((s,g)=>(s + (Number(g.pri
 function distanceKm(lat1,lng1,lat2,lng2) {
   const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lng2-lng1)*Math.PI/180;
   const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)) * 1.2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 // Jarak jalan raya via OSRM (akurat seperti Google Maps), fallback ke Haversine×1.2
+// Module-level cache supaya rute yang sama tidak di-request ulang
+const _osrmCache = {};
 async function getRoadDistanceKm(lat1,lng1,lat2,lng2) {
+  const f = v => parseFloat(v).toFixed(5);
+  const key = `${f(lng1)},${f(lat1)};${f(lng2)},${f(lat2)}`;
+  if (_osrmCache[key] !== undefined) return _osrmCache[key];
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(()=>ctrl.abort(), 5000);
-    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`,{signal:ctrl.signal});
+    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${key}?overview=false`,{signal:ctrl.signal});
     clearTimeout(timer);
     if (!res.ok) throw new Error('osrm '+res.status);
     const json = await res.json();
-    if (json.routes?.[0]) return parseFloat((json.routes[0].distance/1000).toFixed(2));
+    if (json.routes?.[0]) {
+      _osrmCache[key] = parseFloat((json.routes[0].distance/1000).toFixed(2));
+      return _osrmCache[key];
+    }
   } catch(e) { console.warn('OSRM fallback:',e.message); }
-  return parseFloat((distanceKm(lat1,lng1,lat2,lng2)*1.2).toFixed(2));
+  _osrmCache[key] = parseFloat((distanceKm(lat1,lng1,lat2,lng2)*1.2).toFixed(2));
+  return _osrmCache[key];
 }
 
 // ─── MAIN APP ──────────────────────────────────────────────────────
@@ -6778,6 +6787,7 @@ function CourierDeliveries({orders, onUpdate, courierName, onSelect, checkins, o
 function CourierSummary({orders, courierTasks, courierName, checkins, purchaseOrders, branchRequests, serviceIntakes}) {
   const today = new Date().toISOString().split('T')[0];
   const [selDate, setSelDate] = React.useState(today);
+  const [gpsSegKm, setGpsSegKm] = React.useState({});
   const FUEL = 600;
 
   const cleanNote = (note) => (note||'').replace(/·?\s*[\d.]+\s*km\s*$/, '').replace(/^[✅📍▶]\s*/g,'').trim();
@@ -6928,7 +6938,7 @@ function CourierSummary({orders, courierTasks, courierName, checkins, purchaseOr
   let prevLat=null, prevLng=null;
   timeline.forEach(evt => {
     if(evt.lat && evt.lng){
-      if(prevLat!==null) evt._legKm = parseFloat(distanceKm(prevLat,prevLng,evt.lat,evt.lng).toFixed(2));
+      if(prevLat!==null) evt._legKm = getGpsSegDist({lat:prevLat,lng:prevLng},{lat:evt.lat,lng:evt.lng});
       prevLat=evt.lat; prevLng=evt.lng;
     }
   });
@@ -6936,8 +6946,21 @@ function CourierSummary({orders, courierTasks, courierName, checkins, purchaseOr
   // Stats
   const dayOrders = (orders||[]).filter(o=>o.courier_name===courierName && mD(o.delivered_at||o.updated_at) && o.status==='delivered');
   const dayTasks = (courierTasks||[]).filter(t=>t.assigned_courier===courierName && t.status==='done' && mD(t.completed_at||t.updated_at));
+  // OSRM untuk GPS km
+  const _gsk = (a,b) => `${parseFloat(a.lat).toFixed(4)}_${parseFloat(a.lng).toFixed(4)}_${parseFloat(b.lat).toFixed(4)}_${parseFloat(b.lng).toFixed(4)}`;
+  const getGpsSegDist = (a,b) => (!a?.lat||!b?.lat) ? 0 : (gpsSegKm[_gsk(a,b)] ?? parseFloat((distanceKm(parseFloat(a.lat),parseFloat(a.lng),parseFloat(b.lat),parseFloat(b.lng))*1.2).toFixed(2)));
+  React.useEffect(()=>{
+    keyCheckins.forEach((c,i)=>{
+      if(i===0||!keyCheckins[i-1].lat||!c.lat) return;
+      const k=_gsk(keyCheckins[i-1],c);
+      if(gpsSegKm[k]!==undefined) return;
+      getRoadDistanceKm(parseFloat(keyCheckins[i-1].lat),parseFloat(keyCheckins[i-1].lng),parseFloat(c.lat),parseFloat(c.lng))
+        .then(km=>setGpsSegKm(d=>({...d,[k]:km})));
+    });
+  },[selDate, keyCheckins.length]);
+
   let gpsKm = 0;
-  for(let i=1;i<keyCheckins.length;i++) gpsKm+=distanceKm(keyCheckins[i-1].lat,keyCheckins[i-1].lng,keyCheckins[i].lat,keyCheckins[i].lng);
+  for(let i=1;i<keyCheckins.length;i++) gpsKm += getGpsSegDist(keyCheckins[i-1], keyCheckins[i]);
   let actKm = 0;
   dayTasks.forEach(t=>actKm+=t.distance_km||0);
   dayOrders.forEach(o=>actKm+=o.distance_km||0);
@@ -8296,17 +8319,31 @@ function CourierCheckinPanel({courierName, checkins, onCheckin, pendingCheckins=
   const [loading, setLoading] = React.useState(false);
   const [note, setNote] = React.useState('');
   const [gpsErr, setGpsErr] = React.useState(null);
+  const [segKm, setSegKm] = React.useState({});
   const today = new Date().toISOString().split('T')[0];
   const todayCheckins = (checkins||[]).filter(c=>c.courier_name===courierName && (c.created_at||'').startsWith(today));
   const todayPending = (pendingCheckins||[]).filter(c=>c.courier_name===courierName && ((c.created_at||c._queuedAt||'').startsWith(today)));
-  // Merge real + pending for km calculation & display
   const allItems = [
     ...todayCheckins.map(c=>({...c, _pending:false})),
     ...todayPending.map(c=>({...c, _pending:true})),
   ];
   const sorted = [...allItems].sort((a,b)=>new Date(a.created_at||a._queuedAt)-new Date(b.created_at||b._queuedAt));
+
+  // OSRM per-segment distances
+  const _sk = (a,b) => `${parseFloat(a.lat).toFixed(4)}_${parseFloat(a.lng).toFixed(4)}_${parseFloat(b.lat).toFixed(4)}_${parseFloat(b.lng).toFixed(4)}`;
+  const getSegDist = (a,b) => (!a?.lat||!b?.lat) ? 0 : (segKm[_sk(a,b)] ?? parseFloat((distanceKm(parseFloat(a.lat),parseFloat(a.lng),parseFloat(b.lat),parseFloat(b.lng))*1.2).toFixed(2)));
+  React.useEffect(()=>{
+    sorted.forEach((c,i)=>{
+      if(i===0||!sorted[i-1].lat||!c.lat) return;
+      const k=_sk(sorted[i-1],c);
+      if(segKm[k]!==undefined) return;
+      getRoadDistanceKm(parseFloat(sorted[i-1].lat),parseFloat(sorted[i-1].lng),parseFloat(c.lat),parseFloat(c.lng))
+        .then(km=>setSegKm(d=>({...d,[k]:km})));
+    });
+  },[sorted.length]);
+
   let totalKm = 0;
-  for(let i=1;i<sorted.length;i++) totalKm+=distanceKm(sorted[i-1].lat,sorted[i-1].lng,sorted[i].lat,sorted[i].lng);
+  for(let i=1;i<sorted.length;i++) totalKm += getSegDist(sorted[i-1], sorted[i]);
   totalKm = parseFloat(totalKm.toFixed(1));
 
   // Cek permission GPS sekali saat mount
@@ -8396,7 +8433,7 @@ function CourierCheckinPanel({courierName, checkins, onCheckin, pendingCheckins=
                 {!c._pending && <a href={`https://maps.google.com?q=${c.lat},${c.lng}`} target="_blank" style={{fontSize:11,color:'var(--blue)',textDecoration:'none'}}>📌 Lihat di Maps ({c.lat?.toFixed(4)}, {c.lng?.toFixed(4)})</a>}
                 {c._pending && <div style={{fontSize:11,color:'var(--text3)'}}>📌 ({c.lat?.toFixed(4)}, {c.lng?.toFixed(4)}) — menunggu koneksi</div>}
               </div>
-              {i>0 && <div style={{fontSize:11,fontWeight:700,color:'var(--teal)',flexShrink:0}}>+{distanceKm(sorted[i-1].lat,sorted[i-1].lng,c.lat,c.lng).toFixed(1)}km</div>}
+              {i>0 && <div style={{fontSize:11,fontWeight:700,color:'var(--teal)',flexShrink:0}}>+{getSegDist(sorted[i-1],c).toFixed(1)}km</div>}
             </div>
           ))}
           {totalKm>0 && <div style={{paddingTop:6,fontSize:12,fontWeight:700,color:'var(--green)'}}>📏 Total hari ini: {totalKm} km</div>}
