@@ -361,33 +361,66 @@ function App() {
   useEffect(() => {
     if (role) {
       setPage(ROLE_NAV[role][0].id);
-      loadOrders();
-      loadServiceIntakes();
-      loadCourierTasks();
-      loadBranchRequests();
-      loadPurchaseOrders();
-      loadCourierCheckins();
-      loadQuotations();
+      // Role-based loading — hanya load data yang dibutuhkan per role
+      const isAdmin    = ['admin','ops','supervisor'].includes(role);
+      const isTech     = role === 'technician';
+      const isCourier  = role === 'courier';
+      const isPembelian= role === 'admin_pembelian';
+      const isOnline   = role === 'admin_online';
+      const isCabang   = role === 'cabang';
+      const isSales    = role === 'sales';
+      const isAbsensi  = role === 'absensi_only';
+
       loadAttendance();
+      if (isAbsensi) return; // absensi_only: cukup attendance saja
+
+      loadOrders();
+      if (isAdmin || isTech || isSales || isCabang) loadServiceIntakes();
+      if (isAdmin || isCourier) loadCourierTasks();
+      if (isAdmin || isCabang) loadBranchRequests();
+      if (isAdmin || isSales || isPembelian || isOnline) loadPurchaseOrders();
+      if (isAdmin || isCourier) loadCourierCheckins();
+      if (isAdmin || isSales) loadQuotations();
     }
   }, [role]);
 
   // ─── SUPABASE REALTIME ──────────────────────────────────────────────
   useEffect(() => {
     if (!db || !role) return;
-    const channel = db.channel('app-realtime')
-      .on('postgres_changes', {event:'*', schema:'public', table:'orders'},          ()=>loadOrders())
-      .on('postgres_changes', {event:'*', schema:'public', table:'service_intakes'}, ()=>loadServiceIntakes())
-      .on('postgres_changes', {event:'*', schema:'public', table:'courier_tasks'},   ()=>loadCourierTasks())
-      .on('postgres_changes', {event:'*', schema:'public', table:'branch_requests'}, ()=>loadBranchRequests())
-      .on('postgres_changes', {event:'*', schema:'public', table:'purchase_orders'}, ()=>loadPurchaseOrders())
-      .on('postgres_changes', {event:'*', schema:'public', table:'courier_checkins'},()=>loadCourierCheckins())
-      .on('postgres_changes', {event:'*', schema:'public', table:'quotations'},      ()=>loadQuotations())
-      .on('postgres_changes', {event:'*', schema:'public', table:'attendance'},       ()=>loadAttendance())
-      .subscribe(status => {
-        setRealtimeLive(status === 'SUBSCRIBED');
-      });
-    return () => { db.removeChannel(channel); setRealtimeLive(false); };
+    const isAdmin    = ['admin','ops','supervisor'].includes(role);
+    const isTech     = role === 'technician';
+    const isCourier  = role === 'courier';
+    const isPembelian= role === 'admin_pembelian';
+    const isOnline   = role === 'admin_online';
+    const isCabang   = role === 'cabang';
+    const isSales    = role === 'sales';
+
+    let ch = db.channel('app-realtime');
+    // Hanya subscribe ke tabel yang relevan per role
+    if (!['absensi_only'].includes(role)) {
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'orders'}, ()=>loadOrders());
+    }
+    if (isAdmin || isTech || isSales || isCabang) {
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'service_intakes'}, ()=>loadServiceIntakes());
+    }
+    if (isAdmin || isCourier) {
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'courier_tasks'}, ()=>loadCourierTasks());
+    }
+    if (isAdmin || isCabang) {
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'branch_requests'}, ()=>loadBranchRequests());
+    }
+    if (isAdmin || isSales || isPembelian || isOnline) {
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'purchase_orders'}, ()=>loadPurchaseOrders());
+    }
+    if (isAdmin || isCourier) {
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'courier_checkins'}, ()=>loadCourierCheckins());
+    }
+    if (isAdmin || isSales) {
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'quotations'}, ()=>loadQuotations());
+    }
+    ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'attendance'}, ()=>loadAttendance());
+    ch.subscribe(status => { setRealtimeLive(status === 'SUBSCRIBED'); });
+    return () => { db.removeChannel(ch); setRealtimeLive(false); };
   }, [role]);
 
   const showToast = (msg, type='success') => {
@@ -476,7 +509,12 @@ function App() {
   const loadOrders = async (retry=0) => {
     if (!db) return;
     setLoading(true);
-    const {data,error} = await db.from('orders').select('*').order('created_at',{ascending:false});
+    const monthsBack = ['admin','ops','supervisor'].includes(role) ? 6 : 3;
+    const since = new Date(); since.setMonth(since.getMonth() - monthsBack);
+    const {data,error} = await db.from('orders').select('*')
+      .gte('created_at', since.toISOString())
+      .order('created_at',{ascending:false})
+      .limit(500);
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
@@ -501,7 +539,12 @@ function App() {
 
   const loadServiceIntakes = async (retry=0) => {
     if (!db) return;
-    const {data,error} = await db.from('service_intakes').select('*').order('created_at',{ascending:false});
+    const monthsBack = ['admin','ops','supervisor'].includes(role) ? 6 : 3;
+    const since = new Date(); since.setMonth(since.getMonth() - monthsBack);
+    const {data,error} = await db.from('service_intakes').select('*')
+      .gte('created_at', since.toISOString())
+      .order('created_at',{ascending:false})
+      .limit(300);
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
@@ -710,7 +753,9 @@ function App() {
 
   const loadQuotations = async (retry=0) => {
     if (!db) return;
-    const {data,error} = await db.from('quotations').select('*').order('created_at',{ascending:false});
+    const {data,error} = await db.from('quotations').select('*')
+      .order('created_at',{ascending:false})
+      .limit(300);
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
