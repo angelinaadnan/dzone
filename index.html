@@ -2319,6 +2319,8 @@ function PurchaseOrderCard({po, onUpdate, onEdit, userName, canMark, role}) {
   const [tripItemQty, setTripItemQty] = React.useState({}); // {itemIdx: qty} for current trip form
   const [confirmTripDone, setConfirmTripDone] = React.useState(null);
   const [receiveForm, setReceiveForm] = React.useState(null); // {idx, qty} for partial receive
+  const [showBatal, setShowBatal] = React.useState(false);
+  const [batalReason, setBatalReason] = React.useState('');
 
   const items = po.items||[];
   // Qty-aware helpers
@@ -2472,8 +2474,8 @@ function PurchaseOrderCard({po, onUpdate, onEdit, userName, canMark, role}) {
           </div>
         </div>
         <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
-          <span className={`badge ${allArrived?'badge-delivered':arrivedCount>0?'badge-tech':'badge-new'}`}>
-            {allArrived?'✅ Semua Tiba':arrivedCount>0?`📦 ${arrivedCount}/${totalCount} Tiba`:'⏳ Menunggu'}
+          <span className={`badge ${po.status==='cancelled'?'badge-cancelled':allArrived?'badge-delivered':arrivedCount>0?'badge-tech':'badge-new'}`}>
+            {po.status==='cancelled'?'❌ Dibatalkan':allArrived?'✅ Semua Tiba':arrivedCount>0?`📦 ${arrivedCount}/${totalCount} Tiba`:'⏳ Menunggu'}
           </span>
           {activeTrip&&(
             <span className={`badge ${tripStatusCls[activeTrip.status]||'badge-tech'}`} style={{fontSize:10}}>
@@ -2820,6 +2822,44 @@ function PurchaseOrderCard({po, onUpdate, onEdit, userName, canMark, role}) {
           {/* ── Lukas Notes Section ── */}
           <LukasNoteSection po={po} onUpdate={onUpdate} userName={userName} role={role}/>
 
+          {/* ── Batal (ops only, non-cancelled) ── */}
+          {canManagePickup && po.status!=='cancelled' && po.status!=='completed' && (
+            <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid var(--border)'}}>
+              {!showBatal ? (
+                <button className="btn-secondary btn-sm" style={{color:'var(--red)',fontSize:12}} onClick={()=>setShowBatal(true)}>
+                  ❌ Batalkan Pesanan — Tidak Jadi Ambil
+                </button>
+              ) : (
+                <div style={{padding:'10px 12px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:8}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'var(--red)',marginBottom:8}}>❌ Batalkan Pesanan ini?</div>
+                  <input
+                    value={batalReason}
+                    onChange={e=>setBatalReason(e.target.value)}
+                    placeholder="Alasan batal (opsional)..."
+                    style={{width:'100%',padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,boxSizing:'border-box',marginBottom:8}}
+                  />
+                  <div style={{display:'flex',gap:8}}>
+                    <button className="btn-sm" style={{background:'var(--red)',color:'#fff',border:'none',borderRadius:6,padding:'6px 14px',cursor:'pointer',fontWeight:700,fontSize:12}}
+                      onClick={()=>{
+                        onUpdate(po.id,{status:'cancelled',cancel_reason:batalReason.trim()||'Tidak jadi ambil',cancelled_at:new Date().toISOString(),cancelled_by:userName});
+                        setShowBatal(false); setBatalReason('');
+                      }}>
+                      ✓ Ya, Batalkan
+                    </button>
+                    <button className="btn-secondary btn-sm" onClick={()=>{setShowBatal(false);setBatalReason('');}}>Kembali</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {po.status==='cancelled' && (
+            <div style={{marginTop:10,padding:'8px 12px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:7}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--red)'}}>❌ Pesanan Dibatalkan</div>
+              {po.cancel_reason&&<div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>Alasan: {po.cancel_reason}</div>}
+              {po.cancelled_by&&<div style={{fontSize:11,color:'var(--text3)',marginTop:1}}>Oleh: {po.cancelled_by} · {fmtDateTime(po.cancelled_at)}</div>}
+            </div>
+          )}
+
         </div>
       )}
     </div>
@@ -2841,6 +2881,7 @@ function PesanBarangPage({orders, onSave, onUpdate, createdBy, role}) {
     pending: orders.filter(p=>p.status==='pending').length,
     partial: orders.filter(p=>p.status==='partial').length,
     completed: orders.filter(p=>p.status==='completed').length,
+    cancelled: orders.filter(p=>p.status==='cancelled').length,
   };
 
   if (showForm) return <PesanBarangForm onSave={onSave} onCancel={()=>setShowForm(false)} createdBy={createdBy}/>;
@@ -2853,8 +2894,8 @@ function PesanBarangPage({orders, onSave, onUpdate, createdBy, role}) {
         <button className="btn-primary" onClick={()=>setShowForm(true)}>+ Buat Pesanan Baru</button>
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:18}}>
-        {[['pending','Menunggu','var(--text)'],['partial','Sebagian Tiba','var(--amber)'],['completed','Semua Tiba','var(--green)']].map(([s,l,c])=>(
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:18}}>
+        {[['pending','Menunggu','var(--text)'],['partial','Sebagian Tiba','var(--amber)'],['completed','Semua Tiba','var(--green)'],['cancelled','Dibatalkan','var(--red)']].map(([s,l,c])=>(
           <div key={s} className="stat-card" style={{padding:'10px 12px'}}>
             <div style={{fontSize:10,color:'var(--text2)',marginBottom:4}}>{l}</div>
             <div className="stat-num" style={{fontSize:22,color:c}}>{stats[s]}</div>
@@ -2864,9 +2905,9 @@ function PesanBarangPage({orders, onSave, onUpdate, createdBy, role}) {
 
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
         <input placeholder="🔍 Cari supplier..." value={search} onChange={e=>setSearch(e.target.value)} style={{flex:1,minWidth:160,padding:'8px 12px'}}/>
-        {['all','pending','partial','completed'].map(s=>(
+        {['all','pending','partial','completed','cancelled'].map(s=>(
           <button key={s} className={filter===s?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilter(s)}>
-            {s==='all'?'Semua':s==='pending'?'Menunggu':s==='partial'?'Sebagian Tiba':'Selesai'}
+            {s==='all'?'Semua':s==='pending'?'Menunggu':s==='partial'?'Sebagian Tiba':s==='completed'?'Selesai':'Dibatalkan'}
           </button>
         ))}
       </div>
