@@ -322,6 +322,13 @@ function distanceKm(lat1,lng1,lat2,lng2) {
   const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
+// Debounce helper — cegah reload bertubi-tubi saat realtime update
+const _debounceTimers = {};
+function debounceReload(key, fn, ms=1500) {
+  if (_debounceTimers[key]) clearTimeout(_debounceTimers[key]);
+  _debounceTimers[key] = setTimeout(() => { delete _debounceTimers[key]; fn(); }, ms);
+}
+
 // Jarak jalan raya via OSRM (akurat seperti Google Maps), fallback ke Haversine×1.2
 // Module-level cache supaya rute yang sama tidak di-request ulang
 const _osrmCache = {};
@@ -420,28 +427,29 @@ function App() {
 
     let ch = db.channel('app-realtime');
     // Hanya subscribe ke tabel yang relevan per role
+    // Semua handler pakai debounce 1.5 detik — cegah reload bertubi-tubi
     if (!['absensi_only'].includes(role)) {
-      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'orders'}, ()=>loadOrders());
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'orders'}, ()=>debounceReload('orders', loadOrders));
     }
     if (isAdmin || isTech || isSales || isCabang) {
-      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'service_intakes'}, ()=>loadServiceIntakes());
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'service_intakes'}, ()=>debounceReload('si', loadServiceIntakes));
     }
     if (isAdmin || isCourier) {
-      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'courier_tasks'}, ()=>loadCourierTasks());
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'courier_tasks'}, ()=>debounceReload('tasks', loadCourierTasks));
     }
     if (isAdmin || isCabang) {
-      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'branch_requests'}, ()=>loadBranchRequests());
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'branch_requests'}, ()=>debounceReload('branch', loadBranchRequests));
     }
     if (isAdmin || isSales || isPembelian || isOnline) {
-      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'purchase_orders'}, ()=>loadPurchaseOrders());
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'purchase_orders'}, ()=>debounceReload('po', loadPurchaseOrders));
     }
     if (isAdmin || isCourier) {
-      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'courier_checkins'}, ()=>loadCourierCheckins());
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'courier_checkins'}, ()=>debounceReload('checkins', loadCourierCheckins));
     }
     if (isAdmin || isSales) {
-      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'quotations'}, ()=>loadQuotations());
+      ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'quotations'}, ()=>debounceReload('quotations', loadQuotations));
     }
-    ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'attendance'}, ()=>loadAttendance());
+    ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'attendance'}, ()=>debounceReload('attendance', loadAttendance));
     ch.subscribe(status => { setRealtimeLive(status === 'SUBSCRIBED'); });
     return () => { db.removeChannel(ch); setRealtimeLive(false); };
   }, [role]);
@@ -570,7 +578,9 @@ function App() {
     setLoading(true);
     const monthsBack = ['admin','ops','supervisor'].includes(role) ? 6 : 3;
     const since = new Date(); since.setMonth(since.getMonth() - monthsBack);
-    const {data,error} = await db.from('orders').select('*')
+    // npwp_file & po_file di-exclude — di-load on-demand via loadOrderFiles (lazy)
+    const orderCols = 'id,created_at,updated_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status';
+    const {data,error} = await db.from('orders').select(orderCols)
       .gte('created_at', since.toISOString())
       .order('created_at',{ascending:false})
       .limit(500);
