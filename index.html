@@ -726,7 +726,13 @@ function App() {
 
   const updatePurchaseOrder = async (id, updates) => {
     if (!db) { setPurchaseOrders(prev=>prev.map(p=>p.id===id?{...p,...updates}:p)); showToast('Diperbarui (demo)'); return; }
-    const {error} = await db.from('purchase_orders').update(updates).eq('id',id);
+    let {error} = await db.from('purchase_orders').update(updates).eq('id',id);
+    if (error && (error.message||'').toLowerCase().includes('column')) {
+      // Kolom belum ada di DB — retry tanpa kolom yang belum ada
+      const EXTRA_COLS = ['cancel_reason','cancelled_at','cancelled_by'];
+      const safe = Object.fromEntries(Object.entries(updates).filter(([k])=>!EXTRA_COLS.includes(k)));
+      ({error} = await db.from('purchase_orders').update(safe).eq('id',id));
+    }
     if (error) { showToast('Error: '+error.message,'error'); return; }
     await loadPurchaseOrders();
     showToast('Diperbarui!');
