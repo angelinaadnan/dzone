@@ -320,7 +320,7 @@ function totalOrder(goods) { return (goods||[]).reduce((s,g)=>(s + (Number(g.pri
 function distanceKm(lat1,lng1,lat2,lng2) {
   const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lng2-lng1)*Math.PI/180;
   const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)) * 1.2;
 }
 // Jarak jalan raya via OSRM (akurat seperti Google Maps), fallback ke Haversine×1.2
 async function getRoadDistanceKm(lat1,lng1,lat2,lng2) {
