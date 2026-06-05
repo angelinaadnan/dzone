@@ -7519,15 +7519,10 @@ function SIHistoryRow({si, isDone, techName, onUpdateSI}) {
             </div>
           )}
           {/* Catatan teknisi */}
-          {si.tech_note && (
-            <div style={{background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:8,padding:'10px 12px'}}>
-              <div style={{fontWeight:600,fontSize:12,color:'var(--green)',marginBottom:4}}>🔧 Tindakan / Catatan Teknisi</div>
-              <div style={{fontSize:12}}>{si.tech_note}</div>
-            </div>
-          )}
-          {isDone && !si.tech_note && (
-            <div style={{fontSize:12,color:'var(--text3)',fontStyle:'italic'}}>— Catatan tindakan belum diisi —</div>
-          )}
+          <div style={{marginBottom:8}}>
+            <div style={{fontWeight:600,fontSize:12,color:'var(--green)',marginBottom:4}}>🔧 Tindakan / Catatan Teknisi</div>
+            <TechNoteEditBox note={si.tech_note} edits={si.tech_note_edits||[]} editorName={techName} onSave={upd=>onUpdateSI(si.id,upd)}/>
+          </div>
           {/* Log Komponen — read only untuk teknisi */}
           <CompLogDisplay
             comp={si.tech_components}
@@ -7626,6 +7621,7 @@ function TechnicianSummary({orders, serviceIntakes, techName, onUpdate, onUpdate
                 </div>
               ) : (
                 <>
+                  <TechNoteEditBox note={o.tech_note} edits={o.tech_note_edits||[]} editorName={techName} onSave={upd=>onUpdate(o.id,upd)}/>
                   <CompLogDisplay
                     comp={o.tech_components}
                     verified={o.tech_components_verified}
