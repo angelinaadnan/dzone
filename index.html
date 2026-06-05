@@ -342,6 +342,7 @@ function App() {
   const [demoMode, setDemoMode] = useState(!db);
   const [realtimeLive, setRealtimeLive] = useState(false);
   const [pendingPhotos, setPendingPhotos] = useState(()=>{ try{ return JSON.parse(localStorage.getItem('dzone_pending_photos')||'[]'); }catch(e){ return []; } });
+  const [pendingCheckins, setPendingCheckins] = useState(()=>{ try{ return JSON.parse(localStorage.getItem('dzone_pending_checkins')||'[]'); }catch(e){ return []; } });
   const purchaseOrdersRef = React.useRef(purchaseOrders);
   React.useEffect(()=>{ purchaseOrdersRef.current = purchaseOrders; }, [purchaseOrders]);
   const branchRequestsRef = React.useRef(branchRequests);
@@ -427,6 +428,42 @@ function App() {
     setToast({msg,type});
     setTimeout(()=>setToast(null), type==='error' ? 10000 : 3000);
   };
+
+  // ─── OFFLINE CHECKIN QUEUE ──────────────────────────────────────────
+  const queueCheckin = (checkin) => {
+    const item = {...checkin, _queueId: `ci_${Date.now()}`, _queuedAt: new Date().toISOString()};
+    const updated = [...(JSON.parse(localStorage.getItem('dzone_pending_checkins')||'[]')), item];
+    try { localStorage.setItem('dzone_pending_checkins', JSON.stringify(updated)); } catch(e) {}
+    setPendingCheckins(updated);
+  };
+
+  const processPendingCheckins = React.useCallback(async () => {
+    if (!db || !navigator.onLine) return;
+    let pending = [];
+    try { const s = localStorage.getItem('dzone_pending_checkins'); if(s) pending = JSON.parse(s); } catch(e) {}
+    if (!pending.length) return;
+    let sent = 0;
+    for (const item of pending) {
+      try {
+        const {_queueId, _queuedAt, ...checkinData} = item;
+        const {error} = await db.from('courier_checkins').insert([checkinData]).select().single();
+        if (!error) {
+          const remaining = (JSON.parse(localStorage.getItem('dzone_pending_checkins')||'[]')).filter(c=>c._queueId!==item._queueId);
+          try { localStorage.setItem('dzone_pending_checkins', JSON.stringify(remaining)); } catch(e) {}
+          setPendingCheckins(remaining);
+          sent++;
+        } else { break; } // error, stop trying
+      } catch(e) { break; } // still offline
+    }
+    if (sent > 0) { await loadCourierCheckins(); showToast(`✅ ${sent} check-in GPS berhasil terkirim!`); }
+  }, []);
+
+  React.useEffect(() => {
+    if (!pendingCheckins.length) return;
+    processPendingCheckins();
+    window.addEventListener('online', processPendingCheckins);
+    return () => window.removeEventListener('online', processPendingCheckins);
+  }, [pendingCheckins.length]);
 
   // ─── OFFLINE PHOTO QUEUE ────────────────────────────────────────────
   const enqueuePendingPhoto = (base64, folder, action) => {
@@ -849,11 +886,26 @@ function App() {
       showToast('📍 Check-in tersimpan!');
       return n;
     }
-    const {data,error} = await db.from('courier_checkins').insert([checkin]).select().single();
-    if (error) { showToast('Error: '+error.message,'error'); return null; }
-    await loadCourierCheckins();
-    showToast('📍 Check-in tersimpan!');
-    return data;
+    try {
+      const {data,error} = await db.from('courier_checkins').insert([checkin]).select().single();
+      if (error) {
+        const isNetwork = (error.message||'').toLowerCase().includes('fetch') || !navigator.onLine;
+        if (isNetwork) {
+          queueCheckin(checkin);
+          showToast('📴 Offline — check-in disimpan, akan kirim otomatis saat ada internet');
+          return {...checkin, id: `ci_${Date.now()}`, _pending:true};
+        }
+        showToast('Error: '+error.message,'error'); return null;
+      }
+      await loadCourierCheckins();
+      showToast('📍 Check-in tersimpan!');
+      return data;
+    } catch(e) {
+      // TypeError: Failed to fetch (offline)
+      queueCheckin(checkin);
+      showToast('📴 Offline — check-in disimpan, akan kirim otomatis saat ada internet');
+      return {...checkin, id: `ci_${Date.now()}`, _pending:true};
+    }
   };
 
   const loadAttendance = async (retry=0) => {
@@ -1036,7 +1088,7 @@ function App() {
         {role==='ops' && page==='assign' && <OpsAssign orders={orders} onUpdate={updateOrder}/>}
         {role==='ops' && page==='tech_ready' && <OpsTechReady orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
         {role==='ops' && page==='service_monitor' && <OpsServiceMonitor intakes={serviceIntakes} onUpdate={updateServiceIntake} orders={orders}/>}
-        {role==='courier' && page==='courier_job_tasks' && <CourierJobTasks tasks={courierTasks} onUpdate={updateCourierTask} onSaveServiceIntake={saveServiceIntake} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} branchRequests={branchRequests} onUpdateBranch={updateBranchRequest} purchaseOrders={purchaseOrders} onUpdatePO={updatePurchaseOrder} orders={orders} onUpdateOrder={updateOrder} courierName={userName} checkins={courierCheckins} onCheckin={saveCheckin} onSelectOrder={setSelectedOrder} onQueuePhoto={enqueuePendingPhoto} pendingCount={pendingPhotos.length}/>}
+        {role==='courier' && page==='courier_job_tasks' && <CourierJobTasks tasks={courierTasks} onUpdate={updateCourierTask} onSaveServiceIntake={saveServiceIntake} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} branchRequests={branchRequests} onUpdateBranch={updateBranchRequest} purchaseOrders={purchaseOrders} onUpdatePO={updatePurchaseOrder} orders={orders} onUpdateOrder={updateOrder} courierName={userName} checkins={courierCheckins} onCheckin={saveCheckin} onSelectOrder={setSelectedOrder} onQueuePhoto={enqueuePendingPhoto} pendingCount={pendingPhotos.length} pendingCheckins={pendingCheckins}/>}
 
         {role==='courier' && page==='summary' && <CourierSummary orders={orders} courierTasks={courierTasks} courierName={userName} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes}/>}
         {role==='technician' && page==='my_jobs' && <TechnicianJobs orders={orders} onUpdate={updateOrder} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} techName={userName} onSelect={setSelectedOrder}/>}
@@ -8186,13 +8238,19 @@ function CourierTaskForm({onSave, onCancel, createdBy, createdByRole, defaultCou
 }
 
 // ─── COURIER GPS CHECK-IN PANEL ───────────────────────────────────
-function CourierCheckinPanel({courierName, checkins, onCheckin}) {
+function CourierCheckinPanel({courierName, checkins, onCheckin, pendingCheckins=[]}) {
   const [loading, setLoading] = React.useState(false);
   const [note, setNote] = React.useState('');
   const [gpsErr, setGpsErr] = React.useState(null);
   const today = new Date().toISOString().split('T')[0];
   const todayCheckins = (checkins||[]).filter(c=>c.courier_name===courierName && (c.created_at||'').startsWith(today));
-  const sorted = [...todayCheckins].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  const todayPending = (pendingCheckins||[]).filter(c=>c.courier_name===courierName && ((c.created_at||c._queuedAt||'').startsWith(today)));
+  // Merge real + pending for km calculation & display
+  const allItems = [
+    ...todayCheckins.map(c=>({...c, _pending:false})),
+    ...todayPending.map(c=>({...c, _pending:true})),
+  ];
+  const sorted = [...allItems].sort((a,b)=>new Date(a.created_at||a._queuedAt)-new Date(b.created_at||b._queuedAt));
   let totalKm = 0;
   for(let i=1;i<sorted.length;i++) totalKm+=distanceKm(sorted[i-1].lat,sorted[i-1].lng,sorted[i].lat,sorted[i].lng);
   totalKm = parseFloat(totalKm.toFixed(1));
@@ -8252,6 +8310,12 @@ function CourierCheckinPanel({courierName, checkins, onCheckin}) {
           ⚠ GPS gagal: {gpsErr}
         </div>
       )}
+      {/* Banner offline pending */}
+      {todayPending.length>0 && (
+        <div style={{marginBottom:8,padding:'8px 10px',background:'rgba(245,158,11,0.12)',border:'1px solid rgba(245,158,11,0.4)',borderRadius:7,fontSize:12,color:'var(--amber)',display:'flex',alignItems:'center',gap:6}}>
+          ⏳ <b>{todayPending.length} check-in pending</b> — akan terkirim otomatis saat ada internet
+        </div>
+      )}
       <div style={{display:'flex',gap:8,marginBottom:sorted.length>0?10:0}}>
         <input
           style={{flex:1,padding:'8px 12px',background:'var(--bg3)',border:'1px solid var(--border2)',borderRadius:8,color:'var(--text)',fontSize:12}}
@@ -8267,12 +8331,16 @@ function CourierCheckinPanel({courierName, checkins, onCheckin}) {
       {sorted.length>0 && (
         <div style={{borderTop:'1px solid rgba(59,130,246,0.2)',paddingTop:8,maxHeight:180,overflowY:'auto'}}>
           {sorted.map((c,i)=>(
-            <div key={c.id} style={{display:'flex',gap:8,alignItems:'flex-start',padding:'4px 0',borderBottom:i<sorted.length-1?'1px solid var(--border)':'none'}}>
-              <div style={{width:8,height:8,borderRadius:'50%',background:i===sorted.length-1?'var(--blue)':'var(--green)',marginTop:5,flexShrink:0}}/>
+            <div key={c._queueId||c.id} style={{display:'flex',gap:8,alignItems:'flex-start',padding:'4px 0',borderBottom:i<sorted.length-1?'1px solid var(--border)':'none',opacity:c._pending?0.7:1}}>
+              <div style={{width:8,height:8,borderRadius:'50%',background:c._pending?'var(--amber)':i===sorted.length-1?'var(--blue)':'var(--green)',marginTop:5,flexShrink:0}}/>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:12,fontWeight:600}}>{fmtTime(c.created_at)}</div>
+                <div style={{fontSize:12,fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
+                  {fmtTime(c.created_at||c._queuedAt)}
+                  {c._pending && <span style={{fontSize:10,padding:'1px 5px',background:'rgba(245,158,11,0.2)',border:'1px solid rgba(245,158,11,0.4)',borderRadius:4,color:'var(--amber)'}}>⏳ Pending</span>}
+                </div>
                 {c.note && <div style={{fontSize:11,color:'var(--text2)',marginTop:1}}>{c.note}</div>}
-                <a href={`https://maps.google.com?q=${c.lat},${c.lng}`} target="_blank" style={{fontSize:11,color:'var(--blue)',textDecoration:'none'}}>📌 Lihat di Maps ({c.lat?.toFixed(4)}, {c.lng?.toFixed(4)})</a>
+                {!c._pending && <a href={`https://maps.google.com?q=${c.lat},${c.lng}`} target="_blank" style={{fontSize:11,color:'var(--blue)',textDecoration:'none'}}>📌 Lihat di Maps ({c.lat?.toFixed(4)}, {c.lng?.toFixed(4)})</a>}
+                {c._pending && <div style={{fontSize:11,color:'var(--text3)'}}>📌 ({c.lat?.toFixed(4)}, {c.lng?.toFixed(4)}) — menunggu koneksi</div>}
               </div>
               {i>0 && <div style={{fontSize:11,fontWeight:700,color:'var(--teal)',flexShrink:0}}>+{distanceKm(sorted[i-1].lat,sorted[i-1].lng,c.lat,c.lng).toFixed(1)}km</div>}
             </div>
@@ -9807,7 +9875,7 @@ function OpsTaskManager({tasks, onSave, onUpdate, opsName, onSaveServiceIntake, 
   );
 }
 
-function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, onUpdateSI, branchRequests, onUpdateBranch, purchaseOrders, onUpdatePO, orders, onUpdateOrder, onSelectOrder, courierName, checkins, onCheckin, onQueuePhoto, pendingCount=0}) {
+function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, onUpdateSI, branchRequests, onUpdateBranch, purchaseOrders, onUpdatePO, orders, onUpdateOrder, onSelectOrder, courierName, checkins, onCheckin, onQueuePhoto, pendingCount=0, pendingCheckins=[]}) {
   const [filter, setFilter] = React.useState('active');
   const [serviceFormTask, setServiceFormTask] = React.useState(null);
   const [unitCount, setUnitCount] = React.useState(0);
@@ -10065,7 +10133,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
   return (
     <div style={{maxWidth:700}}>
       {/* GPS Check-in Panel */}
-      {onCheckin && <CourierCheckinPanel courierName={courierName} checkins={checkins} onCheckin={onCheckin}/>}
+      {onCheckin && <CourierCheckinPanel courierName={courierName} checkins={checkins} onCheckin={onCheckin} pendingCheckins={pendingCheckins}/>}
 
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
         <div>
