@@ -1080,7 +1080,7 @@ function App() {
   };
 
   const doLogin = (r, n) => {
-    setRole(r); setUserName(n);
+    setUserName(n); setRole(r);
     try { localStorage.setItem('orderflow_session', JSON.stringify({name:n, role:r})); } catch(e) {}
   };
   const doLogout = () => {
@@ -1165,7 +1165,7 @@ function App() {
         {role==='ops' && page==='assign' && <OpsAssign orders={orders} onUpdate={updateOrder}/>}
         {role==='ops' && page==='tech_ready' && <OpsTechReady orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
         {role==='ops' && page==='service_monitor' && <OpsServiceMonitor intakes={serviceIntakes} onUpdate={updateServiceIntake} orders={orders}/>}
-        {role==='courier' && page==='courier_job_tasks' && <CourierJobTasks tasks={courierTasks} onUpdate={updateCourierTask} onSaveServiceIntake={saveServiceIntake} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} branchRequests={branchRequests} onUpdateBranch={updateBranchRequest} purchaseOrders={purchaseOrders} onUpdatePO={updatePurchaseOrder} orders={orders} onUpdateOrder={updateOrder} courierName={userName} checkins={courierCheckins} onCheckin={saveCheckin} onSelectOrder={setSelectedOrder} onQueuePhoto={enqueuePendingPhoto} pendingCount={pendingPhotos.length} pendingCheckins={pendingCheckins}/>}
+        {role==='courier' && page==='courier_job_tasks' && <CourierJobTasks tasks={courierTasks} onUpdate={updateCourierTask} onSaveServiceIntake={saveServiceIntake} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} branchRequests={branchRequests} onUpdateBranch={updateBranchRequest} purchaseOrders={purchaseOrders} onUpdatePO={updatePurchaseOrder} orders={orders} onUpdateOrder={updateOrder} courierName={userName} checkins={courierCheckins} onCheckin={saveCheckin} onSelectOrder={setSelectedOrder} onQueuePhoto={enqueuePendingPhoto} pendingCount={pendingPhotos.length} pendingCheckins={pendingCheckins} onRefresh={loadCourierTasks}/>}
 
         {role==='courier' && page==='summary' && <CourierSummary orders={orders} courierTasks={courierTasks} courierName={userName} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes}/>}
         {role==='technician' && page==='my_jobs' && <TechnicianJobs orders={orders} onUpdate={updateOrder} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} techName={userName} onSelect={setSelectedOrder}/>}
@@ -10079,7 +10079,7 @@ function OpsTaskManager({tasks, onSave, onUpdate, opsName, onSaveServiceIntake, 
   );
 }
 
-function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, onUpdateSI, branchRequests, onUpdateBranch, purchaseOrders, onUpdatePO, orders, onUpdateOrder, onSelectOrder, courierName, checkins, onCheckin, onQueuePhoto, pendingCount=0, pendingCheckins=[]}) {
+function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, onUpdateSI, branchRequests, onUpdateBranch, purchaseOrders, onUpdatePO, orders, onUpdateOrder, onSelectOrder, courierName, checkins, onCheckin, onQueuePhoto, pendingCount=0, pendingCheckins=[], onRefresh}) {
   const [filter, setFilter] = React.useState('active');
   const [serviceFormTask, setServiceFormTask] = React.useState(null);
   const [unitCount, setUnitCount] = React.useState(0);
@@ -10105,6 +10105,16 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
 
   // Sync perubahan ke localStorage
   React.useEffect(()=>{ try{ localStorage.setItem(lsKeyChecked, JSON.stringify(packingChecked)); }catch(e){} }, [packingChecked]);
+
+  // Auto-refresh saat komponen pertama kali dimuat — pastikan data terbaru tersedia
+  const [refreshing, setRefreshing] = React.useState(false);
+  React.useEffect(()=>{ if(onRefresh) onRefresh(); }, []);
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    await onRefresh();
+    setTimeout(()=>setRefreshing(false), 600);
+  };
 
   const myOrders = (orders||[]).filter(o=>o.courier_name===courierName && ['on_delivery','tech'].includes(o.status));
   const myTasks = tasks.filter(t=>t.assigned_courier===courierName);
@@ -10355,6 +10365,9 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
             Aktif {totalActive>0&&`(${totalActive})`}
           </button>
           <button className={filter==='done'?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilter('done')}>Selesai</button>
+          <button className="btn-secondary btn-sm" onClick={handleRefresh} disabled={refreshing} title="Muat ulang tugas terbaru" style={{opacity:refreshing?0.6:1}}>
+            {refreshing ? '⏳' : '🔄'}
+          </button>
         </div>
       </div>
 
