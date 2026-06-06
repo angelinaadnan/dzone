@@ -144,6 +144,30 @@ try {
 } catch(e) { db = null; }
 
 // ─── UPLOAD FOTO KE SUPABASE STORAGE ──────────────────────────────
+// Kompres gambar sebelum upload — kurangi ukuran file dari kamera HP (bisa 10-15 MB)
+// menjadi max ~300-500 KB. Pakai Canvas API bawaan browser.
+function compressImage(base64DataUrl, maxPx=1280, quality=0.82) {
+  return new Promise((resolve) => {
+    if (!base64DataUrl || !base64DataUrl.startsWith('data:')) { resolve(base64DataUrl); return; }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        let {width, height} = img;
+        if (width > maxPx || height > maxPx) {
+          if (width >= height) { height = Math.round(height * maxPx / width); width = maxPx; }
+          else                 { width  = Math.round(width  * maxPx / height); height = maxPx; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } catch(e) { resolve(base64DataUrl); } // fallback ke original jika canvas gagal
+    };
+    img.onerror = () => resolve(base64DataUrl);
+    img.src = base64DataUrl;
+  });
+}
+
 // Semua foto di-upload ke bucket 'photos', database hanya simpan URL.
 // Jika upload gagal, fallback ke base64 (tidak crash).
 async function uploadPhoto(base64DataUrl, folder='misc', retry=0, onStatus=null) {
@@ -152,6 +176,10 @@ async function uploadPhoto(base64DataUrl, folder='misc', retry=0, onStatus=null)
   if (!base64DataUrl.startsWith('data:')) return base64DataUrl;
   if (!db) return null;
   if (onStatus) onStatus(retry === 0 ? '📤 Mengupload foto...' : `🔄 Koneksi lambat, mencoba lagi (${retry+1}/3)...`);
+  // Kompres foto sebelum upload — foto HP bisa 10-15 MB, ini kurangi jadi ~300-500 KB
+  if (retry === 0) {
+    try { base64DataUrl = await compressImage(base64DataUrl); } catch(e) {}
+  }
   try {
     const res  = await fetch(base64DataUrl);
     const blob = await res.blob();
@@ -162,11 +190,11 @@ async function uploadPhoto(base64DataUrl, folder='misc', retry=0, onStatus=null)
     });
     if (error) {
       console.warn('Storage upload error:', error.message);
-      if (retry < 2) {
-        await new Promise(r=>setTimeout(r, 1500*(retry+1)));
+      if (retry < 3) {
+        await new Promise(r=>setTimeout(r, 2000*(retry+1)));
         return uploadPhoto(base64DataUrl, folder, retry+1, onStatus);
       }
-      if (onStatus) onStatus('❌ Gagal');
+      if (onStatus) onStatus('❌ Gagal upload. Cek sinyal lalu coba foto ulang.');
       return null;
     }
     if (onStatus) onStatus(null);
@@ -174,11 +202,11 @@ async function uploadPhoto(base64DataUrl, folder='misc', retry=0, onStatus=null)
     return urlData.publicUrl;
   } catch(e) {
     console.warn('uploadPhoto failed:', e);
-    if (retry < 2) {
-      await new Promise(r=>setTimeout(r, 1500*(retry+1)));
+    if (retry < 3) {
+      await new Promise(r=>setTimeout(r, 2000*(retry+1)));
       return uploadPhoto(base64DataUrl, folder, retry+1, onStatus);
     }
-    if (onStatus) onStatus('❌ Gagal');
+    if (onStatus) onStatus('❌ Gagal upload. Cek sinyal lalu coba foto ulang.');
     return null;
   }
 }
