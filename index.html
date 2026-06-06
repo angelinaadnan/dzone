@@ -11461,9 +11461,30 @@ function BranchRequestPage({requests, onSave, onUpdate, branchName, branchMember
   const members = branchMembers || [branchName];
   const [showForm, setShowForm] = React.useState(false);
   const [editReq, setEditReq] = React.useState(null);
+  const [reqFilter, setReqFilter] = React.useState('all');
   const myReqs = requests.filter(r=>members.includes(r.branch_name));
-  const pendingCount = myReqs.filter(r=>r.status==='pending').length;
-  const partialCount = myReqs.filter(r=>r.status==='partial').length;
+
+  // Classify each request
+  const getReqBucket = (r) => {
+    const trips = r.trips||[];
+    const allItems = r.items||[];
+    const deliveredNames = new Set(trips.filter(t=>t.status==='delivered').flatMap(t=>(t.items||[]).map(i=>i.name)));
+    const inTripNames    = new Set(trips.filter(t=>t.status!=='delivered').flatMap(t=>(t.items||[]).map(i=>i.name)));
+    const deliveredCount = allItems.filter(it=>deliveredNames.has(it.name)).length;
+    const inProgressCount= allItems.filter(it=>inTripNames.has(it.name)).length;
+    const allDone = deliveredCount===allItems.length && allItems.length>0;
+    if (allDone) return 'selesai';
+    if (inProgressCount>0) return 'dikirim';
+    return 'menunggu';
+  };
+  const rBuckets = {
+    menunggu: myReqs.filter(r=>getReqBucket(r)==='menunggu'),
+    dikirim:  myReqs.filter(r=>getReqBucket(r)==='dikirim'),
+    selesai:  myReqs.filter(r=>getReqBucket(r)==='selesai'),
+  };
+  const shownReqs = reqFilter==='all' ? myReqs : rBuckets[reqFilter] || myReqs;
+  const pendingCount = rBuckets.menunggu.length;
+  const partialCount = rBuckets.dikirim.length;
 
   if (showForm) return <BranchRequestForm onSave={onSave} onCancel={()=>setShowForm(false)} branchName={branchName}/>;
   if (editReq) return <BranchRequestForm onUpdate={onUpdate} onCancel={()=>setEditReq(null)} branchName={branchName} initialData={editReq}/>;
@@ -11480,18 +11501,33 @@ function BranchRequestPage({requests, onSave, onUpdate, branchName, branchMember
 
   return (
     <div style={{maxWidth:700}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
         <div>
           <div className="section-title" style={{margin:0}}>📦 Request Barang ke Toko</div>
-          {pendingCount>0 && <div style={{fontSize:12,color:'var(--amber)',marginTop:4}}>⏳ {pendingCount} request menunggu diproses Ops</div>}
-          {partialCount>0 && <div style={{fontSize:12,color:'var(--blue)',marginTop:4}}>🚚 {partialCount} request sedang dikirim sebagian</div>}
         </div>
         <button className="btn-primary" onClick={()=>setShowForm(true)}>+ Request Baru</button>
       </div>
 
-      {myReqs.length===0 && <div className="empty-state"><div className="icon">📦</div><div>Belum ada request barang</div></div>}
+      {/* Status Filter */}
+      <div style={{display:'flex',gap:6,marginBottom:16,padding:'10px 12px',background:'var(--bg3)',borderRadius:10,flexWrap:'wrap'}}>
+        {[
+          {id:'all',      label:'Semua',             count:myReqs.length,          color:null},
+          {id:'menunggu', label:'⏳ Menunggu Ops',    count:rBuckets.menunggu.length, color:'var(--amber)'},
+          {id:'dikirim',  label:'🚚 Sedang Dikirim',  count:rBuckets.dikirim.length,  color:'var(--blue)'},
+          {id:'selesai',  label:'✅ Sudah Diterima',  count:rBuckets.selesai.length,  color:'var(--green)'},
+        ].filter(f=>f.id==='all'||f.count>0).map(f=>(
+          <button key={f.id}
+            onClick={()=>setReqFilter(f.id)}
+            className={reqFilter===f.id?'btn-primary btn-sm':'btn-secondary btn-sm'}
+            style={reqFilter===f.id&&f.color?{background:f.color,borderColor:f.color}:{}}>
+            {f.label} <span style={{opacity:0.8,fontSize:11}}>({f.count})</span>
+          </button>
+        ))}
+      </div>
 
-      {myReqs.map(r=>{
+      {shownReqs.length===0 && <div className="empty-state"><div className="icon">📦</div><div>Tidak ada request di kategori ini</div></div>}
+
+      {shownReqs.map(r=>{
         const trips = r.trips||[];
         const allItems = r.items||[];
         const totalItems = allItems.length;
@@ -11681,6 +11717,7 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
   const [showForm, setShowForm]             = React.useState(false);
   const [pendingIntake, setPendingIntake]   = React.useState(null); // after save, ask route
   const [tab, setTab]                       = React.useState('all'); // 'all' | 'courier' | 'branch_tech'
+  const [statusFilter, setStatusFilter]     = React.useState('all'); // status filter row
   const [expandRow, setExpandRow]           = React.useState({});
   const [actionModal, setActionModal]       = React.useState(null); // {si, type}
   const [techName, setTechName]             = React.useState('');
@@ -11688,6 +11725,20 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
   const [notifyName, setNotifyName]         = React.useState(branchName);
   const [receiptSI, setReceiptSI]           = React.useState(null);
   const [histSI, setHistSI]                 = React.useState(null);
+
+  // Classify each SI into a status bucket for the status filter
+  const getSvcBucket = (si) => {
+    if (si.branch_returned_at) return 'sudah_diambil';
+    if (si.return_status==='returned') return 'di_cabang'; // balik ke cabang, nunggu customer
+    if (si.service_route==='branch_tech') {
+      if (si.status==='branch_done') return 'selesai';
+      return 'proses'; // received or branch_in_progress
+    }
+    // courier route
+    if (si.status==='done') return 'selesai';
+    if (['at_service_center','to_service_center','sc_pickup_assigned','back_from_sc','post_sc_checking'].includes(si.status)) return 'di_sc';
+    return 'proses';
+  };
 
   const members = branchMembers || [branchName];
   const myIntakes = (intakes||[]).filter(si=>members.includes(si.branch_name));
@@ -11825,8 +11876,26 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
     );
   };
 
-  const tabList = [{id:'all',label:'Semua ('+myIntakes.length+')'},{id:'courier',label:'🚚 Titip Kurir ('+courierList.length+')'},{id:'branch_tech',label:'🔧 Teknisi Cabang ('+branchTech.length+')'}];
-  const shown = tab==='all' ? myIntakes : tab==='courier' ? courierList : branchTech;
+  const tabList = [{id:'all',label:'Semua'},{id:'courier',label:'🚚 Titip Kurir'},{id:'branch_tech',label:'🔧 Teknisi Cabang'}];
+  const byRoute = tab==='all' ? myIntakes : tab==='courier' ? courierList : branchTech;
+
+  // Status filter buckets
+  const buckets = {
+    proses:       byRoute.filter(si=>getSvcBucket(si)==='proses'),
+    di_sc:        byRoute.filter(si=>getSvcBucket(si)==='di_sc'),
+    selesai:      byRoute.filter(si=>getSvcBucket(si)==='selesai'),
+    di_cabang:    byRoute.filter(si=>getSvcBucket(si)==='di_cabang'),
+    sudah_diambil:byRoute.filter(si=>getSvcBucket(si)==='sudah_diambil'),
+  };
+  const statusFilterList = [
+    {id:'all',         label:'Semua',            count:byRoute.length,            color:null},
+    {id:'proses',      label:'🔄 Proses',         count:buckets.proses.length,     color:'var(--blue)'},
+    {id:'di_sc',       label:'🏪 Di SC',           count:buckets.di_sc.length,      color:'var(--amber)'},
+    {id:'selesai',     label:'✅ Selesai',         count:buckets.selesai.length,    color:'var(--teal)'},
+    {id:'di_cabang',   label:'📦 Di Cabang',       count:buckets.di_cabang.length,  color:'var(--amber)'},
+    {id:'sudah_diambil',label:'✓ Sudah Diambil',  count:buckets.sudah_diambil.length, color:'var(--green)'},
+  ];
+  const shown = statusFilter==='all' ? byRoute : buckets[statusFilter] || byRoute;
 
   return (
     <div style={{maxWidth:900}}>
@@ -11838,17 +11907,29 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
         <button className="btn-primary" onClick={()=>setShowForm(true)}>+ Form Baru</button>
       </div>
 
-      {/* Tabs */}
-      <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
+      {/* Route Tabs */}
+      <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
         {tabList.map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)}
+          <button key={t.id} onClick={()=>{setTab(t.id);setStatusFilter('all');}}
             className={tab===t.id?'btn-primary btn-sm':'btn-secondary btn-sm'}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {shown.length===0 && <div className="empty-state"><div className="icon">🔧</div><div>Tidak ada data</div></div>}
+      {/* Status Filter Row */}
+      <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap',padding:'10px 12px',background:'var(--bg3)',borderRadius:10}}>
+        {statusFilterList.filter(s=>s.id==='all'||s.count>0).map(s=>(
+          <button key={s.id}
+            onClick={()=>setStatusFilter(s.id)}
+            className={statusFilter===s.id?'btn-primary btn-sm':'btn-secondary btn-sm'}
+            style={statusFilter===s.id&&s.color?{background:s.color,borderColor:s.color}:{}}>
+            {s.label} {s.count>0&&<span style={{opacity:0.8,fontSize:11}}>({s.count})</span>}
+          </button>
+        ))}
+      </div>
+
+      {shown.length===0 && <div className="empty-state"><div className="icon">🔧</div><div>Tidak ada data di kategori ini</div></div>}
 
       {/* ── BRANCH TECH TABLE ─────────────────────────────────────── */}
       {tab==='branch_tech' && branchTech.length>0 && (
