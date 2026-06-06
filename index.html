@@ -7051,6 +7051,10 @@ function CourierSummary({orders, courierTasks, courierName, checkins, purchaseOr
   const gpsEvts = timeline.filter(e=>e._t==='gps');
   if(gpsEvts.length>0){gpsEvts[0].isFirst=true; gpsEvts[gpsEvts.length-1].isLast=true;}
 
+  // OSRM untuk GPS km — harus didefinisikan sebelum dipakai di timeline.forEach
+  const _gsk = (a,b) => `${parseFloat(a.lat).toFixed(4)}_${parseFloat(a.lng).toFixed(4)}_${parseFloat(b.lat).toFixed(4)}_${parseFloat(b.lng).toFixed(4)}`;
+  const getGpsSegDist = (a,b) => (!a?.lat||!b?.lat) ? 0 : (gpsSegKm[_gsk(a,b)] ?? parseFloat((distanceKm(parseFloat(a.lat),parseFloat(a.lng),parseFloat(b.lat),parseFloat(b.lng))*1.2).toFixed(2)));
+
   // Compute leg km between consecutive points with GPS
   let prevLat=null, prevLng=null;
   timeline.forEach(evt => {
@@ -7063,9 +7067,6 @@ function CourierSummary({orders, courierTasks, courierName, checkins, purchaseOr
   // Stats
   const dayOrders = (orders||[]).filter(o=>o.courier_name===courierName && mD(o.delivered_at||o.updated_at) && o.status==='delivered');
   const dayTasks = (courierTasks||[]).filter(t=>t.assigned_courier===courierName && t.status==='done' && mD(t.completed_at||t.updated_at));
-  // OSRM untuk GPS km
-  const _gsk = (a,b) => `${parseFloat(a.lat).toFixed(4)}_${parseFloat(a.lng).toFixed(4)}_${parseFloat(b.lat).toFixed(4)}_${parseFloat(b.lng).toFixed(4)}`;
-  const getGpsSegDist = (a,b) => (!a?.lat||!b?.lat) ? 0 : (gpsSegKm[_gsk(a,b)] ?? parseFloat((distanceKm(parseFloat(a.lat),parseFloat(a.lng),parseFloat(b.lat),parseFloat(b.lng))*1.2).toFixed(2)));
   React.useEffect(()=>{
     keyCheckins.forEach((c,i)=>{
       if(i===0||!keyCheckins[i-1].lat||!c.lat) return;
