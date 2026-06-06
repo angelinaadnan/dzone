@@ -2112,12 +2112,17 @@ function ServiceIntakeEntry({onSave, createdByRole, createdBy, onDone, allIntake
   const [courier, setCourier] = React.useState('');
   const [customCourier, setCustomCourier] = React.useState('');
   const [step, setStep] = React.useState('pick_courier'); // pick_courier | form
+  const [fromBranch, setFromBranch] = React.useState(false);
+  const [selectedBranch, setSelectedBranch] = React.useState('');
   const effectiveCourier = customCourier || courier;
+
+  const ALL_BRANCH_NAMES = Object.values(BRANCH_GROUPS).flat();
 
   if (step === 'form') {
     return (
       <ServiceIntakeForm
         courierName={effectiveCourier}
+        sourceBranch={fromBranch && selectedBranch ? selectedBranch : undefined}
         onSave={async(data) => { await onSave(data); onDone(); }}
         onCancel={() => setStep('pick_courier')}
         existingIntakes={allIntakes}
@@ -2141,8 +2146,47 @@ function ServiceIntakeEntry({onSave, createdByRole, createdBy, onDone, allIntake
           value={customCourier}
           onChange={e=>{setCustomCourier(e.target.value);setCourier('');}}
         />
+
+        {/* Pilihan: apakah ini dari customer cabang yang bawa langsung ke Dusit? */}
+        <div style={{borderTop:'1px solid var(--border)',paddingTop:14,marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:600,marginBottom:8,color:'var(--text2)'}}>🏢 Customer dari Cabang?</div>
+          <div style={{fontSize:12,color:'var(--text3)',marginBottom:10}}>Centang jika customer adalah user cabang (PS/TC) yang bawa langsung ke Dusit — barang akan dikembalikan ke cabang setelah selesai, bukan ke customer langsung.</div>
+          <div style={{display:'flex',gap:8,marginBottom:fromBranch?10:0}}>
+            <button
+              className={!fromBranch?'btn-primary btn-sm':'btn-secondary btn-sm'}
+              onClick={()=>{setFromBranch(false);setSelectedBranch('');}}
+            >Customer Langsung</button>
+            <button
+              className={fromBranch?'btn-primary btn-sm':'btn-secondary btn-sm'}
+              style={fromBranch?{background:'var(--amber)',borderColor:'var(--amber)'}:{}}
+              onClick={()=>setFromBranch(true)}
+            >🏢 Dari Cabang PS/TC</button>
+          </div>
+          {fromBranch && (
+            <select
+              value={selectedBranch}
+              onChange={e=>setSelectedBranch(e.target.value)}
+              style={{width:'100%',padding:'9px 12px',background:'var(--bg3)',border:`1px solid ${selectedBranch?'var(--amber)':'var(--border)'}`,borderRadius:8,color:'var(--text)',fontSize:13}}
+            >
+              <option value="">— Pilih Cabang —</option>
+              <optgroup label="PS">
+                {(BRANCH_GROUPS.PS||[]).map(b=><option key={b} value={b}>{b}</option>)}
+              </optgroup>
+              <optgroup label="TC">
+                {(BRANCH_GROUPS.TC||[]).map(b=><option key={b} value={b}>{b}</option>)}
+              </optgroup>
+            </select>
+          )}
+          {fromBranch && selectedBranch && (
+            <div style={{marginTop:8,padding:'8px 12px',background:'rgba(245,158,11,0.1)',borderRadius:8,fontSize:12,color:'var(--amber)'}}>
+              ⚠️ Setelah servis selesai, barang akan dikirim kembali ke <b>{selectedBranch}</b>, bukan langsung ke customer.
+            </div>
+          )}
+        </div>
+
         <button className="btn-primary" style={{width:'100%',padding:'11px'}} onClick={()=>{
           if(!effectiveCourier){alert('Pilih atau isi nama kurir dulu');return;}
+          if(fromBranch && !selectedBranch){alert('Pilih cabang asal customer');return;}
           setStep('form');
         }}>Lanjut ke Form →</button>
       </div>
