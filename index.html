@@ -1178,7 +1178,7 @@ function App() {
         {role==='supervisor' && page==='sup_tasks' && <SupervisorTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName}/>}
         {role==='supervisor' && page==='sup_tech' && <SupervisorTech orders={orders} serviceIntakes={serviceIntakes} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} supervisorName={userName} canVerify={true}/>}
         {role==='ops' && page==='op_tech_log' && <SupervisorTech orders={orders} serviceIntakes={serviceIntakes} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} supervisorName={userName} canVerify={false}/>}
-        {role==='supervisor' && page==='sup_kurir' && <CourierDailyMonitor orders={orders} courierTasks={courierTasks} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes}/>}
+        {role==='supervisor' && page==='sup_kurir' && <CourierDailyMonitor orders={orders} courierTasks={courierTasks} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes} onRefresh={()=>{loadCourierTasks();loadCourierCheckins();loadOrders();loadServiceIntakes();loadBranchRequests();}}/>}
         {role==='supervisor' && page==='sup_minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName} createdByRole="supervisor"/>}
         {role==='admin_online' && page==='ao_invoicing' && <AdminOnlineInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
         {role==='admin_online' && page==='ao_orders' && <AdminOnlineOrders orders={orders} onSelect={setSelectedOrder}/>}
@@ -3576,10 +3576,21 @@ function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
 }
 
 // ── Kurir Daily Monitor ── tampilan per-kurir per-hari ──
-function CourierDailyMonitor({orders=[], courierTasks=[], checkins=[], purchaseOrders=[], branchRequests=[], serviceIntakes=[]}) {
+function CourierDailyMonitor({orders=[], courierTasks=[], checkins=[], purchaseOrders=[], branchRequests=[], serviceIntakes=[], onRefresh}) {
   const today = new Date().toISOString().split('T')[0];
   const [dateFrom, setDateFrom] = React.useState(today);
   const [dateTo, setDateTo]     = React.useState(today);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [lastRefresh, setLastRefresh] = React.useState(null);
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    await onRefresh();
+    setLastRefresh(new Date());
+    setTimeout(()=>setRefreshing(false), 800);
+  };
+  // Auto-refresh saat komponen mount
+  React.useEffect(()=>{ if(onRefresh) onRefresh(); }, []);
   const [expanded, setExpanded] = React.useState({});
   const FUEL_PER_KM = 600;
 
@@ -3662,7 +3673,7 @@ function CourierDailyMonitor({orders=[], courierTasks=[], checkins=[], purchaseO
 
     // Courier tasks untuk kurir ini pada tanggal ini
     const myTasks = (courierTasks||[]).filter(t=>
-      t.assigned_courier===name && (matchDate(t.updated_at)||matchDate(t.created_at))
+      t.assigned_courier===name && (matchDate(t.completed_at)||matchDate(t.created_at))
     );
 
     // PO pickups
@@ -3730,7 +3741,7 @@ function CourierDailyMonitor({orders=[], courierTasks=[], checkins=[], purchaseO
     myTasks.forEach(t=>{
       const sl=t.start_location,el=t.end_location||t.arrived_location;
       const tKm=t.distance_km>0?t.distance_km:(sl?.lat&&el?.lat?distanceKm(parseFloat(sl.lat),parseFloat(sl.lng),parseFloat(el.lat),parseFloat(el.lng)):null);
-      timeline.push({_t:'task',_time:t.updated_at||t.created_at,
+      timeline.push({_t:'task',_time:t.completed_at||t.created_at,
         taskType:t.task_type,destination:t.destination,completionNote:t.completion_note,
         startLoc:sl,endLoc:el,km:tKm,photo:t.completion_photo,status:t.status});
     });
@@ -3767,7 +3778,8 @@ function CourierDailyMonitor({orders=[], courierTasks=[], checkins=[], purchaseO
           <button className="btn-secondary btn-sm" onClick={()=>setLastNDays(7)}>7 Hari</button>
           <button className="btn-secondary btn-sm" onClick={setThisMonth}>Bulan Ini</button>
           <button className="btn-green btn-sm" onClick={()=>exportCourierDailyMonitorToExcel(courierData, dateFrom===dateTo ? dateFrom : `${dateFrom}_sd_${dateTo}`)}>📊 Export</button>
-          <span style={{fontSize:12,color:'var(--text3)'}}>{activeList.length} aktif · {idleList.length} idle</span>
+          {onRefresh && <button className="btn-secondary btn-sm" onClick={handleRefresh} disabled={refreshing} title="Sinkronkan data terbaru dari semua kurir" style={{opacity:refreshing?0.6:1}}>{refreshing?'⏳':'🔄'} {refreshing?'Memuat...':'Sinkron'}</button>}
+          <span style={{fontSize:12,color:'var(--text3)'}}>{activeList.length} aktif · {idleList.length} idle{lastRefresh&&<span> · diperbarui {lastRefresh.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}</span>}</span>
         </div>
       </div>
 
