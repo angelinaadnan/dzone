@@ -13384,6 +13384,18 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
   // Catatan Ops
   const [showNoteEdit, setShowNoteEdit] = React.useState(false);
   const [noteText, setNoteText] = React.useState(si.ops_note||'');
+  // Edit Tujuan Return (source_type / branch_name)
+  const [showEditSource, setShowEditSource] = React.useState(false);
+  const [editSourceType, setEditSourceType] = React.useState(si.source_type==='branch'?'branch':'customer');
+  const [editBranchName, setEditBranchName] = React.useState(si.branch_name||'');
+  const saveEditSource = () => {
+    if (editSourceType==='branch' && !editBranchName) { alert('Pilih cabang dulu'); return; }
+    onUpdate(si.id, {
+      source_type: editSourceType==='branch' ? 'branch' : 'customer',
+      branch_name: editSourceType==='branch' ? editBranchName : null,
+    });
+    setShowEditSource(false);
+  };
   // SC nota / tanda terima upload
   const [scNotaUploading, setScNotaUploading] = React.useState(false);
   const handleScNotaUpload = async (e) => {
@@ -13460,11 +13472,57 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
           <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={()=>setShowHistory(h=>!h)}>
             {showHistory?'▲ Tutup':'📋 History'}
           </button>
+          <button className="btn-secondary btn-sm" style={{fontSize:11,color:'var(--blue)'}} onClick={()=>setShowEditSource(s=>!s)}>
+            🏢 {showEditSource?'Tutup':'Edit Tujuan'}
+          </button>
         </div>
       </div>
       {showHistory && (
         <div style={{marginBottom:12,paddingBottom:12,borderBottom:'1px solid var(--border)'}}>
           <ServiceHistoryTimeline si={si}/>
+        </div>
+      )}
+
+      {/* ── Edit Tujuan Return ── */}
+      {showEditSource && (
+        <div style={{marginBottom:10,padding:'10px 12px',background:'rgba(59,130,246,0.07)',border:'1px solid rgba(59,130,246,0.25)',borderRadius:8}}>
+          <div style={{fontSize:12,fontWeight:700,color:'var(--blue)',marginBottom:8}}>🏢 Edit Tujuan Pengembalian</div>
+          <div style={{fontSize:11,color:'var(--text3)',marginBottom:10}}>
+            Saat ini: {si.source_type==='branch' ? <span style={{color:'var(--blue)'}}>🏢 Ke Cabang <b>{si.branch_name}</b></span> : <span>👤 Ke Customer Langsung</span>}
+          </div>
+          <div style={{display:'flex',gap:8,marginBottom:editSourceType==='branch'?10:0}}>
+            <button
+              className={editSourceType==='customer'?'btn-primary btn-sm':'btn-secondary btn-sm'}
+              onClick={()=>setEditSourceType('customer')}
+            >👤 Customer Langsung</button>
+            <button
+              className={editSourceType==='branch'?'btn-primary btn-sm':'btn-secondary btn-sm'}
+              style={editSourceType==='branch'?{background:'var(--blue)',borderColor:'var(--blue)'}:{}}
+              onClick={()=>setEditSourceType('branch')}
+            >🏢 Dari Cabang PS/TC</button>
+          </div>
+          {editSourceType==='branch' && (
+            <select
+              value={editBranchName}
+              onChange={e=>setEditBranchName(e.target.value)}
+              style={{width:'100%',padding:'8px 10px',background:'var(--bg3)',border:`1px solid ${editBranchName?'var(--blue)':'var(--border)'}`,borderRadius:6,color:'var(--text)',fontSize:12,marginBottom:10}}
+            >
+              <option value="">— Pilih Cabang —</option>
+              <optgroup label="PS">
+                {(BRANCH_GROUPS.PS||[]).map(b=><option key={b} value={b}>{b}</option>)}
+              </optgroup>
+              <optgroup label="TC">
+                {(BRANCH_GROUPS.TC||[]).map(b=><option key={b} value={b}>{b}</option>)}
+              </optgroup>
+            </select>
+          )}
+          {editSourceType==='branch' && editBranchName && (
+            <div style={{fontSize:11,color:'var(--blue)',marginBottom:8}}>⚠️ Barang akan dikirim balik ke <b>{editBranchName}</b>, bukan ke customer.</div>
+          )}
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn-primary btn-sm" style={{flex:1}} onClick={saveEditSource}>💾 Simpan</button>
+            <button className="btn-secondary btn-sm" onClick={()=>{setShowEditSource(false);setEditSourceType(si.source_type==='branch'?'branch':'customer');setEditBranchName(si.branch_name||'');}}>Batal</button>
+          </div>
         </div>
       )}
 
