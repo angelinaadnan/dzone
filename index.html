@@ -13390,10 +13390,18 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
   const [editBranchName, setEditBranchName] = React.useState(si.branch_name||'');
   const saveEditSource = () => {
     if (editSourceType==='branch' && !editBranchName) { alert('Pilih cabang dulu'); return; }
-    onUpdate(si.id, {
+    const updates = {
       source_type: editSourceType==='branch' ? 'branch' : 'customer',
       branch_name: editSourceType==='branch' ? editBranchName : null,
-    });
+    };
+    // Kalau switch ke branch dan barang sudah "returned" (kurir sudah antar),
+    // anggap sudah tiba di cabang — clear branch_returned_at supaya cabang masih
+    // bisa konfirmasi serah ke customer. Ini buat kasus seperti Bu Titin.
+    if (editSourceType==='branch' && si.return_status==='returned') {
+      updates.branch_returned_at = null;
+      updates.branch_returned_by = null;
+    }
+    onUpdate(si.id, updates);
     setShowEditSource(false);
   };
   // SC nota / tanda terima upload
@@ -13467,7 +13475,15 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
           {(si.complaints||[]).length>0 && <div style={{fontSize:11,color:'var(--amber)',marginTop:3}}>⚠ {si.complaints.slice(0,2).join(', ')}</div>}
         </div>
         <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
-          <span className={`badge ${STATUS_SI[si.status]?.cls||'badge-new'}`} style={{whiteSpace:'nowrap'}}>{STATUS_SI[si.status]?.label||si.status}</span>
+          {(()=>{
+            // Kalau source_type='branch', return_status='returned', belum branch_returned_at → "Di Cabang"
+            const atBranch = si.source_type==='branch' && si.return_status==='returned' && !si.branch_returned_at;
+            const fullyDone = si.source_type==='branch' && !!si.branch_returned_at;
+            const badge = atBranch ? {label:'📦 Di Cabang', cls:'badge-amber'}
+              : fullyDone ? {label:'✅ Selesai', cls:'badge-delivered'}
+              : (STATUS_SI[si.status]||{label:si.status,cls:'badge-new'});
+            return <span className={`badge ${badge.cls}`} style={{whiteSpace:'nowrap'}}>{badge.label}</span>;
+          })()}
           <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={()=>onSelect(si)}>📄 Tanda Terima</button>
           <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={()=>setShowHistory(h=>!h)}>
             {showHistory?'▲ Tutup':'📋 History'}
