@@ -2511,6 +2511,7 @@ function PurchaseOrderCard({po, onUpdate, onEdit, userName, canMark, role}) {
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,cursor:'pointer'}} onClick={()=>setExpanded(e=>!e)}>
         <div style={{flex:1}}>
           <div style={{fontWeight:600,fontSize:14}}>🏭 {po.supplier_name}</div>
+          {po.supplier_address&&<div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>📍 {po.supplier_address}</div>}
           <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>
             Dibuat: {po.created_by} · {fmtDateTime(po.created_at)}
             {po.expected_date&&<span> · 📅 Estimasi tiba: {fmtDate(po.expected_date)}</span>}
