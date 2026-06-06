@@ -9435,7 +9435,7 @@ function OpsDashboard({orders, serviceIntakes, courierTasks, branchRequests, pur
                 .forEach(t=>items.push({label:po.supplier_name||'Supplier', addr:po.supplier_address||'', st:t.in_transit?'jalan':'antri'}));
             });
             (branchRequests||[]).forEach(r=>{
-              (r.trips||[]).filter(t=>t.courier===name&&(t.status==='pending'||t.in_transit))
+              (r.trips||[]).filter(t=>t.courier===name&&t.status!=='delivered'&&(t.status==='pending'||t.in_transit))
                 .forEach(t=>items.push({label:'Antar ke '+r.branch_name, addr:'', st:t.in_transit?'jalan':'antri'}));
             });
             (serviceIntakes||[]).filter(s=>s.sc_delivery_courier===name&&s.status==='to_service_center')
@@ -10679,7 +10679,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           const branchPhotoUrl = await uploadPhoto(branchPhotos[bk]||null, 'branch', 0, setUploadMsg(bk));
                           if (!branchPhotoUrl) {
                             if (onQueuePhoto) {
-                              const updatedTrips=(r.trips||[]).map(t=>t.no===trip.no?{...t,status:'delivered',delivered_at:new Date().toISOString(),photo:null,start_location:startLoc||null,arrived_location:loc,distance_km:km}:t);
+                              const updatedTrips=(r.trips||[]).map(t=>t.no===trip.no?{...t,status:'delivered',in_transit:false,delivered_at:new Date().toISOString(),photo:null,start_location:startLoc||null,arrived_location:loc,distance_km:km}:t);
                               const allDone=updatedTrips.every(t=>t.status==='delivered');
                               const pendingIt=(r.items||[]).filter(it=>!updatedTrips.find(t=>t.status==='delivered'&&(t.items||[]).find(ti=>ti.name===it.name)));
                               onUpdateBranch(r.id,{trips:updatedTrips,status:allDone&&pendingIt.length===0?'completed':'partial'});
@@ -10688,7 +10688,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                             } else { setUploadMsg(bk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
                             return;
                           }
-                          const updatedTrips=(r.trips||[]).map(t=>t.no===trip.no?{...t,status:'delivered',delivered_at:new Date().toISOString(),photo:branchPhotoUrl||null,start_location:startLoc||null,arrived_location:loc,distance_km:km}:t);
+                          const updatedTrips=(r.trips||[]).map(t=>t.no===trip.no?{...t,status:'delivered',in_transit:false,delivered_at:new Date().toISOString(),photo:branchPhotoUrl||null,start_location:startLoc||null,arrived_location:loc,distance_km:km}:t);
                           const allDone=updatedTrips.every(t=>t.status==='delivered');
                           const pendingItems=(r.items||[]).filter(it=>!updatedTrips.find(t=>t.status==='delivered'&&(t.items||[]).find(ti=>ti.name===it.name)));
                           onUpdateBranch(r.id,{trips:updatedTrips,status:allDone&&pendingItems.length===0?'completed':'partial'});
