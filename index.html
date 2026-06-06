@@ -666,9 +666,16 @@ function App() {
   const loadCourierTasks = async (retry=0) => {
     if (!db) return;
     const cols = 'id,created_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo';
-    const since30 = new Date(); since30.setDate(since30.getDate()-30);
-    let tasksQ = db.from('courier_tasks').select(cols).gte('created_at',since30.toISOString()).order('created_at',{ascending:false}).limit(200);
-    if (role==='courier') tasksQ = tasksQ.eq('assigned_courier', userName);
+    let tasksQ = db.from('courier_tasks').select(cols).order('created_at',{ascending:false}).limit(200);
+    if (role==='courier') {
+      // Kurir: filter per-user saja — tidak pakai filter tanggal
+      // supaya tugas aktif (assigned) selalu terlihat meski sudah lama dibuat
+      tasksQ = tasksQ.eq('assigned_courier', userName);
+    } else {
+      // Admin/ops: filter 30 hari terakhir
+      const since30 = new Date(); since30.setDate(since30.getDate()-30);
+      tasksQ = tasksQ.gte('created_at', since30.toISOString());
+    }
     const {data,error} = await tasksQ;
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
