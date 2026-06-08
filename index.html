@@ -3695,11 +3695,7 @@ function SupervisorTasks({tasks, onSave, onUpdate, onDelete, createdBy}) {
                 onDelete={onDelete&&t.status==='pending'&&t.created_by===createdBy ? ()=>onDelete(t.id) : null}/>
               {onUpdate && (
                 <div style={{marginTop:-6,marginBottom:8,paddingLeft:2}}>
-                  <RequestCancelButton item={t} onUpdate={onUpdate}/>
-                  {t.status==='cancel_requested' && (
-                    <div style={{fontSize:11,color:'var(--red)',padding:'4px 8px',background:'rgba(239,68,68,0.07)',borderRadius:6,marginTop:4}}>
-                      🚫 Request batal terkirim — menunggu approval ops{t.cancel_reason?` · "${t.cancel_reason}"`:''}</div>
-                  )}
+                  <DirectCancelTaskButton task={t} onUpdate={onUpdate}/>
                 </div>
               )}
             </div>
@@ -8357,6 +8353,58 @@ function RequestCancelButton({item, onUpdate, style}) {
   );
 }
 
+// Tombol batal langsung untuk tugas/task (tanpa perlu approval ops)
+const NO_CANCEL_TASK_STATUSES = ['done','cancelled','in_service'];
+function DirectCancelTaskButton({task, onUpdate, style}) {
+  const [open, setOpen] = React.useState(false);
+  const [reason, setReason] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+
+  if (NO_CANCEL_TASK_STATUSES.includes(task.status)) return null;
+
+  if (!open) return (
+    <button
+      className="btn-secondary btn-sm"
+      style={{color:'var(--red)',borderColor:'rgba(239,68,68,0.3)',...style}}
+      onClick={e=>{e.stopPropagation();setOpen(true);}}>
+      🚫 Batalkan
+    </button>
+  );
+
+  return (
+    <div style={{background:'rgba(239,68,68,0.07)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:9,padding:'10px 12px',marginTop:8}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:12,fontWeight:700,color:'var(--red)',marginBottom:7}}>🚫 Batalkan Tugas</div>
+      <textarea
+        value={reason}
+        onChange={e=>setReason(e.target.value)}
+        placeholder="Alasan pembatalan (opsional)..."
+        style={{width:'100%',padding:'8px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:12,resize:'vertical',minHeight:50,boxSizing:'border-box',marginBottom:7}}
+      />
+      <div style={{display:'flex',gap:7}}>
+        <button className="btn-secondary btn-sm" style={{flex:1}} onClick={()=>{setOpen(false);setReason('');}}>Kembali</button>
+        <button
+          className="btn-sm"
+          style={{flex:2,background:'var(--red)',color:'#fff',opacity:saving?0.6:1}}
+          disabled={saving}
+          onClick={async()=>{
+            setSaving(true);
+            await onUpdate(task.id,{
+              status:'cancelled',
+              cancel_reason: reason.trim()||'Dibatalkan',
+              cancel_prev_status: task.status,
+              completed_at: new Date().toISOString(),
+            });
+            setSaving(false);
+            setOpen(false);
+            setReason('');
+          }}>
+          {saving?'Menyimpan...':'✓ Batalkan Tugas'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Panel shown in ops dashboard — order revision notifications
 /* ─── OPS: approve/reject revision requests from sales ─── */
 function RevisionNotificationsPanel({orders, onUpdateOrder, opsName}) {
@@ -10596,11 +10644,7 @@ function SalesCourierTasks({tasks, onSave, onUpdate, onDelete, createdBy, create
             onDelete={onDelete&&t.status==='pending'&&t.created_by===createdBy ? ()=>onDelete(t.id) : null}/>
           {onUpdate && (
             <div style={{marginTop:-6,marginBottom:8,paddingLeft:2}}>
-              <RequestCancelButton item={t} onUpdate={onUpdate}/>
-              {t.status==='cancel_requested' && (
-                <div style={{fontSize:11,color:'var(--red)',padding:'4px 8px',background:'rgba(239,68,68,0.07)',borderRadius:6,marginTop:4}}>
-                  🚫 Request batal terkirim — menunggu approval ops{t.cancel_reason?` · "${t.cancel_reason}"`:''}</div>
-              )}
+              <DirectCancelTaskButton task={t} onUpdate={onUpdate}/>
             </div>
           )}
         </div>
@@ -10642,7 +10686,14 @@ function OpsTaskManager({tasks, onSave, onUpdate, opsName, onSaveServiceIntake, 
         ))}
       </div>
       {filtered.length===0 && <div className="empty-state"><div className="icon">📋</div><div>Tidak ada tugas</div></div>}
-      {filtered.map(t=><TaskCard key={t.id} task={t} onUpdate={onUpdate} showAssign={true} showComplete={false} onSaveServiceIntake={onSaveServiceIntake} allIntakes={allIntakes} assignedBy={opsName}/>)}
+      {filtered.map(t=>(
+        <div key={t.id}>
+          <TaskCard task={t} onUpdate={onUpdate} showAssign={true} showComplete={false} onSaveServiceIntake={onSaveServiceIntake} allIntakes={allIntakes} assignedBy={opsName}/>
+          <div style={{marginTop:-6,marginBottom:8,paddingLeft:2}}>
+            <DirectCancelTaskButton task={t} onUpdate={onUpdate}/>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
