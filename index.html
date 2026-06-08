@@ -14702,6 +14702,28 @@ function OpsServiceMonitor({intakes, onUpdate, orders}) {
 function OrderDetailModal({order, onClose, onUpdate, onLoadFiles, role, courierName}) {
   const history = order.status_history || [];
   const total = totalOrder(order.goods);
+  const [editingInvoice, setEditingInvoice] = React.useState(false);
+  const [newInvoiceNum, setNewInvoiceNum] = React.useState('');
+  const [savingInvoice, setSavingInvoice] = React.useState(false);
+  const canEditInvoice = role === 'admin';
+
+  const saveInvoice = async () => {
+    if (!newInvoiceNum.trim()) { alert('Isi nomor invoice baru dulu'); return; }
+    setSavingInvoice(true);
+    await onUpdate(order.id, {
+      invoice_number: newInvoiceNum.trim(),
+      status_history: [...(order.status_history||[]), {
+        status: order.status,
+        time: new Date().toISOString(),
+        note: `No. Invoice direvisi → ${newInvoiceNum.trim()}`,
+        by: 'admin',
+      }],
+    });
+    setSavingInvoice(false);
+    setEditingInvoice(false);
+    setNewInvoiceNum('');
+  };
+
   return (
     <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
       <div className="modal">
@@ -14723,7 +14745,37 @@ function OrderDetailModal({order, onClose, onUpdate, onLoadFiles, role, courierN
             <div><label>Pembayaran</label><div style={{fontSize:14}}>{order.payment_status}</div></div>
             <div><label>Pengiriman</label><div style={{fontSize:14}}>{order.delivery_method}</div></div>
             <div><label>Kurir</label><div style={{fontSize:14}}>{order.courier_name||'—'}</div></div>
-            {order.invoice_number && <div><label>No. Invoice</label><div style={{fontSize:14,fontFamily:'DM Mono',color:'var(--accent2)'}}>{order.invoice_number}</div></div>}
+            <div>
+              <label>No. Invoice</label>
+              {!editingInvoice ? (
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:14,fontFamily:'DM Mono',color:'var(--accent2)',fontWeight:600}}>{order.invoice_number||'—'}</span>
+                  {canEditInvoice && (
+                    <button onClick={()=>{setNewInvoiceNum(order.invoice_number||'');setEditingInvoice(true);}}
+                      style={{fontSize:11,padding:'2px 8px',borderRadius:6,border:'1px solid var(--border2)',background:'transparent',color:'var(--text2)',cursor:'pointer'}}>
+                      ✏️ Revisi
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div style={{marginTop:4}}>
+                  <input
+                    value={newInvoiceNum}
+                    onChange={e=>setNewInvoiceNum(e.target.value)}
+                    placeholder="Contoh: SI.2026.06.00228"
+                    style={{fontFamily:'DM Mono',fontSize:13,marginBottom:6,padding:'6px 10px'}}
+                    onKeyDown={e=>{if(e.key==='Enter')saveInvoice();if(e.key==='Escape'){setEditingInvoice(false);setNewInvoiceNum('');}}}
+                    autoFocus
+                  />
+                  <div style={{display:'flex',gap:6}}>
+                    <button className="btn-secondary btn-sm" onClick={()=>{setEditingInvoice(false);setNewInvoiceNum('');}}>Batal</button>
+                    <button className="btn-primary btn-sm" onClick={saveInvoice} disabled={savingInvoice}>
+                      {savingInvoice?'Menyimpan...':'✓ Simpan'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             {order.tech_name && <div><label>Teknisi</label><div style={{fontSize:14}}>{order.tech_name}</div></div>}
           </div>
           <div style={{marginBottom:4}}><label>Alamat</label><div style={{fontSize:13,color:'var(--text)'}}>{order.customer_address||'—'}</div></div>
