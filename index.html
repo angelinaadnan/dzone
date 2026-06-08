@@ -1036,6 +1036,22 @@ function App() {
     }
   };
 
+  const autoCloseNoCheckout = async (data) => {
+    // Record dari hari sebelumnya yang check_in ada tapi check_out kosong → tandai otomatis
+    const today = new Date().toISOString().slice(0,10);
+    const unclosed = data.filter(a => {
+      const recDate = a.date || a.check_in?.slice(0,10);
+      return a.check_in && !a.check_out && recDate && recDate < today &&
+             !(a.notes||'').includes('[TIDAK_CHECKOUT]');
+    });
+    if (!unclosed.length || !db) return;
+    await Promise.all(unclosed.map(a =>
+      db.from('attendance').update({
+        notes: [(a.notes||'').trim(), '[TIDAK_CHECKOUT]'].filter(Boolean).join(' · '),
+      }).eq('id', a.id)
+    ));
+  };
+
   const loadAttendance = async (retry=0) => {
     if (!db) return;
     // Coba select semua kolom
@@ -1044,7 +1060,13 @@ function App() {
     let attendQ = db.from('attendance').select('*').gte('check_in',since30d.toISOString()).order('check_in',{ascending:false}).limit(1000);
     if (!needAllAttendance) attendQ = attendQ.eq('user_name', userName);
     const {data,error} = await attendQ;
-    if (!error) { if (data) setAttendance(data); return; }
+    if (!error) {
+      if (data) {
+        setAttendance(data);
+        autoCloseNoCheckout(data); // background — tidak block load
+      }
+      return;
+    }
     const isTimeout = (error.message||'').includes('timeout') || (error.message||'').includes('canceling');
     // Jika timeout dan masih ada retry, coba lagi
     if (isTimeout && retry < 2) {
@@ -1554,6 +1576,12 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
     if (!rec?.check_in) return {label:'Belum Absen', color:'var(--red)', dot:'#ef4444', late:0};
     const late = lateMinutes(rec);
     const lateTag = late>0 ? ` · ⏰ TELAT ${late} menit` : '';
+    // Sudah ganti hari tapi belum checkout → tandai otomatis
+    const recDate = rec.date || rec.check_in?.slice(0,10);
+    const isPastDay = recDate && recDate < todayStr;
+    if (!rec.check_out && isPastDay) {
+      return {label:`⚠️ Tidak Checkout${lateTag}`, color:'var(--red)', dot:'#ef4444', late, noCheckout:true};
+    }
     if (rec.check_out) return {label:late>0?`⚠ Hadir${lateTag}`:'✅ Hadir', color:late>0?'var(--amber)':'var(--green)', dot:late>0?'#f59e0b':'#22c55e', late};
     return {label:late>0?`🟡 Masih Kerja${lateTag}`:'🟡 Masih Kerja', color:late>0?'var(--amber)':'var(--teal)', dot:late>0?'#f59e0b':'#14b8a6', late};
   };
