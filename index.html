@@ -1558,6 +1558,9 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
   // Hitung berapa menit telat (0 = tepat waktu / lebih awal)
   const lateMinutes = (rec) => {
     if (!rec?.check_in) return 0;
+    // Record lama yang tidak checkout → jangan hitung telat (sudah tidak relevan)
+    const recDate = rec.date || rec.check_in?.slice(0,10);
+    if (!rec.check_out && recDate && recDate < todayStr) return 0;
     const d = new Date(rec.check_in);
     const actual = d.getHours()*60 + d.getMinutes();
     const sched = getSchedule(rec.user_name);
@@ -1580,7 +1583,7 @@ function AbsensiPage({attendance, onSave, onUpdate, userName, role, demoMode}) {
     const recDate = rec.date || rec.check_in?.slice(0,10);
     const isPastDay = recDate && recDate < todayStr;
     if (!rec.check_out && isPastDay) {
-      return {label:`⚠️ Tidak Checkout${lateTag}`, color:'var(--red)', dot:'#ef4444', late, noCheckout:true};
+      return {label:'⚠️ Tidak Checkout', color:'var(--red)', dot:'#ef4444', late:0, noCheckout:true};
     }
     if (rec.check_out) return {label:late>0?`⚠ Hadir${lateTag}`:'✅ Hadir', color:late>0?'var(--amber)':'var(--green)', dot:late>0?'#f59e0b':'#22c55e', late};
     return {label:late>0?`🟡 Masih Kerja${lateTag}`:'🟡 Masih Kerja', color:late>0?'var(--amber)':'var(--teal)', dot:late>0?'#f59e0b':'#14b8a6', late};
