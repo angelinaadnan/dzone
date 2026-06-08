@@ -683,17 +683,34 @@ function App() {
     }
     let {error} = await db.from('service_intakes').update(updates).eq('id',id);
     if (error && (error.message||'').toLowerCase().includes('column')) {
-      const safe = Object.fromEntries(Object.entries(updates).filter(([k])=>!['tech_note_edits'].includes(k)));
+      const safe = Object.fromEntries(Object.entries(updates).filter(([k])=>!['tech_note_edits','linked_courier_task_id'].includes(k)));
       ({error} = await db.from('service_intakes').update(safe).eq('id',id));
     }
     if (error) { showToast('Error: '+error.message,'error'); return; }
     await loadServiceIntakes();
     showToast('Status servis diperbarui!');
+    // Auto-selesaikan linked Urus Servisan task jika service sudah dikembalikan ke customer
+    const currentIntake = serviceIntakes.find(si=>si.id===id);
+    const linkedTaskId = currentIntake?.linked_courier_task_id;
+    if (linkedTaskId && db) {
+      const merged = {...(currentIntake||{}), ...updates};
+      const fullyReturned =
+        (merged.source_type!=='branch' && updates.return_status==='returned') ||
+        (merged.source_type==='branch' && updates.branch_returned_at);
+      if (fullyReturned) {
+        await db.from('courier_tasks').update({
+          status: 'done',
+          completed_at: new Date().toISOString(),
+          completion_note: `✅ Service selesai & dikembalikan ke customer (${currentIntake?.customer_name||''})`,
+        }).eq('id', linkedTaskId).eq('status','in_service');
+        await loadCourierTasks();
+      }
+    }
   };
 
   const loadCourierTasks = async (retry=0) => {
     if (!db) return;
-    const cols = 'id,created_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,assigned_by,assigned_at,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo';
+    const cols = 'id,created_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,assigned_by,assigned_at,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo,linked_intake_id,cancel_reason,cancel_prev_status,cancel_requested_at';
     // Semua role: filter 60 hari terakhir — filter per-kurir dilakukan di sisi klien
     // supaya tidak ada risiko stale closure saat query, dan tugas lama tetap terlihat
     const since60 = new Date(); since60.setDate(since60.getDate()-60);
@@ -954,6 +971,18 @@ function App() {
     showToast('Tugas diperbarui!');
   };
 
+  const deleteCourierTask = async (id) => {
+    if (!db) {
+      setCourierTasks(prev=>prev.filter(t=>t.id!==id));
+      showToast('Tugas berhasil dihapus!');
+      return;
+    }
+    const {error} = await db.from('courier_tasks').delete().eq('id',id);
+    if (error) { showToast('Error: '+error.message,'error'); return; }
+    await loadCourierTasks();
+    showToast('Tugas berhasil dihapus!');
+  };
+
   const loadCourierCheckins = async (retry=0) => {
     if (!db) return;
     const since14 = new Date(); since14.setDate(since14.getDate()-14);
@@ -1195,7 +1224,7 @@ function App() {
         {role==='technician' && page==='my_jobs' && <TechnicianJobs orders={orders} onUpdate={updateOrder} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} techName={userName} onSelect={setSelectedOrder}/>}
         {role==='technician' && page==='summary' && <TechnicianSummary orders={orders} serviceIntakes={serviceIntakes} techName={userName} onUpdate={updateOrder} onUpdateSI={updateServiceIntake}/>}
         {role==='sales' && page==='new_service' && <ServiceIntakeEntry onSave={saveServiceIntake} createdByRole="sales" createdBy={userName} onDone={()=>setPage('my_orders')} allIntakes={serviceIntakes}/>}
-        {role==='sales' && page==='minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName} createdByRole="sales"/>}
+        {role==='sales' && page==='minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} onDelete={deleteCourierTask} createdBy={userName} createdByRole="sales"/>}
         {role==='ops' && page==='new_service_ops' && <ServiceIntakeEntry onSave={saveServiceIntake} createdByRole="ops" createdBy={userName} onDone={()=>setPage('service_monitor')} allIntakes={serviceIntakes}/>}
         {role==='supervisor' && page==='sup_dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} userRole="supervisor" userName={userName}/>}
         {role==='supervisor' && page==='sup_new_order' && <NewOrderForm onSave={saveOrder} salesName={userName} onToast={showToast}/>}
@@ -1203,11 +1232,11 @@ function App() {
         {role==='supervisor' && page==='sup_orders' && <SupervisorOrders orders={orders} onSelect={setSelectedOrder} onUpdate={updateOrder} currentUser={userName} allowRevisi={true}/>}
         {role==='supervisor' && page==='sup_service' && <SupervisorService intakes={serviceIntakes} orders={orders}/>}
         {role==='supervisor' && page==='sup_branch' && <SupervisorBranch requests={branchRequests}/>}
-        {role==='supervisor' && page==='sup_tasks' && <SupervisorTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName}/>}
+        {role==='supervisor' && page==='sup_tasks' && <SupervisorTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} onDelete={deleteCourierTask} createdBy={userName}/>}
         {role==='supervisor' && page==='sup_tech' && <SupervisorTech orders={orders} serviceIntakes={serviceIntakes} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} supervisorName={userName} canVerify={true}/>}
         {role==='ops' && page==='op_tech_log' && <SupervisorTech orders={orders} serviceIntakes={serviceIntakes} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} supervisorName={userName} canVerify={false}/>}
         {role==='supervisor' && page==='sup_kurir' && <CourierDailyMonitor orders={orders} courierTasks={courierTasks} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes} onRefresh={()=>{loadCourierTasks();loadCourierCheckins();loadOrders();loadServiceIntakes();loadBranchRequests();}}/>}
-        {role==='supervisor' && page==='sup_minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName} createdByRole="supervisor"/>}
+        {role==='supervisor' && page==='sup_minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} onDelete={deleteCourierTask} createdBy={userName} createdByRole="supervisor"/>}
         {role==='admin_online' && page==='ao_invoicing' && <AdminOnlineInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
         {role==='admin_online' && page==='ao_orders' && <AdminOnlineOrders orders={orders} onSelect={setSelectedOrder}/>}
         {role==='admin_online' && page==='ao_tech_request' && <AdminOnlineTechRequest intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} createdBy={userName}/>}
@@ -3511,7 +3540,7 @@ function SupervisorBranch({requests}) {
   );
 }
 
-function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
+function SupervisorTasks({tasks, onSave, onUpdate, onDelete, createdBy}) {
   const [tab, setTab] = React.useState('mytasks');
   const [filter, setFilter] = React.useState('all');
   const [showForm, setShowForm] = React.useState(false);
@@ -3597,7 +3626,7 @@ function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
       {/* Status filter — Semua Task tab only */}
       {tab==='tasks'&&(
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
-          {['all','pending','assigned','on_the_way','arrived','done'].map(s=>(
+          {['all','pending','assigned','on_the_way','arrived','returning','in_service','done'].map(s=>(
             <button key={s} className={filter===s?'btn-primary btn-sm':'btn-secondary btn-sm'} style={{fontSize:11}} onClick={()=>setFilter(s)}>
               {s==='all'?'Semua':(TASK_STATUS[s]?.label||s)}
             </button>
@@ -3611,7 +3640,8 @@ function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
           {myTasks.length===0&&<div className="empty-state"><div className="icon">✅</div><div>Belum ada tugas yang kamu buat</div></div>}
           {myTasks.map(t=>(
             <TaskCard key={t.id} task={t} onUpdate={onUpdate} showAssign={false} showComplete={false}
-              onEdit={['pending','assigned'].includes(t.status)&&t.created_by===createdBy ? ()=>setEditingTask(t) : null}/>
+              onEdit={['pending','assigned'].includes(t.status)&&t.created_by===createdBy ? ()=>setEditingTask(t) : null}
+              onDelete={onDelete&&t.status==='pending'&&t.created_by===createdBy ? ()=>onDelete(t.id) : null}/>
           ))}
         </>
       )}
@@ -3622,7 +3652,8 @@ function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
           {filtered.length===0&&<div className="empty-state"><div className="icon">📋</div><div>Tidak ada tugas{filter!=='all'?' dengan status ini':''}</div></div>}
           {filtered.map(t=>(
             <TaskCard key={t.id} task={t} onUpdate={onUpdate} showAssign={false} showComplete={false}
-              onEdit={['pending','assigned'].includes(t.status)&&t.created_by===createdBy ? ()=>setEditingTask(t) : null}/>
+              onEdit={['pending','assigned'].includes(t.status)&&t.created_by===createdBy ? ()=>setEditingTask(t) : null}
+              onDelete={onDelete&&t.status==='pending'&&t.created_by===createdBy ? ()=>onDelete(t.id) : null}/>
           ))}
         </>
       )}
@@ -8376,7 +8407,8 @@ const TASK_STATUS = {
   assigned:         {label:'Ditugaskan',         cls:'badge-tech'},
   on_the_way:       {label:'🛵 Dalam Perjalanan', cls:'badge-delivery'},
   arrived:          {label:'📍 Di Lokasi',        cls:'badge-prep'},
-  returning:        {label:'🔄 Kembali ke Toko', cls:'badge-invoiced'},
+  returning:        {label:'🔄 Menuju Dusit',    cls:'badge-invoiced'},
+  in_service:       {label:'🔧 Di-Servis',       cls:'badge-tech'},
   done:             {label:'✓ Selesai',           cls:'badge-delivered'},
   cancelled:        {label:'Dibatalkan',          cls:'badge-cancelled'},
   cancel_requested: {label:'⏳ Minta Dibatalkan', cls:'badge-cancelled'},
@@ -9745,11 +9777,12 @@ function WalkInServiceModal({task, onSaveIntake, onUpdateTask, onClose, allIntak
               if(saving) return;
               setSaving(true);
               try {
-                await onSaveIntake(data);
+                const intakeData = {...data, linked_courier_task_id: task.id};
+                const savedIntake = await onSaveIntake(intakeData);
                 await onUpdateTask(task.id, {
-                  status: 'done',
-                  completed_at: new Date().toISOString(),
-                  completion_note: `Walk-in — form servisan diisi (${data.customer_name})`,
+                  status: 'in_service',
+                  linked_intake_id: savedIntake?.id || null,
+                  completion_note: `🔧 Form tanda terima dibuat (${data.customer_name}) — menunggu service selesai`,
                 });
                 onClose();
               } catch(e) { alert('Error: '+e.message); setSaving(false); }
@@ -9762,7 +9795,7 @@ function WalkInServiceModal({task, onSaveIntake, onUpdateTask, onClose, allIntak
   );
 }
 
-function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFillServiceForm, onSaveServiceIntake, allIntakes, getLastCheckin, onCheckin, isLocked=false, lockMessage=null, onQueuePhoto=null, assignedBy=null, onEdit=null}) {
+function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFillServiceForm, onSaveServiceIntake, allIntakes, getLastCheckin, onCheckin, isLocked=false, lockMessage=null, onQueuePhoto=null, assignedBy=null, onEdit=null, onDelete=null}) {
   const [photo, setPhoto] = React.useState(null);
   const [note, setNote] = React.useState('');
   const [assigning, setAssigning] = React.useState(false);
@@ -9842,8 +9875,36 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
     setSaving(false);
   };
 
+  // Khusus Urus Servisan: kurir sudah ambil barang dari customer → status 'returning' (menuju Dusit)
+  // Task TIDAK selesai dulu — Ops buat form tanda terima → selesai otomatis saat service + return ke customer
+  const markPickedUp = async () => {
+    if (!photo) { alert('Foto serah terima dari customer wajib diupload dulu'); return; }
+    setSaving(true);
+    setGpsLoading(true);
+    let loc = null;
+    try { loc = await getGPS(); } catch(e) {}
+    setGpsLoading(false);
+    const pickedNote = note.trim() || '📦 Barang sudah diambil dari customer — menuju Dusit';
+    const updates = { status: 'returning', completion_note: pickedNote };
+    const photoUrl = await uploadPhoto(photo, 'tasks', 0, (msg) => setUploadMsg(msg));
+    if (!photoUrl) {
+      if (onQueuePhoto) {
+        onQueuePhoto(photo, 'tasks', {type:'task_patch', id:task.id, photoField:'completion_photo', patch:{...updates}});
+        setUploadMsg('📱 Foto tersimpan di HP, upload otomatis saat sinyal kembali');
+        await onUpdate(task.id, {...updates, completion_photo: null});
+      } else {
+        setUploadMsg('❌ Foto gagal diupload. Pastikan internet aktif lalu coba lagi.');
+      }
+      setSaving(false); return;
+    }
+    setUploadMsg(null);
+    updates.completion_photo = photoUrl;
+    await onUpdate(task.id, updates);
+    setSaving(false);
+  };
+
   return (
-    <div className="card" style={{marginBottom:12,borderLeft:`3px solid ${task.status==='done'?'var(--green)':task.status==='on_the_way'?'var(--blue)':task.status==='assigned'?'var(--amber)':'var(--border)'}`}}>
+    <div className="card" style={{marginBottom:12,borderLeft:`3px solid ${task.status==='done'?'var(--green)':task.status==='in_service'?'var(--purple,#a855f7)':task.status==='on_the_way'||task.status==='arrived'||task.status==='returning'?'var(--blue)':task.status==='assigned'?'var(--amber)':'var(--border)'}`}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:8}}>
         <div style={{flex:1}}>
           <div style={{fontWeight:600,fontSize:14}}>{task.task_type}</div>
@@ -9868,7 +9929,10 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
           {onEdit && ['pending','assigned'].includes(task.status) && (
             <button className="btn-secondary btn-sm" style={{fontSize:11,color:'var(--amber)'}} onClick={()=>onEdit(task)}>✏️ Edit</button>
           )}
-          {(task.assigned_courier||task.status==='done') && (
+          {onDelete && task.status==='pending' && (
+            <button className="btn-secondary btn-sm" style={{fontSize:11,color:'var(--red)'}} onClick={()=>{if(window.confirm('Yakin hapus tugas ini?')) onDelete();}}>🗑️ Hapus</button>
+          )}
+          {(task.assigned_courier||['done','in_service'].includes(task.status)) && (
             <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={()=>setShowDetail(d=>!d)}>
               {showDetail?'▲ Tutup':'📋 Detail'}
             </button>
@@ -9892,7 +9956,13 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
               : null,
             task.start_location?.time ? {icon:'🚗', label:'Kurir Berangkat', sub:task.start_location.lat?`📍 ${parseFloat(task.start_location.lat).toFixed(4)}, ${parseFloat(task.start_location.lng).toFixed(4)}`:'', time:task.start_location.time, done:true} : null,
             task.arrived_location?.time ? {icon:'📍', label:`Tiba di ${task.destination||'tujuan'}`, sub:task.distance_km?`Jarak: ${task.distance_km} km`:'', time:task.arrived_location.time, done:true} : null,
-            task.status==='done' ? {icon:'✅', label:'Selesai', sub:task.completed_by?`Oleh: ${task.completed_by}`:'', time:task.completed_at, done:true} : null,
+            task.task_type==='Urus Servisan' && ['returning','in_service','done'].includes(task.status)
+              ? {icon:'📦', label:'Barang Diambil dari Customer', sub:'Kurir menuju Dusit', time:null, done:true} : null,
+            task.task_type==='Urus Servisan' && ['in_service','done'].includes(task.status)
+              ? {icon:'📋', label:'Form Tanda Terima Dibuat', sub:task.linked_intake_id?`ID: ${task.linked_intake_id.slice(0,8)}…`:'Ops membuat form intake', time:null, done:true} : null,
+            task.status==='done' && task.task_type==='Urus Servisan'
+              ? {icon:'✅', label:'Service Selesai & Dikembalikan ke Customer', sub:task.completed_by?`Otomatis saat return dikonfirmasi`:'', time:task.completed_at, done:true}
+              : task.status==='done' ? {icon:'✅', label:'Selesai', sub:task.completed_by?`Oleh: ${task.completed_by}`:'', time:task.completed_at, done:true} : null,
           ].filter(Boolean).map((step,i)=>(
             <div key={i} style={{display:'flex',gap:8,marginBottom:8}}>
               <div style={{fontSize:14,width:20,textAlign:'center',flexShrink:0}}>{step.icon}</div>
@@ -9915,6 +9985,23 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
         </div>
       )}
 
+      {showAssign && task.task_type==='Urus Servisan' && task.status==='returning' && onSaveServiceIntake && (
+        <div style={{paddingTop:10,borderTop:'1px solid var(--border)'}}>
+          <div style={{fontSize:12,color:'var(--amber)',marginBottom:8,padding:'8px 10px',background:'rgba(245,158,11,0.08)',borderRadius:6}}>
+            📦 Kurir sedang membawa barang menuju Dusit — buat form tanda terima saat barang tiba
+          </div>
+          <button className="btn-amber btn-sm" style={{width:'100%',padding:'10px',fontWeight:700,fontSize:13}} onClick={()=>setShowWalkIn(true)}>
+            📋 Buat Form Tanda Terima Servisan
+          </button>
+        </div>
+      )}
+      {showAssign && task.status==='in_service' && (
+        <div style={{paddingTop:8,borderTop:'1px solid var(--border)',fontSize:12,color:'var(--text2)'}}>
+          🔧 Form tanda terima sudah dibuat — barang sedang dalam proses servis
+          {task.linked_intake_id && <div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>Lihat detail di Service Monitor · ID: {task.linked_intake_id.slice(0,8)}…</div>}
+          <div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>Task akan selesai otomatis setelah service selesai & dikembalikan ke customer</div>
+        </div>
+      )}
       {showAssign && task.status==='pending' && (
         <div style={{paddingTop:10,borderTop:'1px solid var(--border)'}}>
           {!assigning
@@ -10052,56 +10139,90 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
                   📍 Tiba {fmtTime(task.arrived_location.time)} · <a href={`https://maps.google.com?q=${task.arrived_location.lat},${task.arrived_location.lng}`} target="_blank" style={{color:'var(--blue)'}}>lihat di Maps</a>
                 </div>
               )}
-              {/* Form serah terima servisan — opsional, tapi foto tetap wajib */}
-              {task.task_type==='Urus Servisan' && (
-                <div style={{marginBottom:10}}>
-                  {task.completion_note?.startsWith('✅')
-                    ? <div style={{padding:'10px',background:'rgba(34,197,94,0.12)',borderRadius:8,fontSize:13,color:'var(--green)',marginBottom:8}}>{task.completion_note}</div>
-                    : <button className="btn-primary" style={{width:'100%',padding:'11px',marginBottom:4}} onClick={()=>onFillServiceForm&&onFillServiceForm(task)}>
-                        📋 Isi Form Serah Terima Servisan
-                      </button>
-                  }
+              {task.task_type==='Urus Servisan' ? (
+                /* Urus Servisan: kurir ambil barang dari customer → bawa ke Dusit → Ops buat form */
+                <div>
+                  <div style={{padding:'10px 12px',background:'rgba(59,130,246,0.08)',border:'1px solid rgba(59,130,246,0.2)',borderRadius:8,fontSize:12,color:'var(--text2)',marginBottom:12}}>
+                    ℹ️ <b>Ambil barang dari customer</b>, foto serah terima, lalu kembali ke Dusit.<br/>
+                    <span style={{color:'var(--text3)'}}>Task selesai otomatis setelah Ops buat form tanda terima &amp; service selesai dikembalikan ke customer.</span>
+                  </div>
+                  <div style={{marginBottom:10}}>
+                    <label>📷 Foto Serah Terima dari Customer <span style={{color:'var(--red)',fontWeight:700}}>*</span></label>
+                    <div style={{fontSize:11,color:'var(--amber)',marginBottom:4}}>Wajib sebelum lanjut</div>
+                    <input type="file" accept="image/*" capture="environment" onChange={handlePhoto}/>
+                    {photo && <img src={photo} style={{width:'100%',maxHeight:140,objectFit:'cover',borderRadius:8,marginTop:6}} alt="foto"/>}
+                  </div>
+                  <input placeholder="Catatan (opsional)" value={note} onChange={e=>setNote(e.target.value)}
+                    style={{width:'100%',padding:'8px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',fontSize:13,boxSizing:'border-box',marginBottom:8}}/>
+                  {uploadMsg && <div style={{textAlign:'center',fontSize:12,color:uploadMsg.startsWith('❌')?'var(--red)':uploadMsg.startsWith('📱')?'var(--blue)':'var(--amber)',marginBottom:6,padding:'6px 10px',background:uploadMsg.startsWith('❌')?'rgba(239,68,68,0.1)':uploadMsg.startsWith('📱')?'rgba(59,130,246,0.1)':'rgba(245,158,11,0.1)',borderRadius:6}}>{uploadMsg}</div>}
+                  <button style={{width:'100%',padding:'12px',background:'var(--blue)',color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor:(gpsLoading||saving)?'default':'pointer',opacity:(gpsLoading||saving)?0.7:1}}
+                    onClick={()=>{setUploadMsg(null);markPickedUp();}} disabled={gpsLoading||saving}>
+                    {uploadMsg&&!uploadMsg.startsWith('❌')&&!uploadMsg.startsWith('📱') ? uploadMsg : gpsLoading?'📡 Mengambil GPS...':saving?'⏳ Menyimpan...':'📦 Sudah Ambil Barang — Menuju Dusit'}
+                  </button>
+                </div>
+              ) : (
+                /* Flow normal untuk jenis tugas lain */
+                <div>
+                  <div style={{marginBottom:10}}>
+                    <label>
+                      {task.task_type==='Ambil Giro / Cek' ? 'Foto Giro/Cek' : '📷 Foto Bukti'}
+                      {' '}<span style={{color:'var(--red)',fontWeight:700}}>*</span>
+                    </label>
+                    <div style={{fontSize:11,color:'var(--amber)',marginBottom:4}}>Wajib sebelum selesai</div>
+                    <input type="file" accept="image/*" capture="environment" onChange={handlePhoto}/>
+                    {photo && <img src={photo} style={{width:'100%',maxHeight:140,objectFit:'cover',borderRadius:8,marginTop:6}} alt="foto"/>}
+                  </div>
+                  <input placeholder="Catatan (opsional)" value={note} onChange={e=>setNote(e.target.value)}
+                    style={{width:'100%',padding:'8px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',fontSize:13,boxSizing:'border-box',marginBottom:8}}/>
+                  {uploadMsg && <div style={{textAlign:'center',fontSize:12,color:uploadMsg.startsWith('❌')?'var(--red)':uploadMsg.startsWith('📱')?'var(--blue)':'var(--amber)',marginBottom:6,padding:'6px 10px',background:uploadMsg.startsWith('❌')?'rgba(239,68,68,0.1)':uploadMsg.startsWith('📱')?'rgba(59,130,246,0.1)':'rgba(245,158,11,0.1)',borderRadius:6}}>{uploadMsg}</div>}
+                  <button style={{width:'100%',padding:'12px',background:'var(--green)',color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor:(gpsLoading||saving)?'default':'pointer',opacity:(gpsLoading||saving)?0.7:1}}
+                    onClick={()=>{setUploadMsg(null);markDone();}} disabled={gpsLoading||saving}>
+                    {uploadMsg&&!uploadMsg.startsWith('❌')&&!uploadMsg.startsWith('📱') ? uploadMsg : gpsLoading?'📡 Mengambil GPS...':saving?'⏳ Menyimpan...':'✅ Selesai'}
+                  </button>
                 </div>
               )}
-              {/* Foto WAJIB untuk semua jenis tugas */}
-              <div style={{marginBottom:10}}>
-                <label>
-                  {task.task_type==='Ambil Giro / Cek' ? 'Foto Giro/Cek' : task.task_type==='Urus Servisan' ? '📷 Foto Serah Terima' : '📷 Foto Bukti'}
-                  {' '}<span style={{color:'var(--red)',fontWeight:700}}>*</span>
-                </label>
-                <div style={{fontSize:11,color:'var(--amber)',marginBottom:4}}>Wajib sebelum selesai</div>
-                <input type="file" accept="image/*" capture="environment" onChange={handlePhoto}/>
-                {photo && <img src={photo} style={{width:'100%',maxHeight:140,objectFit:'cover',borderRadius:8,marginTop:6}} alt="foto"/>}
-              </div>
-              <input placeholder="Catatan (opsional)" value={note} onChange={e=>setNote(e.target.value)}
-                style={{width:'100%',padding:'8px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',fontSize:13,boxSizing:'border-box',marginBottom:8}}/>
-              {uploadMsg && <div style={{textAlign:'center',fontSize:12,color:uploadMsg.startsWith('❌')?'var(--red)':uploadMsg.startsWith('📱')?'var(--blue)':'var(--amber)',marginBottom:6,padding:'6px 10px',background:uploadMsg.startsWith('❌')?'rgba(239,68,68,0.1)':uploadMsg.startsWith('📱')?'rgba(59,130,246,0.1)':'rgba(245,158,11,0.1)',borderRadius:6}}>{uploadMsg}</div>}
-              <button style={{width:'100%',padding:'12px',background:'var(--green)',color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor:(gpsLoading||saving)?'default':'pointer',opacity:(gpsLoading||saving)?0.7:1}}
-                onClick={()=>{setUploadMsg(null);markDone();}} disabled={gpsLoading||saving}>
-                {uploadMsg&&!uploadMsg.startsWith('❌')&&!uploadMsg.startsWith('📱') ? uploadMsg : gpsLoading?'📡 Mengambil GPS...':saving?'⏳ Menyimpan...':'✅ Selesai'}
-              </button>
             </div>
           )}
 
-          {/* ── Fallback: returning (data lama) → Selesai ── */}
+          {/* ── Returning: menuju Dusit ── */}
           {task.status==='returning' && (
             <div>
-              {task.return_location && (
-                <div style={{fontSize:11,color:'var(--text3)',marginBottom:10,padding:'6px 10px',background:'var(--bg3)',borderRadius:6}}>
-                  🛵 Berangkat balik {fmtTime(task.return_location.time)} · <a href={`https://maps.google.com?q=${task.return_location.lat},${task.return_location.lng}`} target="_blank" style={{color:'var(--blue)'}}>lihat di Maps</a>
+              {task.task_type==='Urus Servisan' ? (
+                /* Urus Servisan: kurir menuju Dusit — tunggu Ops buat form */
+                <div style={{padding:'12px',background:'rgba(59,130,246,0.08)',border:'1px solid rgba(59,130,246,0.2)',borderRadius:8,fontSize:13}}>
+                  <div style={{fontWeight:700,color:'var(--blue)',marginBottom:6}}>📦 Barang Sudah Diambil — Menuju Dusit</div>
+                  {task.completion_photo && <img src={task.completion_photo} style={{width:'100%',maxHeight:120,objectFit:'cover',borderRadius:6,marginBottom:8}} alt="foto serah terima"/>}
+                  <div style={{fontSize:12,color:'var(--text2)'}}>Serahkan barang ke Ops saat tiba di Dusit.</div>
+                  <div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>Task selesai otomatis setelah Ops buat form tanda terima &amp; service selesai dikembalikan ke customer.</div>
+                </div>
+              ) : (
+                /* Returning normal */
+                <div>
+                  {task.return_location && (
+                    <div style={{fontSize:11,color:'var(--text3)',marginBottom:10,padding:'6px 10px',background:'var(--bg3)',borderRadius:6}}>
+                      🛵 Berangkat balik {fmtTime(task.return_location.time)} · <a href={`https://maps.google.com?q=${task.return_location.lat},${task.return_location.lng}`} target="_blank" style={{color:'var(--blue)'}}>lihat di Maps</a>
+                    </div>
+                  )}
+                  <div style={{marginBottom:10}}>
+                    <label>📷 Foto Bukti <span style={{color:'var(--red)',fontWeight:700}}>*</span></label>
+                    <div style={{fontSize:11,color:'var(--amber)',marginBottom:4}}>Wajib sebelum selesai</div>
+                    <input type="file" accept="image/*" capture="environment" onChange={handlePhoto}/>
+                    {photo && <img src={photo} style={{width:'100%',maxHeight:140,objectFit:'cover',borderRadius:8,marginTop:6}} alt="foto"/>}
+                  </div>
+                  <button style={{width:'100%',padding:'12px',background:'var(--green)',color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor:(gpsLoading||saving)?'default':'pointer',opacity:(gpsLoading||saving)?0.7:1}}
+                    onClick={markDone} disabled={gpsLoading||saving}>
+                    {gpsLoading?'📡 Mengambil GPS...':saving?'⏳ Menyimpan...':'✅ Selesai'}
+                  </button>
                 </div>
               )}
-              {/* Foto wajib di step returning juga */}
-              <div style={{marginBottom:10}}>
-                <label>📷 Foto Bukti <span style={{color:'var(--red)',fontWeight:700}}>*</span></label>
-                <div style={{fontSize:11,color:'var(--amber)',marginBottom:4}}>Wajib sebelum selesai</div>
-                <input type="file" accept="image/*" capture="environment" onChange={handlePhoto}/>
-                {photo && <img src={photo} style={{width:'100%',maxHeight:140,objectFit:'cover',borderRadius:8,marginTop:6}} alt="foto"/>}
-              </div>
-              <button style={{width:'100%',padding:'12px',background:'var(--green)',color:'#fff',border:'none',borderRadius:10,fontWeight:700,fontSize:14,cursor:(gpsLoading||saving)?'default':'pointer',opacity:(gpsLoading||saving)?0.7:1}}
-                onClick={markDone} disabled={gpsLoading||saving}>
-                {gpsLoading?'📡 Mengambil GPS...':saving?'⏳ Menyimpan...':'✅ Selesai'}
-              </button>
+            </div>
+          )}
+
+          {/* ── in_service: barang sedang di-servis ── */}
+          {task.status==='in_service' && (
+            <div style={{padding:'12px',background:'rgba(168,85,247,0.08)',border:'1px solid rgba(168,85,247,0.2)',borderRadius:8,fontSize:13}}>
+              <div style={{fontWeight:700,color:'#a855f7',marginBottom:4}}>🔧 Barang Sedang Di-Servis di Dusit</div>
+              <div style={{fontSize:12,color:'var(--text2)'}}>Form tanda terima sudah dibuat. Task selesai otomatis setelah service &amp; pengembalian ke customer selesai.</div>
             </div>
           )}
 
@@ -10120,7 +10241,7 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
   );
 }
 
-function SalesCourierTasks({tasks, onSave, onUpdate, createdBy, createdByRole}) {
+function SalesCourierTasks({tasks, onSave, onUpdate, onDelete, createdBy, createdByRole}) {
   const [showForm, setShowForm] = React.useState(false);
   const myTasks = tasks.filter(t=>t.created_by===createdBy);
   const pending = myTasks.filter(t=>t.status==='pending').length;
@@ -10139,7 +10260,8 @@ function SalesCourierTasks({tasks, onSave, onUpdate, createdBy, createdByRole}) 
       {myTasks.length===0 && <div className="empty-state"><div className="icon">✅</div><div>Belum ada task</div></div>}
       {myTasks.map(t=>(
         <div key={t.id}>
-          <TaskCard task={t} onUpdate={onUpdate||(() =>{})} showAssign={false} showComplete={false}/>
+          <TaskCard task={t} onUpdate={onUpdate||(() =>{})} showAssign={false} showComplete={false}
+            onDelete={onDelete&&t.status==='pending'&&t.created_by===createdBy ? ()=>onDelete(t.id) : null}/>
           {onUpdate && (
             <div style={{marginTop:-6,marginBottom:8,paddingLeft:2}}>
               <RequestCancelButton item={t} onUpdate={onUpdate}/>
@@ -10171,7 +10293,7 @@ function OpsTaskManager({tasks, onSave, onUpdate, opsName, onSaveServiceIntake, 
           {pending>0 && <div style={{fontSize:12,color:'var(--amber)',marginTop:4}}>⚠ {pending} tugas belum di-assign</div>}
         </div>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          {['all','pending','assigned','on_the_way','done'].map(s=>(
+          {['all','pending','assigned','on_the_way','returning','in_service','done'].map(s=>(
             <button key={s} className={filter===s?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilter(s)}>
               {s==='all'?'Semua':TASK_STATUS[s]?.label||s}
             </button>
@@ -10180,7 +10302,7 @@ function OpsTaskManager({tasks, onSave, onUpdate, opsName, onSaveServiceIntake, 
         </div>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10,marginBottom:18}}>
-        {['pending','assigned','on_the_way','done'].map(s=>(
+        {['pending','assigned','in_service','done'].map(s=>(
           <div key={s} className="stat-card" style={{padding:'12px 14px'}}>
             <div style={{fontSize:11,color:'var(--text2)',marginBottom:4}}>{TASK_STATUS[s]?.label}</div>
             <div className="stat-num" style={{fontSize:22}}>{tasks.filter(t=>t.status===s).length}</div>
