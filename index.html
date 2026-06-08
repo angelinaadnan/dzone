@@ -4501,13 +4501,6 @@ function NewOrderForm({onSave, salesName, onToast}) {
   const addGoods = () => set('goods',[...form.goods,{qty:1,name:'',desc:'',price:''}]);
   const removeGoods = (i) => set('goods',form.goods.filter((_,idx)=>idx!==i));
 
-  const setUpgrade   = (i,k,v) => { const a=[...(form.upgrade_items||[])]; a[i]={...a[i],[k]:v}; set('upgrade_items',a); };
-  const addUpgrade   = () => set('upgrade_items',[...(form.upgrade_items||[]),{name:'',qty:1,unit:'pcs'}]);
-  const removeUpgrade= (i) => set('upgrade_items',(form.upgrade_items||[]).filter((_,idx)=>idx!==i));
-  const setDowngrade  = (i,k,v) => { const a=[...(form.downgrade_items||[])]; a[i]={...a[i],[k]:v}; set('downgrade_items',a); };
-  const addDowngrade  = () => set('downgrade_items',[...(form.downgrade_items||[]),{name:'',qty:1,unit:'pcs'}]);
-  const removeDowngrade=(i) => set('downgrade_items',(form.downgrade_items||[]).filter((_,idx)=>idx!==i));
-
   const handleSubmit = async () => {
     if (!form.customer_name || !form.customer_phone || form.goods.some(g=>!g.name)) {
       onToast('Lengkapi nama customer, nomor HP, dan nama barang','error'); return;
@@ -4659,74 +4652,16 @@ function NewOrderForm({onSave, salesName, onToast}) {
         </div>
       </div>
 
-      {/* ── Upgrade / Downgrade / Swap Komponen ── */}
+      {/* ── Upgrade / Downgrade / Swap Komponen — cukup centang, detail diisi Ops saat assign teknisi ── */}
       <div className="card" style={{marginBottom:16}}>
-        <div style={{fontSize:12,fontWeight:600,color:'var(--text2)',marginBottom:12,textTransform:'uppercase',letterSpacing:'0.05em'}}>🔧 Perubahan Komponen (Upgrade / Downgrade / Swap)</div>
-        <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',marginBottom:form.has_component_change?14:0}}>
+        <div style={{fontSize:12,fontWeight:600,color:'var(--text2)',marginBottom:10,textTransform:'uppercase',letterSpacing:'0.05em'}}>🔧 Perubahan Komponen</div>
+        <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
           <input type="checkbox" checked={!!form.has_component_change} onChange={e=>set('has_component_change',e.target.checked)} style={{width:16,height:16,accentColor:'var(--accent2)',cursor:'pointer'}}/>
-          <span style={{fontSize:13,color:form.has_component_change?'var(--text)':'var(--text2)'}}>Ada perubahan komponen? (upgrade / downgrade / swap)</span>
-        </label>
-        {form.has_component_change && (
           <div>
-            {/* Upgrade items */}
-            <div style={{marginBottom:14,padding:'10px 12px',background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:8}}>
-              <div style={{fontSize:12,fontWeight:700,color:'var(--green)',marginBottom:8}}>➕ Komponen Upgrade — ditambahkan ke unit customer:</div>
-              {(form.upgrade_items||[]).map((item,i)=>(
-                <div key={i} style={{display:'flex',gap:6,marginBottom:6,alignItems:'center'}}>
-                  <input
-                    placeholder="Nama komponen (mis: RAM 8GB DDR4)"
-                    value={item.name||''}
-                    onChange={e=>setUpgrade(i,'name',e.target.value)}
-                    style={{flex:3,padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13}}
-                  />
-                  <input
-                    type="number" placeholder="Qty" min="1"
-                    value={item.qty||1}
-                    onChange={e=>setUpgrade(i,'qty',e.target.value)}
-                    style={{width:56,padding:'7px 8px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13,textAlign:'center'}}
-                  />
-                  <input
-                    placeholder="Satuan"
-                    value={item.unit||'pcs'}
-                    onChange={e=>setUpgrade(i,'unit',e.target.value)}
-                    style={{width:70,padding:'7px 8px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13}}
-                  />
-                  <button onClick={()=>removeUpgrade(i)} style={{background:'none',border:'none',color:'var(--red)',fontSize:18,cursor:'pointer',padding:'0 4px',lineHeight:1}}>×</button>
-                </div>
-              ))}
-              <button className="btn-secondary btn-sm" style={{marginTop:4,borderColor:'rgba(34,197,94,0.3)',color:'var(--green)'}} onClick={addUpgrade}>+ Tambah Item Upgrade</button>
-            </div>
-
-            {/* Downgrade items */}
-            <div style={{padding:'10px 12px',background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8}}>
-              <div style={{fontSize:12,fontWeight:700,color:'var(--amber)',marginBottom:8}}>➖ Komponen Downgrade / Swap — diambil kembali dari customer:</div>
-              {(form.downgrade_items||[]).map((item,i)=>(
-                <div key={i} style={{display:'flex',gap:6,marginBottom:6,alignItems:'center'}}>
-                  <input
-                    placeholder="Nama komponen (mis: RAM 4GB lama)"
-                    value={item.name||''}
-                    onChange={e=>setDowngrade(i,'name',e.target.value)}
-                    style={{flex:3,padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13}}
-                  />
-                  <input
-                    type="number" placeholder="Qty" min="1"
-                    value={item.qty||1}
-                    onChange={e=>setDowngrade(i,'qty',e.target.value)}
-                    style={{width:56,padding:'7px 8px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13,textAlign:'center'}}
-                  />
-                  <input
-                    placeholder="Satuan"
-                    value={item.unit||'pcs'}
-                    onChange={e=>setDowngrade(i,'unit',e.target.value)}
-                    style={{width:70,padding:'7px 8px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13}}
-                  />
-                  <button onClick={()=>removeDowngrade(i)} style={{background:'none',border:'none',color:'var(--red)',fontSize:18,cursor:'pointer',padding:'0 4px',lineHeight:1}}>×</button>
-                </div>
-              ))}
-              <button className="btn-secondary btn-sm" style={{marginTop:4,borderColor:'rgba(245,158,11,0.3)',color:'var(--amber)'}} onClick={addDowngrade}>+ Tambah Item Downgrade/Swap</button>
-            </div>
+            <div style={{fontSize:13,fontWeight:600,color:form.has_component_change?'var(--accent2)':'var(--text2)'}}>Ada upgrade / downgrade / swap komponen?</div>
+            {form.has_component_change && <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>Detail item akan diisi oleh Ops saat assign ke teknisi</div>}
           </div>
-        )}
+        </label>
       </div>
 
       <button className="btn-primary" style={{width:'100%',padding:14,fontSize:15}} onClick={handleSubmit} disabled={saving}>
@@ -13127,7 +13062,6 @@ function ServiceIntakeForm({courierName, onSave, onCancel, prefill, sourceBranch
     complaints:[], complaint_notes:'',
     has_warranty:false, has_purchase_proof:false,
     handover_photo:null, customer_signature:null, courier_signature:null,
-    has_component_change:false, upgrade_items:[], downgrade_items:[],
   });
   const [saving, setSaving] = React.useState(false);
   const [selectedCourier, setSelectedCourier] = React.useState(courierName||'');
@@ -13315,43 +13249,6 @@ function ServiceIntakeForm({courierName, onSave, onCancel, prefill, sourceBranch
           {!selectedCourier && <div style={{marginTop:8,fontSize:11,color:'var(--amber)'}}>ℹ️ Kurir belum dipilih — bisa assign nanti dari halaman Titip Servis</div>}
         </div>
       )}
-
-      {/* ── Instruksi Upgrade / Downgrade / Swap ── */}
-      <div style={{marginTop:16,marginBottom:12}}>
-        <div style={{fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:8}}>🔧 Instruksi Perubahan Komponen (Upgrade / Downgrade)</div>
-        <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginBottom:form.has_component_change?12:0}}>
-          <input type="checkbox" checked={!!form.has_component_change} onChange={e=>set('has_component_change',e.target.checked)} style={{width:15,height:15,accentColor:'var(--accent2)',cursor:'pointer'}}/>
-          <span style={{fontSize:13,color:form.has_component_change?'var(--text)':'var(--text2)'}}>Ada upgrade / downgrade / swap?</span>
-        </label>
-        {form.has_component_change && (
-          <div>
-            <div style={{marginBottom:10,padding:'8px 10px',background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:8}}>
-              <div style={{fontSize:11,fontWeight:700,color:'var(--green)',marginBottom:6}}>➕ Upgrade (ditambahkan):</div>
-              {(form.upgrade_items||[]).map((item,i)=>(
-                <div key={i} style={{display:'flex',gap:4,marginBottom:5}}>
-                  <input placeholder="Nama" value={item.name||''} onChange={e=>{const a=[...(form.upgrade_items||[])];a[i]={...a[i],name:e.target.value};set('upgrade_items',a);}} style={{flex:3,padding:'6px 8px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
-                  <input type="number" min="1" value={item.qty||1} onChange={e=>{const a=[...(form.upgrade_items||[])];a[i]={...a[i],qty:e.target.value};set('upgrade_items',a);}} style={{width:50,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,textAlign:'center'}}/>
-                  <input placeholder="Satuan" value={item.unit||'pcs'} onChange={e=>{const a=[...(form.upgrade_items||[])];a[i]={...a[i],unit:e.target.value};set('upgrade_items',a);}} style={{width:60,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
-                  <button onClick={()=>set('upgrade_items',(form.upgrade_items||[]).filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--red)',fontSize:16,cursor:'pointer',padding:'0 2px'}}>×</button>
-                </div>
-              ))}
-              <button className="btn-secondary btn-sm" style={{borderColor:'rgba(34,197,94,0.3)',color:'var(--green)',marginTop:2}} onClick={()=>set('upgrade_items',[...(form.upgrade_items||[]),{name:'',qty:1,unit:'pcs'}])}>+ Tambah</button>
-            </div>
-            <div style={{padding:'8px 10px',background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8}}>
-              <div style={{fontSize:11,fontWeight:700,color:'var(--amber)',marginBottom:6}}>➖ Downgrade / Swap (diambil kembali):</div>
-              {(form.downgrade_items||[]).map((item,i)=>(
-                <div key={i} style={{display:'flex',gap:4,marginBottom:5}}>
-                  <input placeholder="Nama" value={item.name||''} onChange={e=>{const a=[...(form.downgrade_items||[])];a[i]={...a[i],name:e.target.value};set('downgrade_items',a);}} style={{flex:3,padding:'6px 8px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
-                  <input type="number" min="1" value={item.qty||1} onChange={e=>{const a=[...(form.downgrade_items||[])];a[i]={...a[i],qty:e.target.value};set('downgrade_items',a);}} style={{width:50,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,textAlign:'center'}}/>
-                  <input placeholder="Satuan" value={item.unit||'pcs'} onChange={e=>{const a=[...(form.downgrade_items||[])];a[i]={...a[i],unit:e.target.value};set('downgrade_items',a);}} style={{width:60,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
-                  <button onClick={()=>set('downgrade_items',(form.downgrade_items||[]).filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--red)',fontSize:16,cursor:'pointer',padding:'0 2px'}}>×</button>
-                </div>
-              ))}
-              <button className="btn-secondary btn-sm" style={{borderColor:'rgba(245,158,11,0.3)',color:'var(--amber)',marginTop:2}} onClick={()=>set('downgrade_items',[...(form.downgrade_items||[]),{name:'',qty:1,unit:'pcs'}])}>+ Tambah</button>
-            </div>
-          </div>
-        )}
-      </div>
 
       <SignaturePad label="Tanda Tangan Customer (yang menyerahkan) *" onChange={v=>set('customer_signature',v)}/>
       {sourceBranch
@@ -13847,6 +13744,24 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
   // Catatan Ops
   const [showNoteEdit, setShowNoteEdit] = React.useState(false);
   const [noteText, setNoteText] = React.useState(si.ops_note||'');
+  // Instruksi upgrade/downgrade saat assign ke teknisi
+  const [compChange, setCompChange] = React.useState({has:si.has_component_change||false, ups:si.upgrade_items||[], downs:si.downgrade_items||[]});
+  const setCompUp   = (i,k,v) => setCompChange(c=>({...c,ups:c.ups.map((r,j)=>j===i?{...r,[k]:v}:r)}));
+  const addCompUp   = () => setCompChange(c=>({...c,ups:[...c.ups,{name:'',qty:1,unit:'pcs'}]}));
+  const removeCompUp= (i) => setCompChange(c=>({...c,ups:c.ups.filter((_,j)=>j!==i)}));
+  const setCompDown = (i,k,v) => setCompChange(c=>({...c,downs:c.downs.map((r,j)=>j===i?{...r,[k]:v}:r)}));
+  const addCompDown = () => setCompChange(c=>({...c,downs:[...c.downs,{name:'',qty:1,unit:'pcs'}]}));
+  const removeCompDown=(i)=> setCompChange(c=>({...c,downs:c.downs.filter((_,j)=>j!==i)}));
+  const assignToTech = (techName) => {
+    const updates = {
+      status:'to_technician', tech_assigned:techName,
+      route_type:'technician', tech_assigned_at:new Date().toISOString(),
+      has_component_change: compChange.has,
+      upgrade_items: compChange.has ? compChange.ups.filter(i=>i.name?.trim()) : [],
+      downgrade_items: compChange.has ? compChange.downs.filter(i=>i.name?.trim()) : [],
+    };
+    onUpdate(si.id, updates);
+  };
   // Edit Tujuan Return (source_type / branch_name)
   const [showEditSource, setShowEditSource] = React.useState(false);
   const [editSourceType, setEditSourceType] = React.useState(si.source_type==='branch'?'branch':'customer');
@@ -14005,6 +13920,9 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
         </div>
       )}
 
+      {/* ── Instruksi Upgrade/Downgrade (jika ada) ── */}
+      {si.has_component_change && <CompInstructionPanel upgradeItems={si.upgrade_items} downgradeItems={si.downgrade_items} mode="view"/>}
+
       {/* ── Catatan Ops ── */}
       <div style={{marginBottom:10,padding:'8px 12px',background:'rgba(245,158,11,0.07)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:showNoteEdit?8:0}}>
@@ -14046,13 +13964,50 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
         </div>
       )}
 
-      {/* STEP 1a: Pilih Teknisi */}
+      {/* STEP 1a: Pilih Teknisi + Instruksi Upgrade/Downgrade */}
       {si.status==='received' && routing==='tech' && (
         <div style={{paddingTop:10,borderTop:'1px solid var(--border)'}}>
+          {/* Instruksi perubahan komponen */}
+          <div style={{marginBottom:12,padding:'10px 12px',background:'var(--bg3)',borderRadius:8}}>
+            <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginBottom:compChange.has?10:0}}>
+              <input type="checkbox" checked={compChange.has} onChange={e=>setCompChange(c=>({...c,has:e.target.checked}))} style={{width:15,height:15,accentColor:'var(--accent2)',cursor:'pointer'}}/>
+              <span style={{fontSize:13,fontWeight:600,color:compChange.has?'var(--accent2)':'var(--text2)'}}>🔧 Ada perubahan komponen? (upgrade / downgrade / swap)</span>
+            </label>
+            {compChange.has && (
+              <div>
+                {/* Upgrade */}
+                <div style={{marginBottom:8,padding:'8px 10px',background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:7}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--green)',marginBottom:6}}>➕ Upgrade — ditambahkan ke unit:</div>
+                  {compChange.ups.map((item,i)=>(
+                    <div key={i} style={{display:'flex',gap:4,marginBottom:5}}>
+                      <input placeholder="Nama komponen" value={item.name||''} onChange={e=>setCompUp(i,'name',e.target.value)} style={{flex:3,padding:'6px 8px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
+                      <input type="number" min="1" value={item.qty||1} onChange={e=>setCompUp(i,'qty',e.target.value)} style={{width:48,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,textAlign:'center'}}/>
+                      <input placeholder="Satuan" value={item.unit||'pcs'} onChange={e=>setCompUp(i,'unit',e.target.value)} style={{width:58,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
+                      <button onClick={()=>removeCompUp(i)} style={{background:'none',border:'none',color:'var(--red)',fontSize:16,cursor:'pointer',padding:'0 2px',lineHeight:1}}>×</button>
+                    </div>
+                  ))}
+                  <button className="btn-secondary btn-sm" style={{borderColor:'rgba(34,197,94,0.3)',color:'var(--green)',marginTop:2}} onClick={addCompUp}>+ Tambah Upgrade</button>
+                </div>
+                {/* Downgrade */}
+                <div style={{padding:'8px 10px',background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:7}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'var(--amber)',marginBottom:6}}>➖ Downgrade / Swap — diambil kembali:</div>
+                  {compChange.downs.map((item,i)=>(
+                    <div key={i} style={{display:'flex',gap:4,marginBottom:5}}>
+                      <input placeholder="Nama komponen" value={item.name||''} onChange={e=>setCompDown(i,'name',e.target.value)} style={{flex:3,padding:'6px 8px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
+                      <input type="number" min="1" value={item.qty||1} onChange={e=>setCompDown(i,'qty',e.target.value)} style={{width:48,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,textAlign:'center'}}/>
+                      <input placeholder="Satuan" value={item.unit||'pcs'} onChange={e=>setCompDown(i,'unit',e.target.value)} style={{width:58,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
+                      <button onClick={()=>removeCompDown(i)} style={{background:'none',border:'none',color:'var(--red)',fontSize:16,cursor:'pointer',padding:'0 2px',lineHeight:1}}>×</button>
+                    </div>
+                  ))}
+                  <button className="btn-secondary btn-sm" style={{borderColor:'rgba(245,158,11,0.3)',color:'var(--amber)',marginTop:2}} onClick={addCompDown}>+ Tambah Downgrade</button>
+                </div>
+              </div>
+            )}
+          </div>
           <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:'var(--text2)'}}>🔧 Pilih Teknisi:</div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {TEKNISI_LIST.map(n=>(
-              <button key={n} className="btn-secondary btn-sm" onClick={()=>onUpdate(si.id,{status:'to_technician',tech_assigned:n,route_type:'technician',tech_assigned_at:new Date().toISOString()})}>
+              <button key={n} className="btn-secondary btn-sm" onClick={()=>{ assignToTech(n); setRouting(false); }}>
                 {n}
               </button>
             ))}
