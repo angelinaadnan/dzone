@@ -3324,11 +3324,25 @@ function SupervisorOrders({orders, onSelect, onUpdate, currentUser, allowRevisi=
   const [filter, setFilter] = React.useState('all');
   const [search, setSearch] = React.useState('');
   const [revisingOrder, setRevisingOrder] = React.useState(null);
+
+  // Mapping filter label → actual DB statuses
+  const FILTER_GROUPS = {
+    all:        null,
+    pending:    ['new'],
+    processing: ['invoiced','prep','tech','tech_done','on_delivery','cancel_requested'],
+    delivered:  ['delivered'],
+    cancelled:  ['cancelled'],
+  };
   const statuses = ['all','pending','processing','delivered','cancelled'];
-  const STATUS_LABEL = {pending:'Pending',processing:'Diproses',delivered:'Terkirim',cancelled:'Dibatalkan'};
+  const STATUS_LABEL = {pending:'Aktif/Baru', processing:'Diproses', delivered:'Terkirim', cancelled:'Dibatalkan'};
+
   const filtered = orders
     .filter(o => !hideNew || o.status!=='new')
-    .filter(o => filter==='all' || o.status===filter)
+    .filter(o => {
+      if (filter==='all') return true;
+      const group = FILTER_GROUPS[filter];
+      return group ? group.includes(o.status) : o.status===filter;
+    })
     .filter(o => !search || (o.customer_name||'').toLowerCase().includes(search.toLowerCase()) || (o.sales_name||'').toLowerCase().includes(search.toLowerCase()));
   return (
     <div style={{maxWidth:900}}>
