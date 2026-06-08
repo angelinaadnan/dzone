@@ -4465,6 +4465,10 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
       {/* ── Tab: Perubahan Komponen ── */}
       {tab==='komponen' && (
         <div>
+          {/* Export button */}
+          <div style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}>
+            <button className="btn-green btn-sm" onClick={()=>exportKomponenToExcel(kompOrders, kompSI)}>📊 Export Excel</button>
+          </div>
           {/* Summary stats */}
           <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
             <div style={{flex:1,minWidth:100,background:'var(--bg3)',borderRadius:10,padding:'12px 14px',textAlign:'center'}}>
@@ -6186,6 +6190,66 @@ function exportTechToExcel(orders, serviceIntakes) {
   XLSX.writeFile(wb, `DZ_Laporan_Teknisi_${date}.xlsx`);
 }
 
+
+function exportKomponenToExcel(kompOrders, kompSI) {
+  const wb = XLSX.utils.book_new();
+  const date = new Date().toISOString().slice(0,10);
+  const rows = [];
+
+  const fmtComp = (compArr) =>
+    (compArr||[]).filter(r=>r.spec?.trim()||r.brand?.trim())
+      .map(r=>[r.type,r.spec,r.brand].filter(Boolean).join(' '))
+      .join('; ') || '—';
+
+  // Orderan (Instalasi/Upgrade)
+  (kompOrders||[]).forEach(o => {
+    const comp = o.tech_components;
+    rows.push({
+      'Tipe':               'Instalasi / Upgrade',
+      'Tanggal':            o.created_at ? new Date(o.created_at).toLocaleDateString('id-ID') : '',
+      'Customer':           o.customer_name || '',
+      'Barang':             (o.goods||[]).map(g=>`${g.qty}x ${g.name}`).join('; '),
+      'Sales':              o.sales_name || '',
+      'Teknisi':            o.tech_name || '',
+      'Status':             STATUS_LABELS[o.status] || o.status || '',
+      'Komponen Dipasang':  comp ? fmtComp(comp.masuk)  : '⏳ Belum diisi teknisi',
+      'Komponen Dilepas':   comp ? fmtComp(comp.keluar) : '⏳ Belum diisi teknisi',
+      'Catatan Teknisi':    o.tech_note || '',
+      'Catatan Supervisor': comp?.supervisor_notes || '',
+      'Verifikasi':         o.tech_components_verified
+                              ? `✅ ${o.tech_components_verified.by} — ${new Date(o.tech_components_verified.at).toLocaleDateString('id-ID')}`
+                              : '❌ Belum diverifikasi',
+    });
+  });
+
+  // Servisan
+  (kompSI||[]).forEach(si => {
+    const comp = si.tech_components;
+    rows.push({
+      'Tipe':               'Servis Unit',
+      'Tanggal':            si.created_at ? new Date(si.created_at).toLocaleDateString('id-ID') : '',
+      'Customer':           si.customer_name || '',
+      'Barang':             `${si.unit_type||''}${si.serial_number?' S/N:'+si.serial_number:''}`,
+      'Sales':              si.sales_name || '',
+      'Teknisi':            si.tech_assigned || '',
+      'Status':             {'received':'Diterima','to_technician':'Di Teknisi','post_sc_checking':'Cek Pasca SC','to_service_center':'Ke Service Center','at_service_center':'Di Service Center','done':'Selesai','returned':'Dikembalikan'}[si.status] || si.status || '',
+      'Komponen Dipasang':  comp ? fmtComp(comp.masuk)  : '⏳ Belum diisi teknisi',
+      'Komponen Dilepas':   comp ? fmtComp(comp.keluar) : '⏳ Belum diisi teknisi',
+      'Catatan Teknisi':    si.tech_note || '',
+      'Catatan Supervisor': comp?.supervisor_notes || '',
+      'Verifikasi':         si.tech_components_verified
+                              ? `✅ ${si.tech_components_verified.by} — ${new Date(si.tech_components_verified.at).toLocaleDateString('id-ID')}`
+                              : '❌ Belum diverifikasi',
+    });
+  });
+
+  if (!rows.length) { alert('Tidak ada data perubahan komponen untuk di-export'); return; }
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = Object.keys(rows[0]).map(k=>({wch:Math.max(k.length+2, 18)}));
+  XLSX.utils.book_append_sheet(wb, ws, 'Perubahan Komponen');
+  XLSX.writeFile(wb, `DZ_Perubahan_Komponen_${date}.xlsx`);
+}
 
 function AdminOrders({orders, onUpdate, onSelect}) {
   const [filter, setFilter] = useState('all');
