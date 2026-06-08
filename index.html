@@ -2681,7 +2681,7 @@ function PurchaseOrderCard({po, onUpdate, onEdit, userName, canMark, role}) {
             </span>
           )}
           <span style={{fontSize:11,color:'var(--text3)'}}>{expanded?'▲ Tutup':'▼ Detail'}</span>
-          {po.status==='pending' && (po.created_by===userName || ['admin','ops'].includes(role)) && (
+          {['pending','partial'].includes(po.status) && (po.created_by===userName || ['admin','ops'].includes(role)) && (
             <button
               onClick={e=>{e.stopPropagation(); onEdit&&onEdit(po);}}
               style={{background:'transparent',border:'1px solid var(--accent2)',color:'var(--accent2)',borderRadius:6,padding:'2px 8px',fontSize:12,cursor:'pointer',marginTop:2}}
