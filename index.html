@@ -4253,7 +4253,7 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
   const techOrders = orders.filter(o=>o.tech_name || ['tech','tech_done'].includes(o.status));
   const techSI = (serviceIntakes||[]).filter(si=>si.tech_assigned);
   const [filterTech, setFilterTech] = React.useState('all');
-  const [tab, setTab] = React.useState('orders'); // 'orders' | 'service'
+  const [tab, setTab] = React.useState('orders'); // 'orders' | 'service' | 'komponen'
 
   // Always show all known technicians, plus anyone who has historical jobs
   const allTechs = [...new Set([
@@ -4265,8 +4265,72 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
   const filtOrders = filterTech==='all' ? techOrders : techOrders.filter(o=>o.tech_name===filterTech);
   const filtSI = filterTech==='all' ? techSI : techSI.filter(si=>si.tech_assigned===filterTech);
 
+  // Perubahan komponen: semua item yg has_component_change=true
+  const kompOrders = filtOrders.filter(o=>o.has_component_change);
+  const kompSI     = filtSI.filter(si=>si.has_component_change);
+  const kompTotal  = kompOrders.length + kompSI.length;
+  const kompPending = [
+    ...kompOrders.filter(o=>!o.tech_components_verified),
+    ...kompSI.filter(si=>!si.tech_components_verified),
+  ].length;
+
   const verifyComp = (id, val) => onUpdate(id, {tech_components_verified: val});
   const verifySIComp = (id, val) => onUpdateSI(id, {tech_components_verified: val});
+
+  // Reusable card for Perubahan Komponen tab
+  const KompCard = ({item, type}) => {
+    const isOrder = type==='order';
+    const verified = item.tech_components_verified;
+    const hasLog = item.tech_components && (
+      (item.tech_components.masuk||[]).some(r=>r.spec?.trim()||r.brand?.trim()) ||
+      (item.tech_components.keluar||[]).some(r=>r.spec?.trim()||r.brand?.trim())
+    );
+    const borderColor = verified ? 'var(--green)' : hasLog ? 'var(--amber)' : 'var(--red)';
+    const statusLabel = isOrder
+      ? (STATUS_LABELS[item.status]||item.status)
+      : ({'received':'Diterima','to_technician':'Di Teknisi','post_sc_checking':'Cek Pasca SC','to_service_center':'Ke Service Center','at_service_center':'Di Service Center','done':'Selesai','returned':'Dikembalikan'}[item.status]||item.status);
+    const statusCls = isOrder
+      ? (STATUS_COLORS[item.status]||'badge-new')
+      : (item.status==='done'?'badge-delivered':item.status==='to_technician'?'badge-tech':'badge-prep');
+
+    return (
+      <div className="card" style={{marginBottom:10,borderLeft:`3px solid ${borderColor}`}}>
+        {/* Header */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:8}}>
+          <div style={{flex:1}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:11,background:isOrder?'rgba(99,102,241,0.12)':'rgba(245,158,11,0.12)',color:isOrder?'var(--accent2)':'var(--amber)',padding:'2px 7px',borderRadius:10,fontWeight:700}}>
+                {isOrder ? '💻 Instalasi' : '🛠 Servis'}
+              </span>
+              {verified && <span style={{fontSize:11,color:'var(--green)',fontWeight:700}}>✅ Diverifikasi</span>}
+              {!verified && hasLog && <span style={{fontSize:11,color:'var(--amber)',fontWeight:700}}>⏳ Belum diverifikasi</span>}
+              {!verified && !hasLog && <span style={{fontSize:11,color:'var(--red)',fontWeight:700}}>❌ Teknisi belum isi log</span>}
+            </div>
+            <div style={{fontWeight:600,fontSize:14,marginTop:4}}>{item.customer_name}</div>
+            <div style={{fontSize:12,color:'var(--text2)',marginTop:1}}>
+              {isOrder ? (item.goods||[]).map(g=>g.name).join(', ') : `${item.unit_type||''}${item.serial_number?' · '+item.serial_number:''}`}
+            </div>
+            <div style={{fontSize:11,color:'var(--text3)',marginTop:1}}>{fmtDate(item.created_at)}</div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:12,color:'var(--amber)',fontWeight:600}}>🔧 {isOrder?item.tech_name:item.tech_assigned}</div>
+            <span className={`badge ${statusCls}`} style={{marginTop:4,display:'inline-block'}}>{statusLabel}</span>
+          </div>
+        </div>
+
+        {/* Log komponen dari teknisi */}
+        <CompLogDisplay
+          comp={item.tech_components}
+          verified={item.tech_components_verified}
+          onVerify={val => isOrder ? verifyComp(item.id, val) : verifySIComp(item.id, val)}
+          supervisorName={supervisorName}
+          canVerify={canVerify}
+          showHistory={true}
+          onSaveNotes={!item.tech_components_verified ? (newComp)=>(isOrder?onUpdate:onUpdateSI)(item.id,{tech_components:newComp}) : null}
+        />
+      </div>
+    );
+  };
 
   return (
     <div style={{maxWidth:900}}>
@@ -4290,13 +4354,17 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
         })}
       </div>
 
-      {/* Tab: Orderan vs Servis */}
+      {/* Tab: Orderan | Servis | Perubahan Komponen */}
       <div style={{display:'flex',gap:4,marginBottom:16,background:'var(--bg3)',borderRadius:10,padding:4}}>
         <button onClick={()=>setTab('orders')} style={{flex:1,padding:'8px',borderRadius:7,border:'none',cursor:'pointer',background:tab==='orders'?'var(--bg2)':'transparent',color:tab==='orders'?'var(--text)':'var(--text2)',fontWeight:tab==='orders'?700:400}}>
           💻 Instalasi/Upgrade ({filtOrders.length})
         </button>
         <button onClick={()=>setTab('service')} style={{flex:1,padding:'8px',borderRadius:7,border:'none',cursor:'pointer',background:tab==='service'?'var(--bg2)':'transparent',color:tab==='service'?'var(--text)':'var(--text2)',fontWeight:tab==='service'?700:400}}>
           🛠 Servis Unit ({filtSI.length})
+        </button>
+        <button onClick={()=>setTab('komponen')} style={{flex:1,padding:'8px',borderRadius:7,border:'none',cursor:'pointer',background:tab==='komponen'?'var(--bg2)':'transparent',color:tab==='komponen'?'var(--text)':'var(--text2)',fontWeight:tab==='komponen'?700:400,position:'relative'}}>
+          🔩 Perubahan Komponen
+          {kompPending>0 && <span style={{position:'absolute',top:4,right:6,background:'var(--red)',color:'#fff',borderRadius:99,fontSize:10,fontWeight:700,padding:'1px 5px'}}>{kompPending}</span>}
         </button>
       </div>
 
@@ -4384,6 +4452,60 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
             </div>
           ))}
         </>
+      )}
+
+      {/* ── Tab: Perubahan Komponen ── */}
+      {tab==='komponen' && (
+        <div>
+          {/* Summary stats */}
+          <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
+            <div style={{flex:1,minWidth:100,background:'var(--bg3)',borderRadius:10,padding:'12px 14px',textAlign:'center'}}>
+              <div style={{fontSize:20,fontWeight:700}}>{kompTotal}</div>
+              <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>Total Item</div>
+            </div>
+            <div style={{flex:1,minWidth:100,background:'rgba(239,68,68,0.07)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:10,padding:'12px 14px',textAlign:'center'}}>
+              <div style={{fontSize:20,fontWeight:700,color:'var(--red)'}}>{[...kompOrders,...kompSI].filter(i=>!i.tech_components||!(i.tech_components.masuk||[]).some(r=>r.spec?.trim()||r.brand?.trim())&&!(i.tech_components.keluar||[]).some(r=>r.spec?.trim()||r.brand?.trim())).length}</div>
+              <div style={{fontSize:11,color:'var(--red)',marginTop:2}}>Teknisi Belum Isi Log</div>
+            </div>
+            <div style={{flex:1,minWidth:100,background:'rgba(245,158,11,0.07)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:10,padding:'12px 14px',textAlign:'center'}}>
+              <div style={{fontSize:20,fontWeight:700,color:'var(--amber)'}}>{kompPending}</div>
+              <div style={{fontSize:11,color:'var(--amber)',marginTop:2}}>Belum Diverifikasi</div>
+            </div>
+            <div style={{flex:1,minWidth:100,background:'rgba(34,197,94,0.07)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:10,padding:'12px 14px',textAlign:'center'}}>
+              <div style={{fontSize:20,fontWeight:700,color:'var(--green)'}}>{[...kompOrders,...kompSI].filter(i=>i.tech_components_verified).length}</div>
+              <div style={{fontSize:11,color:'var(--green)',marginTop:2}}>Sudah Diverifikasi</div>
+            </div>
+          </div>
+
+          {kompTotal===0 && (
+            <div className="empty-state"><div className="icon">🔩</div><div>Tidak ada item dengan perubahan komponen</div></div>
+          )}
+
+          {/* Belum diverifikasi dulu */}
+          {[...kompOrders.map(o=>({item:o,type:'order'})),...kompSI.map(si=>({item:si,type:'si'}))]
+            .filter(({item})=>!item.tech_components_verified)
+            .sort((a,b)=>new Date(b.item.created_at)-new Date(a.item.created_at))
+            .map(({item,type})=>(
+              <KompCard key={item.id+type} item={item} type={type==='order'?'order':'si'}/>
+            ))
+          }
+
+          {/* Sudah diverifikasi */}
+          {[...kompOrders.map(o=>({item:o,type:'order'})),...kompSI.map(si=>({item:si,type:'si'}))]
+            .filter(({item})=>!!item.tech_components_verified)
+            .length > 0 && (
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--text3)',margin:'16px 0 8px',textTransform:'uppercase',letterSpacing:1}}>✅ Sudah Diverifikasi</div>
+              {[...kompOrders.map(o=>({item:o,type:'order'})),...kompSI.map(si=>({item:si,type:'si'}))]
+                .filter(({item})=>!!item.tech_components_verified)
+                .sort((a,b)=>new Date(b.item.created_at)-new Date(a.item.created_at))
+                .map(({item,type})=>(
+                  <KompCard key={item.id+type} item={item} type={type==='order'?'order':'si'}/>
+                ))
+              }
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
