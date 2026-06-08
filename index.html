@@ -3639,9 +3639,20 @@ function SupervisorTasks({tasks, onSave, onUpdate, onDelete, createdBy}) {
         <>
           {myTasks.length===0&&<div className="empty-state"><div className="icon">✅</div><div>Belum ada tugas yang kamu buat</div></div>}
           {myTasks.map(t=>(
-            <TaskCard key={t.id} task={t} onUpdate={onUpdate} showAssign={false} showComplete={false}
-              onEdit={['pending','assigned'].includes(t.status)&&t.created_by===createdBy ? ()=>setEditingTask(t) : null}
-              onDelete={onDelete&&t.status==='pending'&&t.created_by===createdBy ? ()=>onDelete(t.id) : null}/>
+            <div key={t.id}>
+              <TaskCard task={t} onUpdate={onUpdate} showAssign={false} showComplete={false}
+                onEdit={['pending','assigned'].includes(t.status)&&t.created_by===createdBy ? ()=>setEditingTask(t) : null}
+                onDelete={onDelete&&t.status==='pending'&&t.created_by===createdBy ? ()=>onDelete(t.id) : null}/>
+              {onUpdate && (
+                <div style={{marginTop:-6,marginBottom:8,paddingLeft:2}}>
+                  <RequestCancelButton item={t} onUpdate={onUpdate}/>
+                  {t.status==='cancel_requested' && (
+                    <div style={{fontSize:11,color:'var(--red)',padding:'4px 8px',background:'rgba(239,68,68,0.07)',borderRadius:6,marginTop:4}}>
+                      🚫 Request batal terkirim — menunggu approval ops{t.cancel_reason?` · "${t.cancel_reason}"`:''}</div>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
         </>
       )}
@@ -7971,7 +7982,7 @@ function AdminOnlineTechRequest({intakes, onSave, onUpdate, createdBy}) {
 }
 
 // ─── CANCEL REQUEST SYSTEM ─────────────────────────────────────────
-const NO_CANCEL_STATUSES = ['delivered','done','returned','cancelled','cancel_requested'];
+const NO_CANCEL_STATUSES = ['delivered','done','returned','cancelled','cancel_requested','in_service'];
 
 // Button shown to any non-ops user to request cancellation
 function RequestCancelButton({item, onUpdate, style}) {
