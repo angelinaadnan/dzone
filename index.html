@@ -607,16 +607,24 @@ function App() {
     const monthsBack = ['admin','ops','supervisor'].includes(role) ? 6 : 3;
     const since = new Date(); since.setMonth(since.getMonth() - monthsBack);
     // npwp_file & po_file di-exclude — di-load on-demand via loadOrderFiles (lazy)
-    const orderCols = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status,upgrade_items,downgrade_items,has_component_change';
-    let ordersQ = db.from('orders').select(orderCols)
-      .gte('created_at', since.toISOString())
-      .order('created_at',{ascending:false})
-      .limit(500);
-    // Filter per-user untuk role non-admin — hanya load order yang relevan
-    if (role==='technician') ordersQ = ordersQ.eq('tech_name', userName);
-    else if (role==='courier') ordersQ = ordersQ.eq('courier_name', userName);
-    else if (role==='sales') ordersQ = ordersQ.eq('sales_name', userName);
-    const {data,error} = await ordersQ;
+    const orderColsBase = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status';
+    const orderColsNew = ',upgrade_items,downgrade_items,has_component_change';
+    const buildOrderQ = (cols) => {
+      let q = db.from('orders').select(cols)
+        .gte('created_at', since.toISOString())
+        .order('created_at',{ascending:false})
+        .limit(500);
+      if (role==='technician') q = q.eq('tech_name', userName);
+      else if (role==='courier') q = q.eq('courier_name', userName);
+      else if (role==='sales') q = q.eq('sales_name', userName);
+      return q;
+    };
+    let {data,error} = await buildOrderQ(orderColsBase+orderColsNew);
+    // Fallback: jika kolom baru belum ada di DB, retry tanpa kolom tsb
+    if (error && (error.message||'').includes('does not exist')) {
+      const res2 = await buildOrderQ(orderColsBase);
+      data = res2.data; error = res2.error;
+    }
     if (error) {
       if (retry < 3 && ((error.message||'').includes('timeout') || (error.message||'').includes('canceling'))) {
         await new Promise(r=>setTimeout(r, 2000*(retry+1)));
