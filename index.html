@@ -607,7 +607,7 @@ function App() {
     const monthsBack = ['admin','ops','supervisor'].includes(role) ? 6 : 3;
     const since = new Date(); since.setMonth(since.getMonth() - monthsBack);
     // npwp_file & po_file di-exclude — di-load on-demand via loadOrderFiles (lazy)
-    const orderCols = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status';
+    const orderCols = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status,upgrade_items,downgrade_items,has_component_change';
     let ordersQ = db.from('orders').select(orderCols)
       .gte('created_at', since.toISOString())
       .order('created_at',{ascending:false})
@@ -4023,6 +4023,91 @@ function fmtComp(rows) {
   return (rows||[]).filter(r=>r.spec||r.brand).map(r=>`${r.type} ${r.spec} ${r.brand}`.trim()).join(', ') || '—';
 }
 
+// Panel instruksi upgrade/downgrade dari sales/ops — ditampilkan ke teknisi & supervisor
+function CompInstructionPanel({upgradeItems, downgradeItems, techComp, mode='view'}) {
+  // mode: 'view' (for technician), 'crosscheck' (for supervisor with comparison)
+  const ups   = (upgradeItems||[]).filter(i=>i.name?.trim());
+  const downs = (downgradeItems||[]).filter(i=>i.name?.trim());
+  if (!ups.length && !downs.length) return null;
+
+  const techMasuk  = (techComp?.masuk||[]).filter(r=>r.spec?.trim()||r.brand?.trim());
+  const techKeluar = (techComp?.keluar||[]).filter(r=>r.spec?.trim()||r.brand?.trim());
+
+  // Hitung total qty instruksi vs laporan teknisi
+  const totalUpQty   = ups.reduce((s,i)=>s+(parseInt(i.qty)||1),0);
+  const totalDownQty = downs.reduce((s,i)=>s+(parseInt(i.qty)||1),0);
+  const totalTechMasukQty  = techMasuk.reduce((s,r)=>s+(parseInt(r.qty)||1),0);
+  const totalTechKeluarQty = techKeluar.reduce((s,r)=>s+(parseInt(r.qty)||1),0);
+
+  const upMatch   = totalTechMasukQty  >= totalUpQty;
+  const downMatch = totalTechKeluarQty >= totalDownQty;
+  const hasDiscrepancy = mode==='crosscheck' && (!upMatch || !downMatch) && techComp;
+
+  return (
+    <div style={{marginTop:10,padding:'10px 12px',background: hasDiscrepancy ? 'rgba(239,68,68,0.06)' : 'rgba(99,102,241,0.06)',border:`1px solid ${hasDiscrepancy?'rgba(239,68,68,0.3)':'rgba(99,102,241,0.2)'}`,borderRadius:8}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+        <div style={{fontSize:12,fontWeight:700,color:hasDiscrepancy?'var(--red)':'var(--accent2)'}}>
+          {hasDiscrepancy ? '⚠️ Instruksi vs Laporan Teknisi — Ada Selisih!' : mode==='crosscheck' ? '📋 Instruksi Perubahan Komponen' : '📋 Instruksi dari Ops: Perubahan Komponen'}
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:mode==='crosscheck'&&techComp?'1fr 1fr':'1fr',gap:12}}>
+        {/* Kolom instruksi */}
+        <div>
+          {ups.length>0 && (
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--green)',marginBottom:4}}>➕ Upgrade (tambahkan ke unit):</div>
+              {ups.map((item,i)=>(
+                <div key={i} style={{fontSize:12,color:'var(--text)',padding:'2px 0'}}>• {item.name}{item.qty>1?` × ${item.qty}`:''} {item.unit||''}</div>
+              ))}
+              {mode==='crosscheck'&&techComp&&(
+                <div style={{fontSize:11,fontWeight:600,marginTop:4,color:upMatch?'var(--green)':'var(--red)'}}>
+                  {upMatch ? `✅ Teknisi pasang ${totalTechMasukQty} item (instruksi: ${totalUpQty})` : `❌ Instruksi ${totalUpQty} item — teknisi lapor ${totalTechMasukQty} item`}
+                </div>
+              )}
+            </div>
+          )}
+          {downs.length>0 && (
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--amber)',marginBottom:4}}>➖ Downgrade/Swap (ambil kembali):</div>
+              {downs.map((item,i)=>(
+                <div key={i} style={{fontSize:12,color:'var(--text)',padding:'2px 0'}}>• {item.name}{item.qty>1?` × ${item.qty}`:''} {item.unit||''}</div>
+              ))}
+              {mode==='crosscheck'&&techComp&&(
+                <div style={{fontSize:11,fontWeight:600,marginTop:4,color:downMatch?'var(--green)':'var(--red)'}}>
+                  {downMatch ? `✅ Teknisi lepas ${totalTechKeluarQty} item (instruksi: ${totalDownQty})` : `❌ Instruksi ${totalDownQty} item — teknisi lapor ${totalTechKeluarQty} item`}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Kolom laporan teknisi — hanya untuk crosscheck */}
+        {mode==='crosscheck'&&techComp&&(
+          <div style={{borderLeft:'1px solid var(--border)',paddingLeft:12}}>
+            <div style={{fontSize:11,fontWeight:700,color:'var(--text2)',marginBottom:4}}>🔧 Dilaporkan Teknisi:</div>
+            {techMasuk.length>0 && (
+              <div style={{marginBottom:6}}>
+                <div style={{fontSize:10,color:'var(--green)',fontWeight:600,marginBottom:2}}>🔼 Dipasang:</div>
+                {techMasuk.map((r,i)=><div key={i} style={{fontSize:11,color:'var(--text2)'}}>{r.type} {r.spec} {r.brand}</div>)}
+              </div>
+            )}
+            {techKeluar.length>0 && (
+              <div>
+                <div style={{fontSize:10,color:'var(--amber)',fontWeight:600,marginBottom:2}}>🔽 Dilepas:</div>
+                {techKeluar.map((r,i)=><div key={i} style={{fontSize:11,color:'var(--text2)'}}>{r.type} {r.spec} {r.brand}</div>)}
+              </div>
+            )}
+            {!techMasuk.length&&!techKeluar.length&&(
+              <div style={{fontSize:11,color:'var(--text3)',fontStyle:'italic'}}>Belum ada laporan komponen</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CompLogDisplay({comp, verified, onVerify, supervisorName, canVerify, showHistory, onSaveNotes}) {
   const [openHistory, setOpenHistory] = React.useState(false);
   // Local notes state: {masuk: ['','','...'], keluar: ['','...']}
@@ -4270,6 +4355,12 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                   ))}
                 </div>
               )}
+              <CompInstructionPanel
+                upgradeItems={o.upgrade_items}
+                downgradeItems={o.downgrade_items}
+                techComp={o.tech_components}
+                mode="crosscheck"
+              />
               <CompLogDisplay
                 comp={o.tech_components}
                 verified={o.tech_components_verified}
@@ -4303,6 +4394,12 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                 </div>
               </div>
               <TechNoteEditBox note={si.tech_note} edits={si.tech_note_edits||[]} editorName={supervisorName} onSave={upd=>onUpdateSI(si.id,upd)}/>
+              <CompInstructionPanel
+                upgradeItems={si.upgrade_items}
+                downgradeItems={si.downgrade_items}
+                techComp={si.tech_components}
+                mode="crosscheck"
+              />
               <CompLogDisplay
                 comp={si.tech_components}
                 verified={si.tech_components_verified}
@@ -4388,9 +4485,10 @@ function NewOrderForm({onSave, salesName, onToast}) {
     customer_name:'', customer_address:'', customer_phone:'',
     faktur_pajak:false, npwp:'', npwp_file:null, has_po:false, po_number:'', po_file:null,
     goods:[{qty:1,name:'',desc:'',price:''}],
-    info_tambahan:'', 
+    info_tambahan:'',
     invoice_materai:false, delivery_method:'Kirim Hari Ini Tidak Urgent', goods_ready:false, goods_status:'',payment_status:'Sudah Lunas',
-    status:'new', status_history:[], tracking:[], assigned_to:null, courier_name:null
+    status:'new', status_history:[], tracking:[], assigned_to:null, courier_name:null,
+    has_component_change:false, upgrade_items:[], downgrade_items:[],
   });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -4402,6 +4500,13 @@ function NewOrderForm({onSave, salesName, onToast}) {
   };
   const addGoods = () => set('goods',[...form.goods,{qty:1,name:'',desc:'',price:''}]);
   const removeGoods = (i) => set('goods',form.goods.filter((_,idx)=>idx!==i));
+
+  const setUpgrade   = (i,k,v) => { const a=[...(form.upgrade_items||[])]; a[i]={...a[i],[k]:v}; set('upgrade_items',a); };
+  const addUpgrade   = () => set('upgrade_items',[...(form.upgrade_items||[]),{name:'',qty:1,unit:'pcs'}]);
+  const removeUpgrade= (i) => set('upgrade_items',(form.upgrade_items||[]).filter((_,idx)=>idx!==i));
+  const setDowngrade  = (i,k,v) => { const a=[...(form.downgrade_items||[])]; a[i]={...a[i],[k]:v}; set('downgrade_items',a); };
+  const addDowngrade  = () => set('downgrade_items',[...(form.downgrade_items||[]),{name:'',qty:1,unit:'pcs'}]);
+  const removeDowngrade=(i) => set('downgrade_items',(form.downgrade_items||[]).filter((_,idx)=>idx!==i));
 
   const handleSubmit = async () => {
     if (!form.customer_name || !form.customer_phone || form.goods.some(g=>!g.name)) {
@@ -4429,7 +4534,8 @@ function NewOrderForm({onSave, salesName, onToast}) {
         goods:[{qty:1,name:'',desc:'',price:''}],
         info_tambahan:'',
         invoice_materai:false, delivery_method:'Kirim Hari Ini Tidak Urgent', goods_ready:false, goods_status:'', payment_status:'Sudah Lunas',
-        status:'new', status_history:[], tracking:[], assigned_to:null, courier_name:null
+        status:'new', status_history:[], tracking:[], assigned_to:null, courier_name:null,
+        has_component_change:false, upgrade_items:[], downgrade_items:[],
       });
       setFormKey(k=>k+1); // force re-mount so file inputs clear too
       setTimeout(()=>setSuccess(false),4000);
@@ -4551,6 +4657,76 @@ function NewOrderForm({onSave, salesName, onToast}) {
             </select>
           </div>
         </div>
+      </div>
+
+      {/* ── Upgrade / Downgrade / Swap Komponen ── */}
+      <div className="card" style={{marginBottom:16}}>
+        <div style={{fontSize:12,fontWeight:600,color:'var(--text2)',marginBottom:12,textTransform:'uppercase',letterSpacing:'0.05em'}}>🔧 Perubahan Komponen (Upgrade / Downgrade / Swap)</div>
+        <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',marginBottom:form.has_component_change?14:0}}>
+          <input type="checkbox" checked={!!form.has_component_change} onChange={e=>set('has_component_change',e.target.checked)} style={{width:16,height:16,accentColor:'var(--accent2)',cursor:'pointer'}}/>
+          <span style={{fontSize:13,color:form.has_component_change?'var(--text)':'var(--text2)'}}>Ada perubahan komponen? (upgrade / downgrade / swap)</span>
+        </label>
+        {form.has_component_change && (
+          <div>
+            {/* Upgrade items */}
+            <div style={{marginBottom:14,padding:'10px 12px',background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:8}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--green)',marginBottom:8}}>➕ Komponen Upgrade — ditambahkan ke unit customer:</div>
+              {(form.upgrade_items||[]).map((item,i)=>(
+                <div key={i} style={{display:'flex',gap:6,marginBottom:6,alignItems:'center'}}>
+                  <input
+                    placeholder="Nama komponen (mis: RAM 8GB DDR4)"
+                    value={item.name||''}
+                    onChange={e=>setUpgrade(i,'name',e.target.value)}
+                    style={{flex:3,padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13}}
+                  />
+                  <input
+                    type="number" placeholder="Qty" min="1"
+                    value={item.qty||1}
+                    onChange={e=>setUpgrade(i,'qty',e.target.value)}
+                    style={{width:56,padding:'7px 8px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13,textAlign:'center'}}
+                  />
+                  <input
+                    placeholder="Satuan"
+                    value={item.unit||'pcs'}
+                    onChange={e=>setUpgrade(i,'unit',e.target.value)}
+                    style={{width:70,padding:'7px 8px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13}}
+                  />
+                  <button onClick={()=>removeUpgrade(i)} style={{background:'none',border:'none',color:'var(--red)',fontSize:18,cursor:'pointer',padding:'0 4px',lineHeight:1}}>×</button>
+                </div>
+              ))}
+              <button className="btn-secondary btn-sm" style={{marginTop:4,borderColor:'rgba(34,197,94,0.3)',color:'var(--green)'}} onClick={addUpgrade}>+ Tambah Item Upgrade</button>
+            </div>
+
+            {/* Downgrade items */}
+            <div style={{padding:'10px 12px',background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--amber)',marginBottom:8}}>➖ Komponen Downgrade / Swap — diambil kembali dari customer:</div>
+              {(form.downgrade_items||[]).map((item,i)=>(
+                <div key={i} style={{display:'flex',gap:6,marginBottom:6,alignItems:'center'}}>
+                  <input
+                    placeholder="Nama komponen (mis: RAM 4GB lama)"
+                    value={item.name||''}
+                    onChange={e=>setDowngrade(i,'name',e.target.value)}
+                    style={{flex:3,padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13}}
+                  />
+                  <input
+                    type="number" placeholder="Qty" min="1"
+                    value={item.qty||1}
+                    onChange={e=>setDowngrade(i,'qty',e.target.value)}
+                    style={{width:56,padding:'7px 8px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13,textAlign:'center'}}
+                  />
+                  <input
+                    placeholder="Satuan"
+                    value={item.unit||'pcs'}
+                    onChange={e=>setDowngrade(i,'unit',e.target.value)}
+                    style={{width:70,padding:'7px 8px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:7,color:'var(--text)',fontSize:13}}
+                  />
+                  <button onClick={()=>removeDowngrade(i)} style={{background:'none',border:'none',color:'var(--red)',fontSize:18,cursor:'pointer',padding:'0 4px',lineHeight:1}}>×</button>
+                </div>
+              ))}
+              <button className="btn-secondary btn-sm" style={{marginTop:4,borderColor:'rgba(245,158,11,0.3)',color:'var(--amber)'}} onClick={addDowngrade}>+ Tambah Item Downgrade/Swap</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <button className="btn-primary" style={{width:'100%',padding:14,fontSize:15}} onClick={handleSubmit} disabled={saving}>
@@ -7490,6 +7666,7 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
               {(si.conditions||[]).length>0 && (
                 <div style={{fontSize:12,color:'var(--text2)',marginBottom:10}}>Kondisi: {si.conditions.join(', ')}{si.condition_notes?' · '+si.condition_notes:''}</div>
               )}
+              <CompInstructionPanel upgradeItems={si.upgrade_items} downgradeItems={si.downgrade_items} mode="view"/>
               {si.tech_components_verified
                 ? <div style={{background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:8,padding:'10px 12px',marginBottom:12,fontSize:12,color:'var(--green)'}}>🔒 Log komponen sudah diverifikasi oleh <b>{si.tech_components_verified.by}</b> — tidak bisa diedit</div>
                 : <ComponentsForm value={getSiComp(si.id)} onChange={v=>setSiComponents(c=>({...c,[si.id]:v}))}/>
@@ -7566,6 +7743,7 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
                   </div>
                 ))}
               </div>
+              <CompInstructionPanel upgradeItems={o.upgrade_items} downgradeItems={o.downgrade_items} mode="view"/>
               {o.tech_components_verified
                 ? <div style={{background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:8,padding:'10px 12px',marginBottom:12,fontSize:12,color:'var(--green)'}}>🔒 Log komponen sudah diverifikasi oleh <b>{o.tech_components_verified.by}</b> — tidak bisa diedit</div>
                 : <ComponentsForm value={getComp(o.id)} onChange={v=>setComponents(c=>({...c,[o.id]:v}))}/>
@@ -12949,6 +13127,7 @@ function ServiceIntakeForm({courierName, onSave, onCancel, prefill, sourceBranch
     complaints:[], complaint_notes:'',
     has_warranty:false, has_purchase_proof:false,
     handover_photo:null, customer_signature:null, courier_signature:null,
+    has_component_change:false, upgrade_items:[], downgrade_items:[],
   });
   const [saving, setSaving] = React.useState(false);
   const [selectedCourier, setSelectedCourier] = React.useState(courierName||'');
@@ -13136,6 +13315,43 @@ function ServiceIntakeForm({courierName, onSave, onCancel, prefill, sourceBranch
           {!selectedCourier && <div style={{marginTop:8,fontSize:11,color:'var(--amber)'}}>ℹ️ Kurir belum dipilih — bisa assign nanti dari halaman Titip Servis</div>}
         </div>
       )}
+
+      {/* ── Instruksi Upgrade / Downgrade / Swap ── */}
+      <div style={{marginTop:16,marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:700,color:'var(--text2)',marginBottom:8}}>🔧 Instruksi Perubahan Komponen (Upgrade / Downgrade)</div>
+        <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginBottom:form.has_component_change?12:0}}>
+          <input type="checkbox" checked={!!form.has_component_change} onChange={e=>set('has_component_change',e.target.checked)} style={{width:15,height:15,accentColor:'var(--accent2)',cursor:'pointer'}}/>
+          <span style={{fontSize:13,color:form.has_component_change?'var(--text)':'var(--text2)'}}>Ada upgrade / downgrade / swap?</span>
+        </label>
+        {form.has_component_change && (
+          <div>
+            <div style={{marginBottom:10,padding:'8px 10px',background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--green)',marginBottom:6}}>➕ Upgrade (ditambahkan):</div>
+              {(form.upgrade_items||[]).map((item,i)=>(
+                <div key={i} style={{display:'flex',gap:4,marginBottom:5}}>
+                  <input placeholder="Nama" value={item.name||''} onChange={e=>{const a=[...(form.upgrade_items||[])];a[i]={...a[i],name:e.target.value};set('upgrade_items',a);}} style={{flex:3,padding:'6px 8px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
+                  <input type="number" min="1" value={item.qty||1} onChange={e=>{const a=[...(form.upgrade_items||[])];a[i]={...a[i],qty:e.target.value};set('upgrade_items',a);}} style={{width:50,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,textAlign:'center'}}/>
+                  <input placeholder="Satuan" value={item.unit||'pcs'} onChange={e=>{const a=[...(form.upgrade_items||[])];a[i]={...a[i],unit:e.target.value};set('upgrade_items',a);}} style={{width:60,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
+                  <button onClick={()=>set('upgrade_items',(form.upgrade_items||[]).filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--red)',fontSize:16,cursor:'pointer',padding:'0 2px'}}>×</button>
+                </div>
+              ))}
+              <button className="btn-secondary btn-sm" style={{borderColor:'rgba(34,197,94,0.3)',color:'var(--green)',marginTop:2}} onClick={()=>set('upgrade_items',[...(form.upgrade_items||[]),{name:'',qty:1,unit:'pcs'}])}>+ Tambah</button>
+            </div>
+            <div style={{padding:'8px 10px',background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--amber)',marginBottom:6}}>➖ Downgrade / Swap (diambil kembali):</div>
+              {(form.downgrade_items||[]).map((item,i)=>(
+                <div key={i} style={{display:'flex',gap:4,marginBottom:5}}>
+                  <input placeholder="Nama" value={item.name||''} onChange={e=>{const a=[...(form.downgrade_items||[])];a[i]={...a[i],name:e.target.value};set('downgrade_items',a);}} style={{flex:3,padding:'6px 8px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
+                  <input type="number" min="1" value={item.qty||1} onChange={e=>{const a=[...(form.downgrade_items||[])];a[i]={...a[i],qty:e.target.value};set('downgrade_items',a);}} style={{width:50,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,textAlign:'center'}}/>
+                  <input placeholder="Satuan" value={item.unit||'pcs'} onChange={e=>{const a=[...(form.downgrade_items||[])];a[i]={...a[i],unit:e.target.value};set('downgrade_items',a);}} style={{width:60,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
+                  <button onClick={()=>set('downgrade_items',(form.downgrade_items||[]).filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--red)',fontSize:16,cursor:'pointer',padding:'0 2px'}}>×</button>
+                </div>
+              ))}
+              <button className="btn-secondary btn-sm" style={{borderColor:'rgba(245,158,11,0.3)',color:'var(--amber)',marginTop:2}} onClick={()=>set('downgrade_items',[...(form.downgrade_items||[]),{name:'',qty:1,unit:'pcs'}])}>+ Tambah</button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <SignaturePad label="Tanda Tangan Customer (yang menyerahkan) *" onChange={v=>set('customer_signature',v)}/>
       {sourceBranch
