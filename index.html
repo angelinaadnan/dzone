@@ -693,7 +693,7 @@ function App() {
 
   const loadCourierTasks = async (retry=0) => {
     if (!db) return;
-    const cols = 'id,created_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo';
+    const cols = 'id,created_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,assigned_by,assigned_at,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo';
     // Semua role: filter 60 hari terakhir — filter per-kurir dilakukan di sisi klien
     // supaya tidak ada risiko stale closure saat query, dan tugas lama tetap terlihat
     const since60 = new Date(); since60.setDate(since60.getDate()-60);
@@ -9779,7 +9779,7 @@ function WalkInServiceModal({task, onSaveIntake, onUpdateTask, onClose, allIntak
   );
 }
 
-function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFillServiceForm, onSaveServiceIntake, allIntakes, getLastCheckin, onCheckin, isLocked=false, lockMessage=null, onQueuePhoto=null}) {
+function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFillServiceForm, onSaveServiceIntake, allIntakes, getLastCheckin, onCheckin, isLocked=false, lockMessage=null, onQueuePhoto=null, assignedBy=null}) {
   const [photo, setPhoto] = React.useState(null);
   const [note, setNote] = React.useState('');
   const [assigning, setAssigning] = React.useState(false);
@@ -9897,8 +9897,14 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
           {/* Timeline entries */}
           {[
             {icon:'📝', label:'Dibuat', sub:`${task.created_by} (${task.created_by_role})`, time:task.created_at, done:true},
-            task.assigned_courier ? {icon:'👷', label:`Ditugaskan ke ${task.assigned_courier}`, sub:'', time:null, done:true} : null,
-            task.start_location?.time ? {icon:'🚗', label:'Berangkat', sub:task.start_location.lat?`📍 ${parseFloat(task.start_location.lat).toFixed(4)}, ${parseFloat(task.start_location.lng).toFixed(4)}`:'', time:task.start_location.time, done:true} : null,
+            // Kalau bukan dari ops, ada step "Masuk ke antrian Ops" sebagai perantara
+            task.created_by_role!=='ops' && task.assigned_courier
+              ? {icon:'⏳', label:'Masuk ke antrian Ops', sub:'Menunggu Ops assign kurir', time:null, done:true}
+              : null,
+            task.assigned_courier
+              ? {icon:'👷', label:`Assign ke ${task.assigned_courier}`, sub:task.assigned_by?`Oleh Ops: ${task.assigned_by}`:'Oleh Ops', time:task.assigned_at||null, done:true}
+              : null,
+            task.start_location?.time ? {icon:'🚗', label:'Kurir Berangkat', sub:task.start_location.lat?`📍 ${parseFloat(task.start_location.lat).toFixed(4)}, ${parseFloat(task.start_location.lng).toFixed(4)}`:'', time:task.start_location.time, done:true} : null,
             task.arrived_location?.time ? {icon:'📍', label:`Tiba di ${task.destination||'tujuan'}`, sub:task.distance_km?`Jarak: ${task.distance_km} km`:'', time:task.arrived_location.time, done:true} : null,
             task.status==='done' ? {icon:'✅', label:'Selesai', sub:task.completed_by?`Oleh: ${task.completed_by}`:'', time:task.completed_at, done:true} : null,
           ].filter(Boolean).map((step,i)=>(
@@ -9936,7 +9942,7 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
                 <div style={{fontSize:12,fontWeight:600,marginBottom:6,color:'var(--text2)'}}>Pilih Kurir:</div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                   {KURIR_LIST.map(n=>(
-                    <button key={n} className="btn-secondary btn-sm" onClick={()=>{onUpdate(task.id,{assigned_courier:n,status:'assigned'});setAssigning(false);}}>
+                    <button key={n} className="btn-secondary btn-sm" onClick={()=>{onUpdate(task.id,{assigned_courier:n,status:'assigned',assigned_by:assignedBy||null,assigned_at:new Date().toISOString()});setAssigning(false);}}>
                       {n}
                     </button>
                   ))}
@@ -9958,14 +9964,14 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
 
       {showAssign && task.status==='assigned' && (
         <div style={{paddingTop:10,borderTop:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
-          <div style={{fontSize:13}}>🚗 Kurir: <b>{task.assigned_courier}</b></div>
+          <div style={{fontSize:13}}>🚗 Kurir: <b>{task.assigned_courier}</b>{task.assigned_by?<span style={{fontSize:11,color:'var(--text3)'}}> · di-assign oleh {task.assigned_by}</span>:''}</div>
           <div style={{display:'flex',gap:6}}>
             <button className="btn-secondary btn-sm" onClick={()=>setAssigning(v=>!v)}>Ganti</button>
-            <button className="btn-secondary btn-sm" style={{color:'var(--red)'}} onClick={()=>onUpdate(task.id,{assigned_courier:null,status:'pending'})}>Batalkan</button>
+            <button className="btn-secondary btn-sm" style={{color:'var(--red)'}} onClick={()=>onUpdate(task.id,{assigned_courier:null,status:'pending',assigned_by:null,assigned_at:null})}>Batalkan</button>
           </div>
           {assigning && <div style={{width:'100%',display:'flex',flexWrap:'wrap',gap:6,marginTop:6}}>
             {KURIR_LIST.map(n=>(
-              <button key={n} className="btn-secondary btn-sm" onClick={()=>{onUpdate(task.id,{assigned_courier:n,status:'assigned'});setAssigning(false);}}>
+              <button key={n} className="btn-secondary btn-sm" onClick={()=>{onUpdate(task.id,{assigned_courier:n,status:'assigned',assigned_by:assignedBy||null,assigned_at:new Date().toISOString()});setAssigning(false);}}>
                 {n}
               </button>
             ))}
@@ -10196,7 +10202,7 @@ function OpsTaskManager({tasks, onSave, onUpdate, opsName, onSaveServiceIntake, 
         ))}
       </div>
       {filtered.length===0 && <div className="empty-state"><div className="icon">📋</div><div>Tidak ada tugas</div></div>}
-      {filtered.map(t=><TaskCard key={t.id} task={t} onUpdate={onUpdate} showAssign={true} showComplete={false} onSaveServiceIntake={onSaveServiceIntake} allIntakes={allIntakes}/>)}
+      {filtered.map(t=><TaskCard key={t.id} task={t} onUpdate={onUpdate} showAssign={true} showComplete={false} onSaveServiceIntake={onSaveServiceIntake} allIntakes={allIntakes} assignedBy={opsName}/>)}
     </div>
   );
 }
