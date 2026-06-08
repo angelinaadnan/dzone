@@ -4023,87 +4023,57 @@ function fmtComp(rows) {
   return (rows||[]).filter(r=>r.spec||r.brand).map(r=>`${r.type} ${r.spec} ${r.brand}`.trim()).join(', ') || '—';
 }
 
-// Panel instruksi upgrade/downgrade dari sales/ops — ditampilkan ke teknisi & supervisor
-function CompInstructionPanel({upgradeItems, downgradeItems, techComp, mode='view'}) {
-  // mode: 'view' (for technician), 'crosscheck' (for supervisor with comparison)
+// Panel flag perubahan komponen — ditampilkan ke teknisi & supervisor untuk cross-check
+function CompInstructionPanel({upgradeItems, downgradeItems, hasChange, techComp, mode='view'}) {
+  // mode: 'view' (teknisi), 'crosscheck' (supervisor)
   const ups   = (upgradeItems||[]).filter(i=>i.name?.trim());
   const downs = (downgradeItems||[]).filter(i=>i.name?.trim());
-  if (!ups.length && !downs.length) return null;
+  if (!hasChange && !ups.length && !downs.length) return null;
 
   const techMasuk  = (techComp?.masuk||[]).filter(r=>r.spec?.trim()||r.brand?.trim());
   const techKeluar = (techComp?.keluar||[]).filter(r=>r.spec?.trim()||r.brand?.trim());
+  const hasTechLog = techMasuk.length>0 || techKeluar.length>0;
 
-  // Hitung total qty instruksi vs laporan teknisi
-  const totalUpQty   = ups.reduce((s,i)=>s+(parseInt(i.qty)||1),0);
-  const totalDownQty = downs.reduce((s,i)=>s+(parseInt(i.qty)||1),0);
-  const totalTechMasukQty  = techMasuk.reduce((s,r)=>s+(parseInt(r.qty)||1),0);
-  const totalTechKeluarQty = techKeluar.reduce((s,r)=>s+(parseInt(r.qty)||1),0);
-
-  const upMatch   = totalTechMasukQty  >= totalUpQty;
-  const downMatch = totalTechKeluarQty >= totalDownQty;
-  const hasDiscrepancy = mode==='crosscheck' && (!upMatch || !downMatch) && techComp;
+  // crosscheck: apakah teknisi sudah lapor komponen?
+  const hasDiscrepancy = mode==='crosscheck' && techComp && !hasTechLog;
 
   return (
-    <div style={{marginTop:10,padding:'10px 12px',background: hasDiscrepancy ? 'rgba(239,68,68,0.06)' : 'rgba(99,102,241,0.06)',border:`1px solid ${hasDiscrepancy?'rgba(239,68,68,0.3)':'rgba(99,102,241,0.2)'}`,borderRadius:8}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-        <div style={{fontSize:12,fontWeight:700,color:hasDiscrepancy?'var(--red)':'var(--accent2)'}}>
-          {hasDiscrepancy ? '⚠️ Instruksi vs Laporan Teknisi — Ada Selisih!' : mode==='crosscheck' ? '📋 Instruksi Perubahan Komponen' : '📋 Instruksi dari Ops: Perubahan Komponen'}
-        </div>
+    <div style={{marginTop:10,padding:'10px 12px',background:hasDiscrepancy?'rgba(239,68,68,0.06)':'rgba(99,102,241,0.06)',border:`1px solid ${hasDiscrepancy?'rgba(239,68,68,0.3)':'rgba(99,102,241,0.2)'}`,borderRadius:8}}>
+      <div style={{fontSize:12,fontWeight:700,color:hasDiscrepancy?'var(--red)':'var(--accent2)',marginBottom:6}}>
+        {mode==='crosscheck' ? '📋 Ada Rencana Perubahan Komponen' : '📋 Instruksi: Ada Perubahan Komponen'}
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:mode==='crosscheck'&&techComp?'1fr 1fr':'1fr',gap:12}}>
-        {/* Kolom instruksi */}
-        <div>
-          {ups.length>0 && (
-            <div style={{marginBottom:8}}>
-              <div style={{fontSize:11,fontWeight:700,color:'var(--green)',marginBottom:4}}>➕ Upgrade (tambahkan ke unit):</div>
-              {ups.map((item,i)=>(
-                <div key={i} style={{fontSize:12,color:'var(--text)',padding:'2px 0'}}>• {item.name}{item.qty>1?` × ${item.qty}`:''} {item.unit||''}</div>
-              ))}
-              {mode==='crosscheck'&&techComp&&(
-                <div style={{fontSize:11,fontWeight:600,marginTop:4,color:upMatch?'var(--green)':'var(--red)'}}>
-                  {upMatch ? `✅ Teknisi pasang ${totalTechMasukQty} item (instruksi: ${totalUpQty})` : `❌ Instruksi ${totalUpQty} item — teknisi lapor ${totalTechMasukQty} item`}
-                </div>
-              )}
-            </div>
-          )}
-          {downs.length>0 && (
+      {/* Detail item jika ada */}
+      {ups.length>0 && (
+        <div style={{marginBottom:4}}>
+          <span style={{fontSize:11,fontWeight:700,color:'var(--green)'}}>➕ Upgrade: </span>
+          <span style={{fontSize:12,color:'var(--text)'}}>{ups.map(i=>`${i.name}${i.qty>1?` ×${i.qty}`:''}`).join(', ')}</span>
+        </div>
+      )}
+      {downs.length>0 && (
+        <div style={{marginBottom:4}}>
+          <span style={{fontSize:11,fontWeight:700,color:'var(--amber)'}}>➖ Downgrade/Swap: </span>
+          <span style={{fontSize:12,color:'var(--text)'}}>{downs.map(i=>`${i.name}${i.qty>1?` ×${i.qty}`:''}`).join(', ')}</span>
+        </div>
+      )}
+
+      {/* Crosscheck: laporan teknisi */}
+      {mode==='crosscheck' && (
+        <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}}>
+          <div style={{fontSize:11,fontWeight:700,color:'var(--text2)',marginBottom:4}}>🔧 Laporan Teknisi:</div>
+          {hasTechLog ? (
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:'var(--amber)',marginBottom:4}}>➖ Downgrade/Swap (ambil kembali):</div>
-              {downs.map((item,i)=>(
-                <div key={i} style={{fontSize:12,color:'var(--text)',padding:'2px 0'}}>• {item.name}{item.qty>1?` × ${item.qty}`:''} {item.unit||''}</div>
-              ))}
-              {mode==='crosscheck'&&techComp&&(
-                <div style={{fontSize:11,fontWeight:600,marginTop:4,color:downMatch?'var(--green)':'var(--red)'}}>
-                  {downMatch ? `✅ Teknisi lepas ${totalTechKeluarQty} item (instruksi: ${totalDownQty})` : `❌ Instruksi ${totalDownQty} item — teknisi lapor ${totalTechKeluarQty} item`}
-                </div>
-              )}
+              {techMasuk.length>0 && <div style={{fontSize:11,color:'var(--green)'}}>🔼 Dipasang: {techMasuk.map(r=>`${r.type||''} ${r.spec||''} ${r.brand||''}`.trim()).join(', ')}</div>}
+              {techKeluar.length>0 && <div style={{fontSize:11,color:'var(--amber)'}}>🔽 Dilepas: {techKeluar.map(r=>`${r.type||''} ${r.spec||''} ${r.brand||''}`.trim()).join(', ')}</div>}
+              <div style={{fontSize:11,color:'var(--green)',fontWeight:600,marginTop:4}}>✅ Teknisi sudah laporkan log komponen</div>
+            </div>
+          ) : (
+            <div style={{fontSize:11,color:'var(--red)',fontWeight:600}}>
+              {techComp === undefined ? '⏳ Belum ada laporan — teknisi belum selesai' : '❌ Teknisi belum mengisi log komponen!'}
             </div>
           )}
         </div>
-
-        {/* Kolom laporan teknisi — hanya untuk crosscheck */}
-        {mode==='crosscheck'&&techComp&&(
-          <div style={{borderLeft:'1px solid var(--border)',paddingLeft:12}}>
-            <div style={{fontSize:11,fontWeight:700,color:'var(--text2)',marginBottom:4}}>🔧 Dilaporkan Teknisi:</div>
-            {techMasuk.length>0 && (
-              <div style={{marginBottom:6}}>
-                <div style={{fontSize:10,color:'var(--green)',fontWeight:600,marginBottom:2}}>🔼 Dipasang:</div>
-                {techMasuk.map((r,i)=><div key={i} style={{fontSize:11,color:'var(--text2)'}}>{r.type} {r.spec} {r.brand}</div>)}
-              </div>
-            )}
-            {techKeluar.length>0 && (
-              <div>
-                <div style={{fontSize:10,color:'var(--amber)',fontWeight:600,marginBottom:2}}>🔽 Dilepas:</div>
-                {techKeluar.map((r,i)=><div key={i} style={{fontSize:11,color:'var(--text2)'}}>{r.type} {r.spec} {r.brand}</div>)}
-              </div>
-            )}
-            {!techMasuk.length&&!techKeluar.length&&(
-              <div style={{fontSize:11,color:'var(--text3)',fontStyle:'italic'}}>Belum ada laporan komponen</div>
-            )}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -4356,6 +4326,7 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
                 </div>
               )}
               <CompInstructionPanel
+                hasChange={o.has_component_change}
                 upgradeItems={o.upgrade_items}
                 downgradeItems={o.downgrade_items}
                 techComp={o.tech_components}
@@ -4395,6 +4366,7 @@ function SupervisorTech({orders, serviceIntakes, onUpdate, onUpdateSI, superviso
               </div>
               <TechNoteEditBox note={si.tech_note} edits={si.tech_note_edits||[]} editorName={supervisorName} onSave={upd=>onUpdateSI(si.id,upd)}/>
               <CompInstructionPanel
+                hasChange={si.has_component_change}
                 upgradeItems={si.upgrade_items}
                 downgradeItems={si.downgrade_items}
                 techComp={si.tech_components}
@@ -7601,7 +7573,7 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
               {(si.conditions||[]).length>0 && (
                 <div style={{fontSize:12,color:'var(--text2)',marginBottom:10}}>Kondisi: {si.conditions.join(', ')}{si.condition_notes?' · '+si.condition_notes:''}</div>
               )}
-              <CompInstructionPanel upgradeItems={si.upgrade_items} downgradeItems={si.downgrade_items} mode="view"/>
+              <CompInstructionPanel hasChange={si.has_component_change} upgradeItems={si.upgrade_items} downgradeItems={si.downgrade_items} mode="view"/>
               {si.tech_components_verified
                 ? <div style={{background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:8,padding:'10px 12px',marginBottom:12,fontSize:12,color:'var(--green)'}}>🔒 Log komponen sudah diverifikasi oleh <b>{si.tech_components_verified.by}</b> — tidak bisa diedit</div>
                 : <ComponentsForm value={getSiComp(si.id)} onChange={v=>setSiComponents(c=>({...c,[si.id]:v}))}/>
@@ -7678,7 +7650,7 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
                   </div>
                 ))}
               </div>
-              <CompInstructionPanel upgradeItems={o.upgrade_items} downgradeItems={o.downgrade_items} mode="view"/>
+              <CompInstructionPanel hasChange={o.has_component_change} upgradeItems={o.upgrade_items} downgradeItems={o.downgrade_items} mode="view"/>
               {o.tech_components_verified
                 ? <div style={{background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.3)',borderRadius:8,padding:'10px 12px',marginBottom:12,fontSize:12,color:'var(--green)'}}>🔒 Log komponen sudah diverifikasi oleh <b>{o.tech_components_verified.by}</b> — tidak bisa diedit</div>
                 : <ComponentsForm value={getComp(o.id)} onChange={v=>setComponents(c=>({...c,[o.id]:v}))}/>
@@ -13744,23 +13716,14 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
   // Catatan Ops
   const [showNoteEdit, setShowNoteEdit] = React.useState(false);
   const [noteText, setNoteText] = React.useState(si.ops_note||'');
-  // Instruksi upgrade/downgrade saat assign ke teknisi
-  const [compChange, setCompChange] = React.useState({has:si.has_component_change||false, ups:si.upgrade_items||[], downs:si.downgrade_items||[]});
-  const setCompUp   = (i,k,v) => setCompChange(c=>({...c,ups:c.ups.map((r,j)=>j===i?{...r,[k]:v}:r)}));
-  const addCompUp   = () => setCompChange(c=>({...c,ups:[...c.ups,{name:'',qty:1,unit:'pcs'}]}));
-  const removeCompUp= (i) => setCompChange(c=>({...c,ups:c.ups.filter((_,j)=>j!==i)}));
-  const setCompDown = (i,k,v) => setCompChange(c=>({...c,downs:c.downs.map((r,j)=>j===i?{...r,[k]:v}:r)}));
-  const addCompDown = () => setCompChange(c=>({...c,downs:[...c.downs,{name:'',qty:1,unit:'pcs'}]}));
-  const removeCompDown=(i)=> setCompChange(c=>({...c,downs:c.downs.filter((_,j)=>j!==i)}));
+  // Flag perubahan komponen saat assign ke teknisi
+  const [compChange, setCompChange] = React.useState({has:si.has_component_change||false});
   const assignToTech = (techName) => {
-    const updates = {
+    onUpdate(si.id, {
       status:'to_technician', tech_assigned:techName,
       route_type:'technician', tech_assigned_at:new Date().toISOString(),
       has_component_change: compChange.has,
-      upgrade_items: compChange.has ? compChange.ups.filter(i=>i.name?.trim()) : [],
-      downgrade_items: compChange.has ? compChange.downs.filter(i=>i.name?.trim()) : [],
-    };
-    onUpdate(si.id, updates);
+    });
   };
   // Edit Tujuan Return (source_type / branch_name)
   const [showEditSource, setShowEditSource] = React.useState(false);
@@ -13921,7 +13884,7 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
       )}
 
       {/* ── Instruksi Upgrade/Downgrade (jika ada) ── */}
-      {si.has_component_change && <CompInstructionPanel upgradeItems={si.upgrade_items} downgradeItems={si.downgrade_items} mode="view"/>}
+      <CompInstructionPanel hasChange={si.has_component_change} upgradeItems={si.upgrade_items} downgradeItems={si.downgrade_items} mode="view"/>
 
       {/* ── Catatan Ops ── */}
       <div style={{marginBottom:10,padding:'8px 12px',background:'rgba(245,158,11,0.07)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8}}>
@@ -13964,47 +13927,14 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
         </div>
       )}
 
-      {/* STEP 1a: Pilih Teknisi + Instruksi Upgrade/Downgrade */}
+      {/* STEP 1a: Pilih Teknisi */}
       {si.status==='received' && routing==='tech' && (
         <div style={{paddingTop:10,borderTop:'1px solid var(--border)'}}>
-          {/* Instruksi perubahan komponen */}
-          <div style={{marginBottom:12,padding:'10px 12px',background:'var(--bg3)',borderRadius:8}}>
-            <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginBottom:compChange.has?10:0}}>
-              <input type="checkbox" checked={compChange.has} onChange={e=>setCompChange(c=>({...c,has:e.target.checked}))} style={{width:15,height:15,accentColor:'var(--accent2)',cursor:'pointer'}}/>
-              <span style={{fontSize:13,fontWeight:600,color:compChange.has?'var(--accent2)':'var(--text2)'}}>🔧 Ada perubahan komponen? (upgrade / downgrade / swap)</span>
-            </label>
-            {compChange.has && (
-              <div>
-                {/* Upgrade */}
-                <div style={{marginBottom:8,padding:'8px 10px',background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:7}}>
-                  <div style={{fontSize:11,fontWeight:700,color:'var(--green)',marginBottom:6}}>➕ Upgrade — ditambahkan ke unit:</div>
-                  {compChange.ups.map((item,i)=>(
-                    <div key={i} style={{display:'flex',gap:4,marginBottom:5}}>
-                      <input placeholder="Nama komponen" value={item.name||''} onChange={e=>setCompUp(i,'name',e.target.value)} style={{flex:3,padding:'6px 8px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
-                      <input type="number" min="1" value={item.qty||1} onChange={e=>setCompUp(i,'qty',e.target.value)} style={{width:48,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,textAlign:'center'}}/>
-                      <input placeholder="Satuan" value={item.unit||'pcs'} onChange={e=>setCompUp(i,'unit',e.target.value)} style={{width:58,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
-                      <button onClick={()=>removeCompUp(i)} style={{background:'none',border:'none',color:'var(--red)',fontSize:16,cursor:'pointer',padding:'0 2px',lineHeight:1}}>×</button>
-                    </div>
-                  ))}
-                  <button className="btn-secondary btn-sm" style={{borderColor:'rgba(34,197,94,0.3)',color:'var(--green)',marginTop:2}} onClick={addCompUp}>+ Tambah Upgrade</button>
-                </div>
-                {/* Downgrade */}
-                <div style={{padding:'8px 10px',background:'rgba(245,158,11,0.06)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:7}}>
-                  <div style={{fontSize:11,fontWeight:700,color:'var(--amber)',marginBottom:6}}>➖ Downgrade / Swap — diambil kembali:</div>
-                  {compChange.downs.map((item,i)=>(
-                    <div key={i} style={{display:'flex',gap:4,marginBottom:5}}>
-                      <input placeholder="Nama komponen" value={item.name||''} onChange={e=>setCompDown(i,'name',e.target.value)} style={{flex:3,padding:'6px 8px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
-                      <input type="number" min="1" value={item.qty||1} onChange={e=>setCompDown(i,'qty',e.target.value)} style={{width:48,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,textAlign:'center'}}/>
-                      <input placeholder="Satuan" value={item.unit||'pcs'} onChange={e=>setCompDown(i,'unit',e.target.value)} style={{width:58,padding:'6px',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12}}/>
-                      <button onClick={()=>removeCompDown(i)} style={{background:'none',border:'none',color:'var(--red)',fontSize:16,cursor:'pointer',padding:'0 2px',lineHeight:1}}>×</button>
-                    </div>
-                  ))}
-                  <button className="btn-secondary btn-sm" style={{borderColor:'rgba(245,158,11,0.3)',color:'var(--amber)',marginTop:2}} onClick={addCompDown}>+ Tambah Downgrade</button>
-                </div>
-              </div>
-            )}
-          </div>
-          <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:'var(--text2)'}}>🔧 Pilih Teknisi:</div>
+          <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginBottom:12,padding:'8px 10px',background:'var(--bg3)',borderRadius:8}}>
+            <input type="checkbox" checked={compChange.has} onChange={e=>setCompChange(c=>({...c,has:e.target.checked}))} style={{width:15,height:15,accentColor:'var(--accent2)',cursor:'pointer'}}/>
+            <span style={{fontSize:13,color:compChange.has?'var(--accent2)':'var(--text2)',fontWeight:compChange.has?600:400}}>🔧 Ada rencana perubahan komponen? (upgrade / downgrade / swap)</span>
+          </label>
+          <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:'var(--text2)'}}>Pilih Teknisi:</div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {TEKNISI_LIST.map(n=>(
               <button key={n} className="btn-secondary btn-sm" onClick={()=>{ assignToTech(n); setRouting(false); }}>
