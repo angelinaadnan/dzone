@@ -9787,6 +9787,7 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
   const [saving, setSaving] = React.useState(false);
   const [showWalkIn, setShowWalkIn] = React.useState(false);
   const [uploadMsg, setUploadMsg] = React.useState(null);
+  const [showDetail, setShowDetail] = React.useState(false);
 
   const handlePhoto = (e) => {
     const file = e.target.files[0]; if(!file) return;
@@ -9879,8 +9880,48 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
           )}
           <div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>Dibuat oleh: {task.created_by} ({task.created_by_role}) · {fmtDateTime(task.created_at)}</div>
         </div>
-        <span className={`badge ${TASK_STATUS[task.status]?.cls||'badge-new'}`}>{TASK_STATUS[task.status]?.label||task.status}</span>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
+          <span className={`badge ${TASK_STATUS[task.status]?.cls||'badge-new'}`}>{TASK_STATUS[task.status]?.label||task.status}</span>
+          {(task.assigned_courier||task.status==='done') && (
+            <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={()=>setShowDetail(d=>!d)}>
+              {showDetail?'▲ Tutup':'📋 Detail'}
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* ── Detail / History Panel ── */}
+      {showDetail && (
+        <div style={{marginBottom:12,padding:'10px 12px',background:'var(--bg3)',borderRadius:8,borderLeft:'3px solid var(--accent2)'}}>
+          <div style={{fontSize:11,fontWeight:700,color:'var(--accent2)',marginBottom:10}}>📋 Riwayat Tugas</div>
+          {/* Timeline entries */}
+          {[
+            {icon:'📝', label:'Dibuat', sub:`${task.created_by} (${task.created_by_role})`, time:task.created_at, done:true},
+            task.assigned_courier ? {icon:'👷', label:`Ditugaskan ke ${task.assigned_courier}`, sub:'', time:null, done:true} : null,
+            task.start_location?.time ? {icon:'🚗', label:'Berangkat', sub:task.start_location.lat?`📍 ${parseFloat(task.start_location.lat).toFixed(4)}, ${parseFloat(task.start_location.lng).toFixed(4)}`:'', time:task.start_location.time, done:true} : null,
+            task.arrived_location?.time ? {icon:'📍', label:`Tiba di ${task.destination||'tujuan'}`, sub:task.distance_km?`Jarak: ${task.distance_km} km`:'', time:task.arrived_location.time, done:true} : null,
+            task.status==='done' ? {icon:'✅', label:'Selesai', sub:task.completed_by?`Oleh: ${task.completed_by}`:'', time:task.completed_at, done:true} : null,
+          ].filter(Boolean).map((step,i)=>(
+            <div key={i} style={{display:'flex',gap:8,marginBottom:8}}>
+              <div style={{fontSize:14,width:20,textAlign:'center',flexShrink:0}}>{step.icon}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:600,color:'var(--text)'}}>{step.label}</div>
+                {step.sub && <div style={{fontSize:11,color:'var(--text3)'}}>{step.sub}</div>}
+                {step.time && <div style={{fontSize:11,color:'var(--green)'}}>⏱ {fmtDateTime(step.time)}</div>}
+              </div>
+            </div>
+          ))}
+          {task.completion_note && (
+            <div style={{marginTop:8,padding:'8px 10px',background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.25)',borderRadius:6}}>
+              <div style={{fontSize:11,fontWeight:700,color:'var(--green)',marginBottom:3}}>💬 Catatan Selesai</div>
+              <div style={{fontSize:12,color:'var(--text)'}}>{task.completion_note}</div>
+            </div>
+          )}
+          {task.completion_photo && (
+            <img src={task.completion_photo} style={{width:'100%',maxHeight:160,objectFit:'cover',borderRadius:8,marginTop:8,border:'1px solid var(--border)'}} alt="bukti selesai"/>
+          )}
+        </div>
+      )}
 
       {showAssign && task.status==='pending' && (
         <div style={{paddingTop:10,borderTop:'1px solid var(--border)'}}>
