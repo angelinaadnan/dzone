@@ -3571,30 +3571,7 @@ function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
     );
   };
 
-  const TaskCard = ({t}) => (
-    <div className="card" style={{marginBottom:10,borderLeft:`3px solid ${statusBorder(t.status)}`}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10}}>
-        <div style={{flex:1}}>
-          <div style={{fontWeight:600,fontSize:13}}>{t.task_type}</div>
-          <div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>{t.destination}{t.contact_name?' · '+t.contact_name:''}</div>
-          {t.description&&<div style={{fontSize:12,color:'var(--text3)',marginTop:3}}>{t.description}</div>}
-          <div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>
-            {fmtDateTime(t.created_at)}
-            {t.assigned_courier&&<span> · Kurir: <b>{t.assigned_courier}</b></span>}
-            {t.created_by&&tab==='tasks'&&<span> · Dari: <b>{t.created_by}</b></span>}
-          </div>
-          {t.status==='done'&&t.completion_note&&<div style={{fontSize:12,color:'var(--green)',marginTop:4}}>✓ {t.completion_note}</div>}
-        </div>
-        <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
-          <span className={`badge ${TASK_STATUS[t.status]?.cls||'badge-new'}`}>{TASK_STATUS[t.status]?.label||t.status}</span>
-          {['pending','assigned'].includes(t.status) && t.created_by===createdBy && (
-            <button className="btn-secondary btn-sm" style={{fontSize:10,padding:'3px 8px',color:'var(--amber)'}} onClick={()=>setEditingTask(t)}>&#9998; Edit</button>
-          )}
-        </div>
-      </div>
-      {t.completion_photo&&<img src={t.completion_photo} style={{width:'100%',maxHeight:120,objectFit:'cover',borderRadius:8,marginTop:8}} alt="bukti"/>}
-    </div>
-  );
+  // Pakai global TaskCard — sudah ada Riwayat Tugas + onEdit prop untuk edit button supervisor
 
   return (
     <div style={{maxWidth:900}}>
@@ -3632,7 +3609,10 @@ function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
       {tab==='mytasks'&&(
         <>
           {myTasks.length===0&&<div className="empty-state"><div className="icon">✅</div><div>Belum ada tugas yang kamu buat</div></div>}
-          {myTasks.map(t=><TaskCard key={t.id} t={t}/>)}
+          {myTasks.map(t=>(
+            <TaskCard key={t.id} task={t} onUpdate={onUpdate} showAssign={false} showComplete={false}
+              onEdit={['pending','assigned'].includes(t.status)&&t.created_by===createdBy ? ()=>setEditingTask(t) : null}/>
+          ))}
         </>
       )}
 
@@ -3640,7 +3620,10 @@ function SupervisorTasks({tasks, onSave, onUpdate, createdBy}) {
       {tab==='tasks'&&(
         <>
           {filtered.length===0&&<div className="empty-state"><div className="icon">📋</div><div>Tidak ada tugas{filter!=='all'?' dengan status ini':''}</div></div>}
-          {filtered.map(t=><TaskCard key={t.id} t={t}/>)}
+          {filtered.map(t=>(
+            <TaskCard key={t.id} task={t} onUpdate={onUpdate} showAssign={false} showComplete={false}
+              onEdit={['pending','assigned'].includes(t.status)&&t.created_by===createdBy ? ()=>setEditingTask(t) : null}/>
+          ))}
         </>
       )}
     </div>
@@ -9779,7 +9762,7 @@ function WalkInServiceModal({task, onSaveIntake, onUpdateTask, onClose, allIntak
   );
 }
 
-function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFillServiceForm, onSaveServiceIntake, allIntakes, getLastCheckin, onCheckin, isLocked=false, lockMessage=null, onQueuePhoto=null, assignedBy=null}) {
+function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFillServiceForm, onSaveServiceIntake, allIntakes, getLastCheckin, onCheckin, isLocked=false, lockMessage=null, onQueuePhoto=null, assignedBy=null, onEdit=null}) {
   const [photo, setPhoto] = React.useState(null);
   const [note, setNote] = React.useState('');
   const [assigning, setAssigning] = React.useState(false);
@@ -9882,6 +9865,9 @@ function TaskCard({task, onUpdate, showAssign, showComplete, courierName, onFill
         </div>
         <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
           <span className={`badge ${TASK_STATUS[task.status]?.cls||'badge-new'}`}>{TASK_STATUS[task.status]?.label||task.status}</span>
+          {onEdit && ['pending','assigned'].includes(task.status) && (
+            <button className="btn-secondary btn-sm" style={{fontSize:11,color:'var(--amber)'}} onClick={()=>onEdit(task)}>✏️ Edit</button>
+          )}
           {(task.assigned_courier||task.status==='done') && (
             <button className="btn-secondary btn-sm" style={{fontSize:11}} onClick={()=>setShowDetail(d=>!d)}>
               {showDetail?'▲ Tutup':'📋 Detail'}
