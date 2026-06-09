@@ -250,6 +250,8 @@ const STATUS_COLORS = { new:'badge-new', invoiced:'badge-invoiced', prep:'badge-
 const STATUS_DOTS = { new:'#6c63ff', invoiced:'#3b82f6', prep:'#f59e0b', tech:'#14b8a6', tech_done:'#22c55e', on_delivery:'#f97316', delivered:'#22c55e', cancelled:'#ef4444', cancel_requested:'#ef4444' };
 const ROLES = ['sales','admin','ops','courier','technician','cabang','supervisor','admin_pembelian','admin_online'];
 const ROLE_LABELS = { sales:'📊 Sales', admin:'🗂 Admin', ops:'⚙️ Ops', courier:'🚚 Kurir', technician:'🔧 Teknisi', cabang:'🏢 Cabang', supervisor:'👁 Supervisor', admin_pembelian:'🛒 Admin Pembelian', admin_online:'🌐 Admin Online', absensi_only:'🗓 Staff' };
+// Sales yang revisiannya bisa di-approve oleh Admin Online (selain Ops)
+const AO_APPROVER_SALES = ['ade','lili'];
 
 // ─── DAFTAR AKUN — edit di sini untuk tambah / ubah / hapus akun ──
 const USER_ACCOUNTS = [
@@ -3184,6 +3186,7 @@ function RevisiOrderModal({order, onClose, onSave, currentUser}) {
       info_before: order.info_tambahan,
       info_after:  infoTambahan,
       status: 'pending_ops',  // menunggu persetujuan ops
+      ao_can_approve: AO_APPROVER_SALES.includes((currentUser||'').toLowerCase()),
     };
     // goods belum diubah dulu — ops harus approve dulu, baru admin apply
     await onSave(order.id, {
@@ -6494,6 +6497,7 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
 
   return (
     <div style={{maxWidth:900}}>
+      <AORevisionPanel orders={orders} onUpdateOrder={onUpdate} aoName="admin_online"/>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:4}}>
         <div className="section-title" style={{margin:0}}>🧾 Invoicing <span style={{fontSize:12,fontWeight:400,color:'var(--blue)'}}>Admin Online</span> <span style={{fontSize:14,fontWeight:400,color:'var(--text2)',fontFamily:'DM Sans'}}>({pending.length} pending)</span></div>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
@@ -8514,6 +8518,131 @@ function RevisionNotificationsPanel({orders, onUpdateOrder, opsName}) {
                     <div style={{color:'var(--text2)',marginBottom:8}}>Barang dianggap sudah terlanjur dikirim. Orderan dilanjutkan seperti biasa, revisi diabaikan.</div>
                     <div style={{display:'flex',gap:6}}>
                       <button style={{background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.4)',color:'var(--red)',borderRadius:6,padding:'5px 14px',cursor:'pointer',fontSize:12,fontWeight:600}} onClick={()=>dismissRevision(order,idx)}>Ya, Tolak</button>
+                      <button className="btn-secondary btn-sm" onClick={()=>setRejectConfirm(null)}>Batal</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {!isConfirmingReject && (
+                <div style={{display:'flex',flexDirection:'column',gap:6,flexShrink:0,alignItems:'stretch',minWidth:120}}>
+                  <button className="btn-sm" style={{background:'rgba(34,197,94,0.15)',border:'1px solid rgba(34,197,94,0.4)',color:'var(--green)',borderRadius:6,padding:'6px 12px',cursor:'pointer',fontSize:12,fontWeight:600,textAlign:'center'}} onClick={()=>approveRevision(order,idx)}>
+                    ✓ Setujui → Admin
+                  </button>
+                  <div style={{fontSize:9,color:'var(--text3)',textAlign:'center',lineHeight:1.3}}>Admin akan buat invoice revisi</div>
+                  <button className="btn-sm" style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',color:'var(--red)',borderRadius:6,padding:'6px 12px',cursor:'pointer',fontSize:12,textAlign:'center'}} onClick={()=>setRejectConfirm({orderId:order.id,idx})}>
+                    ✕ Tolak
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── ADMIN ONLINE: approve revisions from Ade/Lili ─── */
+function AORevisionPanel({orders, onUpdateOrder, aoName}) {
+  const [expanded, setExpanded] = React.useState(true);
+  const [rejectConfirm, setRejectConfirm] = React.useState(null);
+
+  const pending = [];
+  (orders||[]).forEach(order => {
+    (order.revisions||[]).forEach((rev, idx) => {
+      if (rev.status === 'pending_ops' && rev.ao_can_approve) {
+        pending.push({order, rev, idx});
+      }
+    });
+  });
+
+  if (pending.length === 0) return null;
+
+  const buildDiff = (before, after) => {
+    const bMap={}, aMap={}, diffs=[];
+    (before||[]).forEach(g=>{bMap[g.name]=g;});
+    (after||[]).forEach(g=>{aMap[g.name]=g;});
+    (before||[]).forEach(g=>{
+      if (!aMap[g.name]) diffs.push({type:'removed',name:g.name,qty:g.qty,price:g.price});
+      else {
+        const a=aMap[g.name]; const ch=[];
+        if(Number(a.qty)!==Number(g.qty))     ch.push(`qty: ${g.qty}→${a.qty}`);
+        if(Number(a.price)!==Number(g.price)) ch.push(`harga: ${fmtCurrency(g.price)}→${fmtCurrency(a.price)}`);
+        if(a.name!==g.name)                   ch.push(`nama: "${g.name}"→"${a.name}"`);
+        if(ch.length>0) diffs.push({type:'changed',name:a.name,changes:ch});
+      }
+    });
+    (after||[]).forEach(g=>{ if(!bMap[g.name]) diffs.push({type:'added',name:g.name,qty:g.qty,price:g.price}); });
+    return diffs;
+  };
+
+  const approveRevision = (order, idx) => {
+    const updated = (order.revisions||[]).map((r,i) =>
+      i===idx ? {...r, status:'pending_admin', read_by_ops:true, ops_by:aoName||'admin_online', ops_at:new Date().toISOString()} : r
+    );
+    onUpdateOrder(order.id, {revisions: updated});
+  };
+
+  const rejectRevision = (order, idx) => {
+    const updated = (order.revisions||[]).map((r,i) =>
+      i===idx ? {...r, status:'ops_rejected', read_by_ops:true, ops_by:aoName||'admin_online', ops_at:new Date().toISOString()} : r
+    );
+    onUpdateOrder(order.id, {revisions: updated});
+    setRejectConfirm(null);
+  };
+
+  return (
+    <div style={{background:'rgba(20,184,166,0.06)',border:'2px solid rgba(20,184,166,0.4)',borderRadius:12,padding:'14px 16px',marginBottom:18}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:expanded?12:0,cursor:'pointer'}} onClick={()=>setExpanded(e=>!e)}>
+        <div style={{fontWeight:800,fontSize:14,color:'var(--teal)',display:'flex',alignItems:'center',gap:8}}>
+          ✏️ Revisi Order — Perlu Approval Kamu
+          <span style={{background:'var(--teal)',color:'#fff',borderRadius:12,padding:'1px 9px',fontSize:12}}>{pending.length}</span>
+        </div>
+        <span style={{color:'var(--text3)',fontSize:12}}>{expanded?'▲ Tutup':'▼ Buka'}</span>
+      </div>
+      {expanded && pending.map(({order, rev, idx}) => {
+        const diffs = buildDiff(rev.goods_before, rev.goods_after);
+        const tBef = rev.total_before ?? (rev.goods_before||[]).reduce((s,g)=>s+Number(g.price||0)*Number(g.qty||0)-(Number(g.discount)||0),0);
+        const tAft = rev.total_after  ?? (rev.goods_after ||[]).reduce((s,g)=>s+Number(g.price||0)*Number(g.qty||0)-(Number(g.discount)||0),0);
+        const isConfirmingReject = rejectConfirm && rejectConfirm.orderId===order.id && rejectConfirm.idx===idx;
+        return (
+          <div key={`${order.id}_${idx}`} style={{padding:'10px 14px',background:'var(--bg3)',borderRadius:8,marginBottom:8,borderLeft:'3px solid var(--teal)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:700,fontSize:13}}>📦 {order.customer_name}
+                  {order.sales_name&&<span style={{fontSize:11,color:'var(--text3)',fontWeight:400,marginLeft:8}}>({order.sales_name})</span>}
+                  <span style={{fontSize:11,color:'var(--text3)',fontWeight:400,marginLeft:8}}>Status: {STATUS_LABELS[order.status]||order.status}</span>
+                </div>
+                <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>
+                  Diminta oleh <b style={{color:'var(--teal)'}}>{rev.by}</b> · {fmtDateTime(rev.at)}
+                </div>
+                <div style={{marginTop:6,fontSize:12,padding:'5px 9px',background:'rgba(20,184,166,0.08)',borderRadius:6,fontStyle:'italic',color:'var(--text)'}}>
+                  💬 "{rev.alasan}"
+                </div>
+                {diffs.length>0 && (
+                  <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:6}}>
+                    {diffs.map((d,di)=>(
+                      <div key={di} style={{fontSize:11,padding:'3px 8px',borderRadius:5,
+                        background:d.type==='added'?'rgba(34,197,94,0.1)':d.type==='removed'?'rgba(239,68,68,0.1)':'rgba(59,130,246,0.08)',
+                        color:d.type==='added'?'var(--green)':d.type==='removed'?'var(--red)':'var(--blue)',
+                      }}>
+                        {d.type==='added'   && `✚ Ditambah: ${d.name} ×${d.qty} @ ${fmtCurrency(d.price)}`}
+                        {d.type==='removed' && `✕ Dihapus: ${d.name} ×${d.qty} @ ${fmtCurrency(d.price)}`}
+                        {d.type==='changed' && `↔ ${d.name}: ${d.changes.join(' · ')}`}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{marginTop:6,display:'flex',gap:16,fontSize:11,color:'var(--text3)'}}>
+                  <span>Sebelum: <b style={{color:'var(--text2)'}}>{fmtCurrency(tBef)}</b></span>
+                  <span>Setelah: <b style={{color:tAft!==tBef?'var(--amber)':'var(--text2)'}}>{fmtCurrency(tAft)}{tAft!==tBef&&<span style={{marginLeft:4}}>({tAft>tBef?'+':'−'}{fmtCurrency(Math.abs(tAft-tBef))})</span>}</b></span>
+                </div>
+                {isConfirmingReject && (
+                  <div style={{marginTop:8,padding:'8px 12px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:8,fontSize:12}}>
+                    <div style={{color:'var(--red)',fontWeight:600,marginBottom:6}}>⚠️ Tolak revisi ini?</div>
+                    <div style={{color:'var(--text2)',marginBottom:8}}>Revisi akan ditolak dan tidak diproses.</div>
+                    <div style={{display:'flex',gap:6}}>
+                      <button style={{background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.4)',color:'var(--red)',borderRadius:6,padding:'5px 14px',cursor:'pointer',fontSize:12,fontWeight:600}} onClick={()=>rejectRevision(order,idx)}>Ya, Tolak</button>
                       <button className="btn-secondary btn-sm" onClick={()=>setRejectConfirm(null)}>Batal</button>
                     </div>
                   </div>
