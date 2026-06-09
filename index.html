@@ -3532,7 +3532,7 @@ function SupervisorService({intakes, orders}) {
         <>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
             <input placeholder="🔍 Cari nama / unit / S/N..." value={search} onChange={e=>setSearch(e.target.value)} style={{flex:1,minWidth:160,padding:'8px 12px'}}/>
-            {['all','received','to_technician','back_from_sc','post_sc_checking','to_service_center','at_service_center','sc_pickup_assigned','sc_batal','done','returned'].map(s=>(
+            {['all','received','to_technician','back_from_sc','post_sc_checking','to_service_center','at_service_center','sc_pickup_assigned','sc_batal','batal_servis','batal_dikembalikan','done','returned'].map(s=>(
               <button key={s} className={filter===s?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilter(s)}>
                 {s==='all'?'Semua':STATUS_SI[s]?.label||s}
               </button>
@@ -14454,8 +14454,10 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
             <div>
               <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:showBatal?10:0}}>
                 <button className="btn-secondary btn-sm" style={{color:'var(--amber)'}} onClick={()=>setRouting('psc_change_tech')}>🔄 Ganti Teknisi</button>
-                <button className="btn-green btn-sm" onClick={()=>setShowDoneUpload(s=>!s)}>✅ Cek OK — Selesai</button>
-                <button className="btn-secondary btn-sm" style={{color:'var(--red)'}} onClick={()=>setShowBatal(b=>!b)}>❌ Batal</button>
+                <button className="btn-green btn-sm" onClick={()=>setShowDoneUpload(s=>!s)}>
+                  {si.sc_cancelled ? '✅ Cek OK — Siap Dikembalikan' : '✅ Cek OK — Selesai'}
+                </button>
+                {!si.sc_cancelled && <button className="btn-secondary btn-sm" style={{color:'var(--red)'}} onClick={()=>setShowBatal(b=>!b)}>❌ Batal</button>}
               </div>
               {showBatal && <BatalBox reason={batalReason} setReason={setBatalReason} onConfirm={doBatalServis} onClose={()=>{setShowBatal(false);setBatalReason('');}} note="Barang akan langsung dikembalikan ke cabang/customer"/>}
             </div>
@@ -14467,10 +14469,15 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
               {donePhoto&&<img src={donePhoto} style={{width:'100%',maxHeight:150,objectFit:'cover',borderRadius:8,marginBottom:8,display:'block'}} alt="bukti"/>}
               <div style={{display:'flex',gap:8}}>
                 <button className="btn-green btn-sm" style={{flex:1}} onClick={async()=>{
-                  const pscDoneUrl = await uploadPhoto(donePhoto||null, 'tech_done');
-                  onUpdate(si.id,{status:'done',done_at:new Date().toISOString()});
+                  await uploadPhoto(donePhoto||null, 'tech_done');
+                  // sc_cancelled → batal_servis (perlu dikembalikan ke customer/cabang)
+                  // normal → done
+                  onUpdate(si.id, si.sc_cancelled
+                    ? {status:'batal_servis', batal_checked_at:new Date().toISOString()}
+                    : {status:'done', done_at:new Date().toISOString()}
+                  );
                   setShowDoneUpload(false); setDonePhoto(null);
-                }}>✅ Konfirmasi Cek OK</button>
+                }}>{si.sc_cancelled ? '✅ Konfirmasi Cek OK — Atur Pengembalian' : '✅ Konfirmasi Cek OK'}</button>
                 <button className="btn-secondary btn-sm" onClick={()=>{setShowDoneUpload(false);setDonePhoto(null);}}>Batal</button>
               </div>
             </div>
@@ -14606,15 +14613,14 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
         </div>
       )}
 
-      {/* Batal Servis — belum ke SC, langsung kembalikan */}
+      {/* Batal Servis — atur pengembalian barang ke customer / cabang */}
       {si.status==='batal_servis' && (
         <div style={{paddingTop:10,borderTop:'1px solid var(--border)'}}>
-          <div style={{marginBottom:10,padding:'8px 12px',background:'rgba(239,68,68,0.08)',borderRadius:8}}>
-            <div style={{fontSize:12,fontWeight:700,color:'var(--red)',marginBottom:3}}>❌ Servis Dibatalkan</div>
-            {si.cancel_reason&&<div style={{fontSize:12,color:'var(--text2)'}}>Alasan: {si.cancel_reason}</div>}
-            <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>
-              Sebelumnya: {STATUS_SI[si.cancel_prev_status]?.label||si.cancel_prev_status||'-'} · {si.tech_assigned?'Teknisi: '+si.tech_assigned:''}
-            </div>
+          <div style={{marginBottom:10,padding:'10px 12px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:8}}>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--red)',marginBottom:3}}>❌ Servis Dibatalkan — Perlu Dikembalikan ke Customer</div>
+            {si.cancel_reason&&<div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>Alasan: {si.cancel_reason}</div>}
+            {si.sc_cancelled&&<div style={{fontSize:11,color:'var(--amber)',marginTop:2}}>⚠ Barang ditarik dari SC: <b>{si.service_center_name}</b> — cek kondisi sudah dilakukan</div>}
+            {si.tech_assigned&&!si.sc_cancelled&&<div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>Teknisi terakhir: {si.tech_assigned}</div>}
           </div>
           <ReturnBatalBox si={si} onUpdate={onUpdate} batalReturnKurir={batalReturnKurir}/>
         </div>
@@ -14657,7 +14663,7 @@ function OpsServiceMonitor({intakes, onUpdate, orders}) {
   const [tab, setTab] = React.useState('list'); // 'list' | 'sn'
   const filtered = filter==='all' ? intakes : intakes.filter(si=>si.status===filter);
   const installOrders = (orders||[]).filter(o=>o.tech_name||['tech','tech_done','on_delivery','delivered'].includes(o.status));
-  const needAction = intakes.filter(si=>['received','at_service_center','back_from_sc','sc_batal'].includes(si.status)).length;
+  const needAction = intakes.filter(si=>['received','at_service_center','back_from_sc','sc_batal','batal_servis'].includes(si.status)).length;
 
   return (
     <div style={{maxWidth:900}}>
@@ -14685,7 +14691,7 @@ function OpsServiceMonitor({intakes, onUpdate, orders}) {
             ))}
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
-            {['all','received','to_technician','back_from_sc','post_sc_checking','to_service_center','at_service_center','sc_pickup_assigned','sc_batal','done'].map(s=>(
+            {['all','received','to_technician','back_from_sc','post_sc_checking','to_service_center','at_service_center','sc_pickup_assigned','sc_batal','batal_servis','batal_dikembalikan','done','returned'].map(s=>(
               <button key={s} className={filter===s?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilter(s)}>
                 {s==='all'?'Semua':STATUS_SI[s]?.label||s}
               </button>
