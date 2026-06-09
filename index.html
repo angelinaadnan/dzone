@@ -5475,6 +5475,20 @@ function SalesSignatureModal({salesName, sigPreview, onSave, onDelete, onClose})
 }
 
 function ConvertToOrderModal({q, salesName, converting, onConfirm, onClose}) {
+  // Always load fresh quotation from DB to reflect latest revisions
+  const [freshQ, setFreshQ] = React.useState(q);
+  const [loadingFresh, setLoadingFresh] = React.useState(true);
+  React.useEffect(() => {
+    let cancelled = false;
+    if (db) {
+      db.from('quotations').select('*').eq('id', q.id).single().then(({data}) => {
+        if (!cancelled && data) setFreshQ(data);
+        setLoadingFresh(false);
+      });
+    } else { setLoadingFresh(false); }
+    return () => { cancelled = true; };
+  }, [q.id]);
+
   const [form, setForm] = React.useState({
     payment_status: 'Langsung Tagih',
     delivery_method: 'Kirim Hari Ini Tidak Urgent',
@@ -5489,7 +5503,7 @@ function ConvertToOrderModal({q, salesName, converting, onConfirm, onClose}) {
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const inp = {padding:'8px 10px',background:'var(--bg3)',border:'1px solid var(--border2)',borderRadius:7,color:'var(--text)',fontSize:13,width:'100%',boxSizing:'border-box'};
-  const total = totalOrder(q.goods);
+  const total = totalOrder(freshQ.goods);
 
   const handleSubmit = () => {
     if (!form.payment_status) { alert('Pilih sistem pembayaran'); return; }
@@ -5504,7 +5518,7 @@ function ConvertToOrderModal({q, salesName, converting, onConfirm, onClose}) {
         <div className="modal-header">
           <div>
             <div style={{fontFamily:'Syne',fontWeight:700,fontSize:15}}>🚀 Jadikan Order</div>
-            <div style={{fontSize:12,color:'var(--text3)',marginTop:2}}>{q.quotation_number} · {q.customer_name} · {fmtCurrency(total)}</div>
+            <div style={{fontSize:12,color:'var(--text3)',marginTop:2}}>{freshQ.quotation_number} · {freshQ.customer_name} · {fmtCurrency(total)}</div>
           </div>
           <button onClick={onClose} style={{background:'none',color:'var(--text2)',fontSize:20,border:'none',cursor:'pointer',lineHeight:1}}>×</button>
         </div>
@@ -5512,12 +5526,15 @@ function ConvertToOrderModal({q, salesName, converting, onConfirm, onClose}) {
 
           {/* Barang ringkasan */}
           <div style={{background:'var(--bg3)',borderRadius:8,padding:'10px 12px',marginBottom:16,fontSize:12}}>
-            <div style={{fontWeight:600,marginBottom:6,color:'var(--text2)'}}>📦 Barang dari Penawaran</div>
-            {(q.goods||[]).map((g,i)=>{
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+              <div style={{fontWeight:600,color:'var(--text2)'}}>📦 Barang dari Penawaran</div>
+              {loadingFresh && <div style={{fontSize:10,color:'var(--amber)'}}>⏳ Memuat revisi terbaru...</div>}
+            </div>
+            {(freshQ.goods||[]).map((g,i)=>{
               const disc=Number(g.discount)||0;
               return (
                 <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:'1px solid var(--border)'}}>
-                  <span style={{color:'var(--text)'}}>{g.qty}× {g.name}{g.desc?' — '+g.desc:''}{disc>0?<span style={{color:'var(--red)',marginLeft:4}}>-{fmtCurrency(disc)}</span>:null}</span>
+                  <span style={{color:'var(--text)'}}><b>{g.qty}</b>× {g.name}{g.desc?' — '+g.desc:''}{disc>0?<span style={{color:'var(--red)',marginLeft:4}}>-{fmtCurrency(disc)}</span>:null}</span>
                   <span style={{fontFamily:'DM Mono',color:'var(--accent2)',flexShrink:0,marginLeft:8}}>{fmtCurrency((Number(g.price)||0)*Number(g.qty||1)-disc)}</span>
                 </div>
               );
@@ -5638,14 +5655,20 @@ function QuotationPage({quotations, onSave, onUpdate, onSaveOrder, salesName, on
 
   const handleConvert = async (q, orderForm) => {
     setConverting(q.id);
+    // Re-fetch fresh quotation from DB to ensure we use the latest revision (not stale state)
+    let freshQ = q;
+    if (db) {
+      const {data: freshData} = await db.from('quotations').select('*').eq('id', q.id).single();
+      if (freshData) freshQ = freshData;
+    }
     const order = {
       date: new Date().toISOString().split('T')[0],
-      sales_name: q.sales_name,
-      customer_name: q.customer_name,
-      customer_phone: q.customer_phone||'',
-      customer_address: q.customer_address||'',
-      goods: q.goods,
-      info_tambahan: orderForm.info_tambahan || `[Dari Penawaran: ${q.quotation_number}]${q.notes?' — '+q.notes:''}`,
+      sales_name: freshQ.sales_name,
+      customer_name: freshQ.customer_name,
+      customer_phone: freshQ.customer_phone||'',
+      customer_address: freshQ.customer_address||'',
+      goods: freshQ.goods,
+      info_tambahan: orderForm.info_tambahan || `[Dari Penawaran: ${freshQ.quotation_number}]${freshQ.notes?' — '+freshQ.notes:''}`,
       payment_status: orderForm.payment_status || 'Langsung Tagih',
       delivery_method: orderForm.delivery_method || 'Kirim Hari Ini Tidak Urgent',
       faktur_pajak: orderForm.faktur_pajak||false,
@@ -5657,12 +5680,12 @@ function QuotationPage({quotations, onSave, onUpdate, onSaveOrder, salesName, on
       npwp: orderForm.npwp||'',
       npwp_file: orderForm.npwp_file==='__loading__' ? null : (orderForm.npwp_file||null),
       status:'new',
-      status_history:[{status:'new',time:new Date().toISOString(),note:`Converted dari ${q.quotation_number}`,by:salesName}],
+      status_history:[{status:'new',time:new Date().toISOString(),note:`Converted dari ${freshQ.quotation_number}`,by:salesName}],
       tracking:[], assigned_to:null, courier_name:null,
     };
     const result = await onSaveOrder(order);
     if (result) {
-      await onUpdate(q.id, {status:'converted', order_id:result.id, converted_at:new Date().toISOString()});
+      await onUpdate(freshQ.id, {status:'converted', order_id:result.id, converted_at:new Date().toISOString()});
       onToast(`✅ Order berhasil dibuat dari ${q.quotation_number}!`);
       setConvertItem(null);
     }
