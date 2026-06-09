@@ -2135,7 +2135,8 @@ function ServiceHistoryTimeline({si}) {
   if (si.route_type==='service_center' || si.service_center_name) {
     steps.push({icon:'🚗', label:`Antar ke SC: ${si.service_center_name||'-'}`, sub:`Kurir: ${si.sc_delivery_courier||'-'}`, time:si.sc_delivered_at||null, done:done('at_service_center')});
     steps.push({icon:'🏪', label:'Di Service Center', sub:si.sc_receipt_photo?'Tanda terima terupload':'Menunggu konfirmasi SC', time:null, done:done('at_service_center')});
-    steps.push({icon:si.sc_ekspedisi?'📦':'🚗', label:si.sc_cancelled?(si.sc_ekspedisi?'Ekspedisi dari SC (Batal)':'Tarik dari SC (Batal)'):(si.sc_ekspedisi?'Ekspedisi dari SC':'Ambil dari SC'), sub:si.sc_ekspedisi?`Via ekspedisi SC${si.sc_pickup_courier?' ('+si.sc_pickup_courier+')':''}`:`Kurir: ${si.sc_pickup_courier||'-'}`, time:si.sc_picked_up_at||null, done:done('back_from_sc')});
+    const isEkspedisi = si.sc_pickup_courier==='Ekspedisi SC' || si.status==='sc_ekspedisi_waiting';
+    steps.push({icon:isEkspedisi?'📦':'🚗', label:si.sc_cancelled?(isEkspedisi?'Ekspedisi dari SC (Batal)':'Tarik dari SC (Batal)'):(isEkspedisi?'Ekspedisi dari SC':'Ambil dari SC'), sub:isEkspedisi?'Via ekspedisi/kurir SC':`Kurir: ${si.sc_pickup_courier||'-'}`, time:si.sc_picked_up_at||null, done:done('back_from_sc')});
     steps.push({icon:'🏠', label:'Tiba di Ops', sub:si.sc_cancelled?'Barang ditarik — cek kondisi':'Barang sudah di tangan Ops', time:si.sc_picked_up_at||null, done:done('back_from_sc')});
     steps.push({icon:'🔬', label:'Cek Teknisi (Post-SC)', sub:si.tech_assigned?`Teknisi: ${si.tech_assigned}`:'Belum', time:si.tech_assigned_at||null, done:done('post_sc_checking')});
   }
@@ -14362,7 +14363,7 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
               </button>
             ))}
             <button className="btn-secondary btn-sm" style={{background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.4)',color:'var(--amber)'}}
-              onClick={()=>{ if(window.confirm('SC akan kirim sendiri via ekspedisi/kurir mereka. Kamu akan konfirmasi ketika barang tiba di Ops. Lanjut?')) onUpdate(si.id,{status:'sc_ekspedisi_waiting',sc_ekspedisi:true,sc_pickup_courier:'Ekspedisi SC'}); }}>
+              onClick={()=>{ if(window.confirm('SC akan kirim sendiri via ekspedisi/kurir mereka. Kamu akan konfirmasi ketika barang tiba di Ops. Lanjut?')) onUpdate(si.id,{status:'sc_ekspedisi_waiting',sc_pickup_courier:'Ekspedisi SC'}); }}>
               📦 Ekspedisi (SC kirim sendiri)
             </button>
           </div>
@@ -14402,7 +14403,7 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
           </button>
           <div style={{marginTop:8}}>
             <button className="btn-secondary btn-sm" style={{color:'var(--text3)',fontSize:11}}
-              onClick={()=>{ if(window.confirm('Batalkan opsi Ekspedisi dan kembali ke pilihan kurir?')) onUpdate(si.id,{status: si.sc_cancelled?'sc_batal':'at_service_center',sc_ekspedisi:false,sc_pickup_courier:null}); }}>
+              onClick={()=>{ if(window.confirm('Batalkan opsi Ekspedisi dan kembali ke pilihan kurir?')) onUpdate(si.id,{status: si.sc_cancelled?'sc_batal':'at_service_center',sc_pickup_courier:null}); }}>
               ✕ Batalkan Ekspedisi
             </button>
           </div>
@@ -14426,7 +14427,7 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
               </button>
             ))}
             <button className="btn-secondary btn-sm" style={{background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.4)',color:'var(--amber)'}}
-              onClick={()=>{ if(window.confirm('SC akan kirim sendiri via ekspedisi/kurir mereka. Kamu konfirmasi ketika barang tiba di Ops. Lanjut?')) onUpdate(si.id,{status:'sc_ekspedisi_waiting',sc_ekspedisi:true,sc_pickup_courier:'Ekspedisi SC',sc_cancelled:true}); }}>
+              onClick={()=>{ if(window.confirm('SC akan kirim sendiri via ekspedisi/kurir mereka. Kamu konfirmasi ketika barang tiba di Ops. Lanjut?')) onUpdate(si.id,{status:'sc_ekspedisi_waiting',sc_pickup_courier:'Ekspedisi SC',sc_cancelled:true}); }}>
               📦 Ekspedisi (SC kirim sendiri)
             </button>
           </div>
