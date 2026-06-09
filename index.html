@@ -2118,7 +2118,7 @@ function ServiceHistoryTimeline({si}) {
 
   // ── Courier / Ops route (existing) ─────────────────────────────────
   const done = (s) => {
-    const order = ['received','to_technician','to_service_center','at_service_center','sc_pickup_assigned','back_from_sc','post_sc_checking','done','returned'];
+    const order = ['received','to_technician','to_service_center','at_service_center','sc_pickup_assigned','sc_ekspedisi_waiting','back_from_sc','post_sc_checking','done','returned'];
     const isReturned = si.status==='returned' || si.return_status==='returned';
     const cur = order.indexOf(isReturned ? 'returned' : si.status);
     return cur >= order.indexOf(s);
@@ -2135,7 +2135,7 @@ function ServiceHistoryTimeline({si}) {
   if (si.route_type==='service_center' || si.service_center_name) {
     steps.push({icon:'🚗', label:`Antar ke SC: ${si.service_center_name||'-'}`, sub:`Kurir: ${si.sc_delivery_courier||'-'}`, time:si.sc_delivered_at||null, done:done('at_service_center')});
     steps.push({icon:'🏪', label:'Di Service Center', sub:si.sc_receipt_photo?'Tanda terima terupload':'Menunggu konfirmasi SC', time:null, done:done('at_service_center')});
-    steps.push({icon:'🚗', label:si.sc_cancelled?'Tarik dari SC (Batal)':'Ambil dari SC', sub:`Kurir: ${si.sc_pickup_courier||'-'}`, time:si.sc_picked_up_at||null, done:done('back_from_sc')});
+    steps.push({icon:si.sc_ekspedisi?'📦':'🚗', label:si.sc_cancelled?(si.sc_ekspedisi?'Ekspedisi dari SC (Batal)':'Tarik dari SC (Batal)'):(si.sc_ekspedisi?'Ekspedisi dari SC':'Ambil dari SC'), sub:si.sc_ekspedisi?`Via ekspedisi SC${si.sc_pickup_courier?' ('+si.sc_pickup_courier+')':''}`:`Kurir: ${si.sc_pickup_courier||'-'}`, time:si.sc_picked_up_at||null, done:done('back_from_sc')});
     steps.push({icon:'🏠', label:'Tiba di Ops', sub:si.sc_cancelled?'Barang ditarik — cek kondisi':'Barang sudah di tangan Ops', time:si.sc_picked_up_at||null, done:done('back_from_sc')});
     steps.push({icon:'🔬', label:'Cek Teknisi (Post-SC)', sub:si.tech_assigned?`Teknisi: ${si.tech_assigned}`:'Belum', time:si.tech_assigned_at||null, done:done('post_sc_checking')});
   }
@@ -3532,7 +3532,7 @@ function SupervisorService({intakes, orders}) {
         <>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
             <input placeholder="🔍 Cari nama / unit / S/N..." value={search} onChange={e=>setSearch(e.target.value)} style={{flex:1,minWidth:160,padding:'8px 12px'}}/>
-            {['all','received','to_technician','back_from_sc','post_sc_checking','to_service_center','at_service_center','sc_pickup_assigned','sc_batal','batal_servis','batal_dikembalikan','done','returned'].map(s=>(
+            {['all','received','to_technician','back_from_sc','post_sc_checking','to_service_center','at_service_center','sc_pickup_assigned','sc_ekspedisi_waiting','sc_batal','batal_servis','batal_dikembalikan','done','returned'].map(s=>(
               <button key={s} className={filter===s?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilter(s)}>
                 {s==='all'?'Semua':STATUS_SI[s]?.label||s}
               </button>
@@ -9293,9 +9293,10 @@ function OpsDashboard({orders, serviceIntakes, courierTasks, branchRequests, pur
     received:           si.filter(s=>s.status==='received'),
     to_technician:      si.filter(s=>s.status==='to_technician'),
     to_service_center:  si.filter(s=>s.status==='to_service_center'),
-    at_service_center:  si.filter(s=>s.status==='at_service_center'),
-    sc_pickup_assigned: si.filter(s=>s.status==='sc_pickup_assigned'),
-    done:               si.filter(s=>s.status==='done'),
+    at_service_center:    si.filter(s=>s.status==='at_service_center'),
+    sc_pickup_assigned:   si.filter(s=>s.status==='sc_pickup_assigned'),
+    sc_ekspedisi_waiting: si.filter(s=>s.status==='sc_ekspedisi_waiting'),
+    done:                 si.filter(s=>s.status==='done'),
   };
   const siNeedReturn   = si.filter(s=>s.status==='done' && s.return_status==='pending');
   const siDoneToday    = si.filter(s=>(s.done_at||'').startsWith(today));
@@ -9619,8 +9620,9 @@ function OpsDashboard({orders, serviceIntakes, courierTasks, branchRequests, pur
             {key:'to_technician',      label:'👨‍🔧 Di Teknisi',      items:siByStatus.to_technician,       color:'var(--text2)'},
             {key:'to_service_center',  label:'🚚 Menuju SC',         items:siByStatus.to_service_center,  color:'var(--text2)'},
             {key:'at_service_center',  label:'🏪 Di SC',             items:siByStatus.at_service_center,  color:siByStatus.at_service_center.length>0?'var(--blue)':'var(--text3)'},
-            {key:'sc_pickup_assigned', label:'📦 SC Selesai/Jemput', items:siByStatus.sc_pickup_assigned, color:siByStatus.sc_pickup_assigned.length>0?'var(--teal)':'var(--text3)'},
-            {key:'done',               label:'✅ Selesai (total)',   items:siByStatus.done,               color:'var(--green)'},
+            {key:'sc_pickup_assigned',   label:'📦 SC Selesai/Jemput', items:siByStatus.sc_pickup_assigned,   color:siByStatus.sc_pickup_assigned.length>0?'var(--teal)':'var(--text3)'},
+            {key:'sc_ekspedisi_waiting', label:'📦 Tunggu Ekspedisi SC', items:siByStatus.sc_ekspedisi_waiting, color:siByStatus.sc_ekspedisi_waiting.length>0?'var(--amber)':'var(--text3)'},
+            {key:'done',                 label:'✅ Selesai (total)',   items:siByStatus.done,               color:'var(--green)'},
           ];
           return (
             <div className="card" style={{padding:'14px 16px'}}>
@@ -12278,7 +12280,7 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
     }
     // courier route
     if (si.status==='done') return 'selesai';
-    if (['at_service_center','to_service_center','sc_pickup_assigned','back_from_sc','post_sc_checking'].includes(si.status)) return 'di_sc';
+    if (['at_service_center','to_service_center','sc_pickup_assigned','sc_ekspedisi_waiting','back_from_sc','post_sc_checking'].includes(si.status)) return 'di_sc';
     return 'proses';
   };
 
@@ -13931,6 +13933,7 @@ const STATUS_SI = {
   to_service_center:    {label:'Antar ke SC',             cls:'badge-delivery'},
   at_service_center:    {label:'Di Service Center',       cls:'badge-tech'},
   sc_pickup_assigned:   {label:'Ambil dari SC',           cls:'badge-delivery'},
+  sc_ekspedisi_waiting: {label:'📦 Tunggu Ekspedisi SC',   cls:'badge-amber'},
   back_from_sc:         {label:'↩ Kembali dari SC',        cls:'badge-amber'},
   post_sc_checking:     {label:'🔬 Cek Teknisi (post-SC)', cls:'badge-tech'},
   sc_batal:             {label:'❌ Batal di SC',            cls:'badge-cancelled'},
@@ -14051,7 +14054,7 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
 
   // Batal confirm handler — used from multiple statuses
   const doBatalServis = () => {
-    const isAtSC = ['to_service_center','at_service_center','sc_pickup_assigned'].includes(si.status);
+    const isAtSC = ['to_service_center','at_service_center','sc_pickup_assigned','sc_ekspedisi_waiting'].includes(si.status);
     onUpdate(si.id, {
       status: isAtSC ? 'sc_batal' : 'batal_servis',
       cancel_reason: batalReason.trim()||'Tidak jadi diperbaiki',
@@ -14358,6 +14361,10 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
                 {n}
               </button>
             ))}
+            <button className="btn-secondary btn-sm" style={{background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.4)',color:'var(--amber)'}}
+              onClick={()=>{ if(window.confirm('SC akan kirim sendiri via ekspedisi/kurir mereka. Kamu akan konfirmasi ketika barang tiba di Ops. Lanjut?')) onUpdate(si.id,{status:'sc_ekspedisi_waiting',sc_ekspedisi:true,sc_pickup_courier:'Ekspedisi SC'}); }}>
+              📦 Ekspedisi (SC kirim sendiri)
+            </button>
           </div>
           <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid var(--border)'}}>
             {!showBatal
@@ -14381,6 +14388,27 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
         </div>
       )}
 
+      {/* Ekspedisi SC — menunggu barang dikirim SC ke Ops */}
+      {si.status==='sc_ekspedisi_waiting' && (
+        <div style={{paddingTop:10,borderTop:'1px solid var(--border)'}}>
+          <div style={{padding:'10px 12px',background:'rgba(245,158,11,0.07)',border:'1px solid rgba(245,158,11,0.3)',borderRadius:8,marginBottom:10}}>
+            <div style={{fontSize:12,fontWeight:700,color:'var(--amber)',marginBottom:3}}>📦 Tunggu Ekspedisi SC</div>
+            <div style={{fontSize:12,color:'var(--text2)'}}>SC: <b>{si.service_center_name}</b></div>
+            <div style={{fontSize:11,color:'var(--text3)',marginTop:3}}>SC mengirim barang via ekspedisi/kurir mereka sendiri. Konfirmasi ketika barang tiba di Ops.</div>
+          </div>
+          <button className="btn-primary btn-sm"
+            onClick={()=>{ if(window.confirm('Konfirmasi barang sudah tiba di Ops dari ekspedisi SC?')) onUpdate(si.id,{status:'back_from_sc',sc_picked_up_at:new Date().toISOString()}); }}>
+            ✅ Sudah Tiba di Ops
+          </button>
+          <div style={{marginTop:8}}>
+            <button className="btn-secondary btn-sm" style={{color:'var(--text3)',fontSize:11}}
+              onClick={()=>{ if(window.confirm('Batalkan opsi Ekspedisi dan kembali ke pilihan kurir?')) onUpdate(si.id,{status: si.sc_cancelled?'sc_batal':'at_service_center',sc_ekspedisi:false,sc_pickup_courier:null}); }}>
+              ✕ Batalkan Ekspedisi
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* SC dibatalkan — assign kurir ambil balik dari SC */}
       {si.status==='sc_batal' && (
         <div style={{paddingTop:10,borderTop:'1px solid var(--border)'}}>
@@ -14397,6 +14425,10 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
                 {n}
               </button>
             ))}
+            <button className="btn-secondary btn-sm" style={{background:'rgba(245,158,11,0.1)',border:'1px solid rgba(245,158,11,0.4)',color:'var(--amber)'}}
+              onClick={()=>{ if(window.confirm('SC akan kirim sendiri via ekspedisi/kurir mereka. Kamu konfirmasi ketika barang tiba di Ops. Lanjut?')) onUpdate(si.id,{status:'sc_ekspedisi_waiting',sc_ekspedisi:true,sc_pickup_courier:'Ekspedisi SC',sc_cancelled:true}); }}>
+              📦 Ekspedisi (SC kirim sendiri)
+            </button>
           </div>
         </div>
       )}
@@ -14663,7 +14695,7 @@ function OpsServiceMonitor({intakes, onUpdate, orders}) {
   const [tab, setTab] = React.useState('list'); // 'list' | 'sn'
   const filtered = filter==='all' ? intakes : intakes.filter(si=>si.status===filter);
   const installOrders = (orders||[]).filter(o=>o.tech_name||['tech','tech_done','on_delivery','delivered'].includes(o.status));
-  const needAction = intakes.filter(si=>['received','at_service_center','back_from_sc','sc_batal','batal_servis'].includes(si.status)).length;
+  const needAction = intakes.filter(si=>['received','at_service_center','back_from_sc','sc_batal','batal_servis','sc_ekspedisi_waiting'].includes(si.status)).length;
 
   return (
     <div style={{maxWidth:900}}>
@@ -14683,15 +14715,15 @@ function OpsServiceMonitor({intakes, onUpdate, orders}) {
       ) : (
         <>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:8,marginBottom:18}}>
-            {['received','to_technician','back_from_sc','post_sc_checking','at_service_center','sc_batal','done'].map(s=>(
-              <div key={s} className="stat-card" style={{padding:'10px 12px',borderLeft:['back_from_sc','sc_batal'].includes(s)&&intakes.filter(si=>si.status===s).length>0?'3px solid var(--amber)':'none'}}>
+            {['received','to_technician','back_from_sc','post_sc_checking','at_service_center','sc_ekspedisi_waiting','sc_batal','done'].map(s=>(
+              <div key={s} className="stat-card" style={{padding:'10px 12px',borderLeft:['back_from_sc','sc_batal','sc_ekspedisi_waiting'].includes(s)&&intakes.filter(si=>si.status===s).length>0?'3px solid var(--amber)':'none'}}>
                 <div style={{fontSize:10,color:'var(--text2)',marginBottom:4}}>{STATUS_SI[s]?.label}</div>
-                <div className="stat-num" style={{fontSize:20,color:['back_from_sc','sc_batal'].includes(s)&&intakes.filter(si=>si.status===s).length>0?'var(--amber)':'inherit'}}>{intakes.filter(si=>si.status===s).length}</div>
+                <div className="stat-num" style={{fontSize:20,color:['back_from_sc','sc_batal','sc_ekspedisi_waiting'].includes(s)&&intakes.filter(si=>si.status===s).length>0?'var(--amber)':'inherit'}}>{intakes.filter(si=>si.status===s).length}</div>
               </div>
             ))}
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>
-            {['all','received','to_technician','back_from_sc','post_sc_checking','to_service_center','at_service_center','sc_pickup_assigned','sc_batal','batal_servis','batal_dikembalikan','done','returned'].map(s=>(
+            {['all','received','to_technician','back_from_sc','post_sc_checking','to_service_center','at_service_center','sc_pickup_assigned','sc_ekspedisi_waiting','sc_batal','batal_servis','batal_dikembalikan','done','returned'].map(s=>(
               <button key={s} className={filter===s?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilter(s)}>
                 {s==='all'?'Semua':STATUS_SI[s]?.label||s}
               </button>
