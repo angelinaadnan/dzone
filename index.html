@@ -4786,7 +4786,7 @@ function NewOrderForm({onSave, salesName, onToast}) {
           <div>
             <label>Metode Pengiriman</label>
             <select value={form.delivery_method} onChange={e=>set('delivery_method',e.target.value)}>
-              <option>Kirim Hari Ini Urgent</option><option>Kirim Hari Ini Tidak Urgent</option><option>Kirim Besok Tidak Urgent</option><option>Di Pickup Sendiri</option>
+              <option>Kirim Hari Ini Urgent</option><option>Kirim Hari Ini Tidak Urgent</option><option>Kirim Besok Tidak Urgent</option><option>Di Pickup Sendiri</option><option>Titip Mobil PIK</option>
             </select>
           </div>
           <div>
@@ -5541,6 +5541,7 @@ function ConvertToOrderModal({q, salesName, converting, onConfirm, onClose}) {
                 <option>Kirim Hari Ini Tidak Urgent</option>
                 <option>Kirim Besok Tidak Urgent</option>
                 <option>Di Pickup Sendiri</option>
+                <option>Titip Mobil PIK</option>
               </select>
             </div>
           </div>
@@ -11822,7 +11823,7 @@ function BranchTitipKirimForm({onSave, onCancel, branchName, onToast}) {
           <div>
             <label>Metode Pengiriman</label>
             <select value={form.delivery_method} onChange={e=>set('delivery_method',e.target.value)}>
-              <option>Kirim Hari Ini Urgent</option><option>Kirim Hari Ini Tidak Urgent</option><option>Kirim Besok Tidak Urgent</option><option>Di Pickup Sendiri</option>
+              <option>Kirim Hari Ini Urgent</option><option>Kirim Hari Ini Tidak Urgent</option><option>Kirim Besok Tidak Urgent</option><option>Di Pickup Sendiri</option><option>Titip Mobil PIK</option>
             </select>
           </div>
           <div>
