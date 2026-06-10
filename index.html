@@ -437,7 +437,7 @@ function App() {
       loadOrders();
       if (isAdmin || isTech || isSales || isCabang || isCourier) loadServiceIntakes();
       if (isAdmin || isCourier) loadCourierTasks();
-      if (isAdmin || isCabang || isCourier) loadBranchRequests();
+      if (isAdmin || isCabang || isCourier || isTech) loadBranchRequests();
       if (isAdmin || isSales || isPembelian || isOnline || isCourier) loadPurchaseOrders();
       if (isAdmin || isCourier) loadCourierCheckins();
       if (isAdmin || isSales) loadQuotations();
@@ -467,7 +467,7 @@ function App() {
     if (isAdmin || isCourier) {
       ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'courier_tasks'}, ()=>debounceReload('tasks', loadCourierTasks));
     }
-    if (isAdmin || isCabang || isCourier) {
+    if (isAdmin || isCabang || isCourier || isTech) {
       ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'branch_requests'}, ()=>debounceReload('branch', loadBranchRequests));
     }
     if (isAdmin || isSales || isPembelian || isOnline || isCourier) {
@@ -1244,7 +1244,7 @@ function App() {
         {role==='admin' && page==='orders' && <AdminOrders orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} currentUser={userName}/>}
         {role==='admin' && page==='invoicing' && <AdminInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
         {role==='ops' && page==='dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} onUpdateSI={updateServiceIntake} onUpdateTask={updateCourierTask} userRole="ops" userName={userName}/>}
-        {role==='ops' && page==='queue' && <OpsQueue orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
+        {role==='ops' && page==='queue' && <OpsQueue orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} currentUser={userName}/>}
         {role==='ops' && page==='op_orders' && <SupervisorOrders orders={orders} onSelect={setSelectedOrder} onUpdate={updateOrder} currentUser={userName} allowRevisi={false} hideNew={true}/>}
         {role==='ops' && page==='op_tasks' && <OpsTaskManager tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} opsName={userName} onSaveServiceIntake={saveServiceIntake} allIntakes={serviceIntakes}/>}
         {role==='ops' && page==='op_branch' && <OpsBranchManager requests={branchRequests} onUpdate={updateBranchRequest}/>}
@@ -1260,7 +1260,7 @@ function App() {
         {role==='courier' && page==='courier_job_tasks' && <CourierJobTasks tasks={courierTasks} onUpdate={updateCourierTask} onSaveServiceIntake={saveServiceIntake} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} branchRequests={branchRequests} onUpdateBranch={updateBranchRequest} purchaseOrders={purchaseOrders} onUpdatePO={updatePurchaseOrder} orders={orders} onUpdateOrder={updateOrder} courierName={userName} checkins={courierCheckins} onCheckin={saveCheckin} onSelectOrder={setSelectedOrder} onQueuePhoto={enqueuePendingPhoto} pendingCount={pendingPhotos.length} pendingCheckins={pendingCheckins} onRefresh={loadCourierTasks}/>}
 
         {role==='courier' && page==='summary' && <CourierSummary orders={orders} courierTasks={courierTasks} courierName={userName} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes}/>}
-        {role==='technician' && page==='my_jobs' && <TechnicianJobs orders={orders} onUpdate={updateOrder} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} techName={userName} onSelect={setSelectedOrder}/>}
+        {role==='technician' && page==='my_jobs' && <TechnicianJobs orders={orders} onUpdate={updateOrder} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} techName={userName} onSelect={setSelectedOrder} branchRequests={branchRequests} onUpdateBranch={updateBranchRequest}/>}
         {role==='technician' && page==='summary' && <TechnicianSummary orders={orders} serviceIntakes={serviceIntakes} techName={userName} onUpdate={updateOrder} onUpdateSI={updateServiceIntake}/>}
         {role==='sales' && page==='new_service' && <ServiceIntakeEntry onSave={saveServiceIntake} createdByRole="sales" createdBy={userName} onDone={()=>setPage('my_orders')} allIntakes={serviceIntakes}/>}
         {role==='sales' && page==='minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} onDelete={deleteCourierTask} createdBy={userName} createdByRole="sales"/>}
@@ -5530,6 +5530,9 @@ function ConvertToOrderModal({q, salesName, converting, onConfirm, onClose}) {
     po_number: '',
     po_file: null,
     info_tambahan: `[Dari Penawaran: ${q.quotation_number}]${q.notes?' — '+q.notes:''}`,
+    has_upgrade: false,
+    has_downgrade: false,
+    has_swap: false,
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const inp = {padding:'8px 10px',background:'var(--bg3)',border:'1px solid var(--border2)',borderRadius:7,color:'var(--text)',fontSize:13,width:'100%',boxSizing:'border-box'};
@@ -5646,6 +5649,28 @@ function ConvertToOrderModal({q, salesName, converting, onConfirm, onClose}) {
             )}
           </div>
 
+          {/* Perubahan Barang */}
+          <div style={{background:'var(--bg3)',borderRadius:8,padding:'12px',marginBottom:14}}>
+            <div style={{fontWeight:600,fontSize:12,color:'var(--text2)',marginBottom:8}}>🔄 Ada Perubahan Barang?</div>
+            <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
+              <label style={{display:'flex',alignItems:'center',gap:7,fontSize:13,cursor:'pointer'}}>
+                <input type="checkbox" checked={form.has_upgrade} onChange={e=>set('has_upgrade',e.target.checked)}/>
+                ⬆️ Ada Upgrade
+              </label>
+              <label style={{display:'flex',alignItems:'center',gap:7,fontSize:13,cursor:'pointer'}}>
+                <input type="checkbox" checked={form.has_downgrade} onChange={e=>set('has_downgrade',e.target.checked)}/>
+                ⬇️ Ada Downgrade
+              </label>
+              <label style={{display:'flex',alignItems:'center',gap:7,fontSize:13,cursor:'pointer'}}>
+                <input type="checkbox" checked={form.has_swap} onChange={e=>set('has_swap',e.target.checked)}/>
+                🔁 Ada Swap/Tukar
+              </label>
+            </div>
+            {(form.has_upgrade||form.has_downgrade||form.has_swap) && (
+              <div style={{marginTop:8,fontSize:11,color:'var(--amber)'}}>⚠ Teknisi akan diberitahu ada perubahan komponen</div>
+            )}
+          </div>
+
           {/* Info Tambahan */}
           <div style={{marginBottom:16}}>
             <label style={{display:'block',marginBottom:4,fontSize:12,fontWeight:600,color:'var(--text2)'}}>📝 Info Tambahan untuk Admin/Ops</label>
@@ -5709,6 +5734,10 @@ function QuotationPage({quotations, onSave, onUpdate, onSaveOrder, salesName, on
       po_file: orderForm.po_file==='__loading__' ? null : (orderForm.po_file||null),
       npwp: orderForm.npwp||'',
       npwp_file: orderForm.npwp_file==='__loading__' ? null : (orderForm.npwp_file||null),
+      has_upgrade: orderForm.has_upgrade||false,
+      has_downgrade: orderForm.has_downgrade||false,
+      has_swap: orderForm.has_swap||false,
+      has_component_change: !!(orderForm.has_upgrade||orderForm.has_downgrade||orderForm.has_swap),
       status:'new',
       status_history:[{status:'new',time:new Date().toISOString(),note:`Converted dari ${freshQ.quotation_number}`,by:salesName}],
       tracking:[], assigned_to:null, courier_name:null,
@@ -6813,7 +6842,7 @@ function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
 }
 
 // ─── OPS QUEUE ─────────────────────────────────────────────────────
-function OpsQueue({orders, onUpdate, onSelect}) {
+function OpsQueue({orders, onUpdate, onSelect, currentUser}) {
   const ready = orders.filter(o=>o.status==='invoiced');
   const [techOpen, setTechOpen] = React.useState({}); // {id: bool}
   const [techPick, setTechPick] = React.useState({}); // {id: name}
@@ -6826,12 +6855,43 @@ function OpsQueue({orders, onUpdate, onSelect}) {
         <div key={o.id} className="card" style={{marginBottom:12}}>
           <div style={{display:'flex',alignItems:'flex-start',gap:14,flexWrap:'wrap'}}>
             <div style={{flex:1}}>
-              <div style={{fontWeight:600,fontSize:15}}>{o.customer_name}</div>
+              <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                <div style={{fontWeight:600,fontSize:15}}>{o.customer_name}</div>
+                {o.has_upgrade && <span style={{fontSize:10,padding:'2px 7px',borderRadius:10,background:'rgba(20,184,166,0.15)',color:'var(--teal)',fontWeight:700}}>⬆️ Upgrade</span>}
+                {o.has_downgrade && <span style={{fontSize:10,padding:'2px 7px',borderRadius:10,background:'rgba(239,68,68,0.12)',color:'var(--red)',fontWeight:700}}>⬇️ Downgrade</span>}
+                {o.has_swap && <span style={{fontSize:10,padding:'2px 7px',borderRadius:10,background:'rgba(139,92,246,0.15)',color:'#a78bfa',fontWeight:700}}>🔁 Swap</span>}
+              </div>
               <div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>{o.customer_address}</div>
               <div style={{marginTop:8}}>
                 {o.goods?.map((g,i)=><div key={i} style={{fontSize:13,color:'var(--text)'}}>• {g.qty}x {g.name} — {g.desc}</div>)}
               </div>
               {o.info_tambahan && <div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {o.info_tambahan}</div>}
+              {/* Revision indicator */}
+              {(()=>{
+                const pendingOpsIdx = (o.revisions||[]).findIndex(r=>r.status==='pending_ops');
+                const pendingOps = pendingOpsIdx>=0 ? o.revisions[pendingOpsIdx] : null;
+                if(!pendingOps) return null;
+                return (
+                  <div style={{marginTop:8,padding:'8px 10px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:8,fontSize:11}}>
+                    <div style={{color:'var(--amber)',fontWeight:600,marginBottom:4}}>✏️ Revisi menunggu persetujuan Ops · "{pendingOps.alasan}"</div>
+                    <div style={{color:'var(--text2)',marginBottom:6}}>Sebelum: {fmtCurrency(pendingOps.total_before||0)} → Setelah: <b style={{color:'var(--accent2)'}}>{fmtCurrency(pendingOps.total_after||0)}</b></div>
+                    <div style={{display:'flex',gap:8}}>
+                      <button className="btn-sm" style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:6,padding:'5px 12px',fontWeight:700,cursor:'pointer',fontSize:11}}
+                        onClick={e=>{e.stopPropagation();
+                          if(!window.confirm(`Setujui revisi "${pendingOps.alasan}" dari ${pendingOps.by}?`)) return;
+                          const updRev=(o.revisions||[]).map((r,i)=>i===pendingOpsIdx?{...r,status:'pending_admin',read_by_ops:true,ops_by:currentUser||'ops',ops_at:new Date().toISOString()}:r);
+                          onUpdate(o.id,{revisions:updRev});
+                        }}>✅ Setujui</button>
+                      <button className="btn-sm" style={{background:'transparent',color:'var(--red)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:6,padding:'5px 12px',cursor:'pointer',fontSize:11}}
+                        onClick={e=>{e.stopPropagation();
+                          const note=window.prompt('Alasan tolak:',''); if(note===null) return;
+                          const updRev=(o.revisions||[]).map((r,i)=>i===pendingOpsIdx?{...r,status:'ops_rejected',ops_by:currentUser||'ops',ops_at:new Date().toISOString(),ops_note:note}:r);
+                          onUpdate(o.id,{revisions:updRev});
+                        }}>❌ Tolak</button>
+                    </div>
+                  </div>
+                );
+              })()}
               {/* Inline teknisi picker */}
               {techOpen[o.id] && (
                 <div style={{marginTop:12,padding:'10px 12px',background:'rgba(20,184,166,0.07)',border:'1px solid rgba(20,184,166,0.3)',borderRadius:8}}>
@@ -7917,9 +7977,14 @@ function ComponentsForm({value, onChange}) {
   );
 }
 
-function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName, onSelect}) {
+function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName, onSelect, branchRequests, onUpdateBranch}) {
   // Tampilkan semua order yang di-assign ke teknisi ini dan belum selesai/dikirim
   const myJobs = orders.filter(o=>o.tech_name===techName && !['tech_done','on_delivery','delivered','cancelled','ao_serah'].includes(o.status));
+  // Tugas dari cabang — tech entries di branch_requests
+  const branchTechJobs = (branchRequests||[]).flatMap(r=>{
+    const techEntries = (r.trips||[]).filter(t=>t.type==='tech'&&t.tech_name===techName&&t.status!=='done');
+    return techEntries.map(t=>({...t, _req: r}));
+  });
   // Servisan yang di-assign ke teknisi ini
   const myServiceJobs = (serviceIntakes||[]).filter(si=>si.tech_assigned===techName && ['to_technician','post_sc_checking'].includes(si.status));
   const [photoData, setPhotoData]     = useState({}); // instalasi/upgrade photos
@@ -7980,11 +8045,43 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
         <div className="section-title" style={{margin:0}}>🔧 Pekerjaan Saya</div>
         <div style={{fontSize:12,color:'var(--text3)'}}>
-          {myJobs.length+myServiceJobs.length === 0
+          {myJobs.length+myServiceJobs.length+branchTechJobs.length === 0
             ? <span style={{color:'var(--green)'}}>✅ Tidak ada pekerjaan aktif</span>
-            : <span style={{color:'var(--amber)'}}>⏳ {myJobs.length+myServiceJobs.length} pekerjaan aktif</span>}
+            : <span style={{color:'var(--amber)'}}>⏳ {myJobs.length+myServiceJobs.length+branchTechJobs.length} pekerjaan aktif</span>}
         </div>
       </div>
+
+      {/* ── Tugas dari Cabang ── */}
+      {branchTechJobs.length>0 && (
+        <div style={{marginBottom:20}}>
+          <div style={{fontWeight:600,fontSize:13,color:'var(--teal)',marginBottom:10}}>🏢 Tugas dari Cabang ({branchTechJobs.length})</div>
+          {branchTechJobs.map(t=>{
+            const r = t._req;
+            const items = (r.items||[]).map(i=>i.name||i).filter(Boolean);
+            return (
+              <div key={t.id} className="card" style={{marginBottom:12,borderLeft:'3px solid var(--teal)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:600,fontSize:14}}>🏢 {r.branch_name||r.created_by||'Cabang'}</div>
+                    {items.length>0 && <div style={{fontSize:13,color:'var(--text)',marginTop:4}}>{items.map((name,i)=><div key={i}>• {name}</div>)}</div>}
+                    {t.note && <div style={{marginTop:6,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>📝 {t.note}</div>}
+                    <div style={{fontSize:11,color:'var(--text3)',marginTop:6}}>Diterima: {fmtDateTime(t.assigned_at)}</div>
+                  </div>
+                  <div>
+                    <span className="badge badge-tech" style={{marginBottom:8,display:'block',textAlign:'center'}}>Cabang</span>
+                    <button className="btn-sm" style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:6,padding:'7px 14px',fontWeight:700,cursor:'pointer',fontSize:12,whiteSpace:'nowrap'}}
+                      onClick={()=>{
+                        if(!window.confirm('Tandai tugas ini selesai?')) return;
+                        const updatedTrips = (r.trips||[]).map(e=>e.id===t.id?{...e,status:'done',done_at:new Date().toISOString()}:e);
+                        onUpdateBranch && onUpdateBranch(r.id, {trips: updatedTrips});
+                      }}>✅ Selesai</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── Servisan ── */}
       {myServiceJobs.length>0 && (
@@ -15275,6 +15372,23 @@ function OrderDetailModal({order, onClose, onUpdate, onLoadFiles, role, courierN
 
           <hr className="divider"/>
           <div style={{fontWeight:600,marginBottom:10}}>Barang</div>
+          {(()=>{
+            const rev = (order.revisions||[]).find(r=>r.status==='pending_ops'||r.status==='pending_admin');
+            if(!rev) return null;
+            return (
+              <div style={{marginBottom:12,padding:'10px 14px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:10,fontSize:12}}>
+                <div style={{fontWeight:700,color:'var(--amber)',marginBottom:6}}>
+                  ✏️ {rev.status==='pending_ops'?'Revisi menunggu persetujuan Ops':'Revisi disetujui Ops, menunggu Admin update invoice'} · "{rev.alasan}"
+                </div>
+                <div style={{color:'var(--text2)',marginBottom:4}}>Barang setelah revisi:</div>
+                {(rev.goods_after||[]).map((g,i)=>{
+                  const lineTotal = (Number(g.price)||0)*(Number(g.qty)||1)-(Number(g.discount)||0);
+                  return <div key={i} style={{color:'var(--text)',padding:'2px 0'}}><b>{g.qty}×</b> {g.name} — <span style={{fontFamily:'DM Mono',color:'var(--accent2)'}}>{fmtCurrency(lineTotal)}</span></div>;
+                })}
+                <div style={{marginTop:6,fontFamily:'Syne',fontWeight:700,color:'var(--accent2)'}}>Total baru: {fmtCurrency(rev.total_after)}</div>
+              </div>
+            );
+          })()}
           {(order.goods||[]).map((g,i)=>{
             const lineDisc = Number(g.discount)||0;
             const lineTotal = (Number(g.price)||0)*(Number(g.qty)||1) - lineDisc;
