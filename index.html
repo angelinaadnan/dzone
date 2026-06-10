@@ -5527,9 +5527,7 @@ function ConvertToOrderModal({q, salesName, converting, onConfirm, onClose}) {
     po_number: '',
     po_file: null,
     info_tambahan: `[Dari Penawaran: ${q.quotation_number}]${q.notes?' — '+q.notes:''}`,
-    has_upgrade: false,
-    has_downgrade: false,
-    has_swap: false,
+    has_component_change: false,
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const inp = {padding:'8px 10px',background:'var(--bg3)',border:'1px solid var(--border2)',borderRadius:7,color:'var(--text)',fontSize:13,width:'100%',boxSizing:'border-box'};
@@ -5646,26 +5644,16 @@ function ConvertToOrderModal({q, salesName, converting, onConfirm, onClose}) {
             )}
           </div>
 
-          {/* Perubahan Barang */}
+          {/* Perubahan Komponen */}
           <div style={{background:'var(--bg3)',borderRadius:8,padding:'12px',marginBottom:14}}>
-            <div style={{fontWeight:600,fontSize:12,color:'var(--text2)',marginBottom:8}}>🔄 Ada Perubahan Barang?</div>
-            <div style={{display:'flex',gap:20,flexWrap:'wrap'}}>
-              <label style={{display:'flex',alignItems:'center',gap:7,fontSize:13,cursor:'pointer'}}>
-                <input type="checkbox" checked={form.has_upgrade} onChange={e=>set('has_upgrade',e.target.checked)}/>
-                ⬆️ Ada Upgrade
-              </label>
-              <label style={{display:'flex',alignItems:'center',gap:7,fontSize:13,cursor:'pointer'}}>
-                <input type="checkbox" checked={form.has_downgrade} onChange={e=>set('has_downgrade',e.target.checked)}/>
-                ⬇️ Ada Downgrade
-              </label>
-              <label style={{display:'flex',alignItems:'center',gap:7,fontSize:13,cursor:'pointer'}}>
-                <input type="checkbox" checked={form.has_swap} onChange={e=>set('has_swap',e.target.checked)}/>
-                🔁 Ada Swap/Tukar
-              </label>
-            </div>
-            {(form.has_upgrade||form.has_downgrade||form.has_swap) && (
-              <div style={{marginTop:8,fontSize:11,color:'var(--amber)'}}>⚠ Teknisi akan diberitahu ada perubahan komponen</div>
-            )}
+            <div style={{fontWeight:600,fontSize:11,color:'var(--text3)',marginBottom:8,textTransform:'uppercase',letterSpacing:'0.05em'}}>🔧 Perubahan Komponen</div>
+            <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
+              <input type="checkbox" checked={!!form.has_component_change} onChange={e=>set('has_component_change',e.target.checked)} style={{width:16,height:16,accentColor:'var(--accent2)',cursor:'pointer'}}/>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:form.has_component_change?'var(--accent2)':'var(--text2)'}}>Ada upgrade / downgrade / swap komponen?</div>
+                {form.has_component_change && <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>Detail item akan diisi oleh Ops saat assign ke teknisi</div>}
+              </div>
+            </label>
           </div>
 
           {/* Info Tambahan */}
@@ -5720,12 +5708,7 @@ function QuotationPage({quotations, onSave, onUpdate, onSaveOrder, salesName, on
       customer_phone: freshQ.customer_phone||'',
       customer_address: freshQ.customer_address||'',
       goods: freshQ.goods,
-      info_tambahan: [
-        orderForm.info_tambahan || `[Dari Penawaran: ${freshQ.quotation_number}]${freshQ.notes?' — '+freshQ.notes:''}`,
-        orderForm.has_upgrade?'⬆️ Upgrade komponen':'',
-        orderForm.has_downgrade?'⬇️ Downgrade komponen':'',
-        orderForm.has_swap?'🔁 Swap/tukar komponen':'',
-      ].filter(Boolean).join(' | '),
+      info_tambahan: orderForm.info_tambahan || `[Dari Penawaran: ${freshQ.quotation_number}]${freshQ.notes?' — '+freshQ.notes:''}`,
       payment_status: orderForm.payment_status || 'Langsung Tagih',
       delivery_method: orderForm.delivery_method || 'Kirim Hari Ini Tidak Urgent',
       faktur_pajak: orderForm.faktur_pajak||false,
@@ -5736,7 +5719,7 @@ function QuotationPage({quotations, onSave, onUpdate, onSaveOrder, salesName, on
       po_file: orderForm.po_file==='__loading__' ? null : (orderForm.po_file||null),
       npwp: orderForm.npwp||'',
       npwp_file: orderForm.npwp_file==='__loading__' ? null : (orderForm.npwp_file||null),
-      has_component_change: !!(orderForm.has_upgrade||orderForm.has_downgrade||orderForm.has_swap),
+      has_component_change: !!(orderForm.has_component_change),
       status:'new',
       status_history:[{status:'new',time:new Date().toISOString(),note:`Converted dari ${freshQ.quotation_number}`,by:salesName}],
       tracking:[], assigned_to:null, courier_name:null,
