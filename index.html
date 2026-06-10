@@ -6632,7 +6632,11 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles, aoName})
     if(revIdx<0) return {};
     const rev = o.revisions[revIdx];
     const updRevs = (o.revisions||[]).map((r,i)=>i===revIdx?{...r,status:'applied',ops_by:aoName||'admin_online',ops_at:new Date().toISOString(),applied_at:new Date().toISOString()}:r);
-    return {goods:rev.goods_after, revisions:updRevs};
+    const updates = {goods:rev.goods_after, revisions:updRevs};
+    if(rev.info_after   !== undefined) updates.info_tambahan = rev.info_after;
+    if(rev.faktur_after !== undefined) updates.faktur_pajak  = rev.faktur_after;
+    if(rev.npwp_after   !== undefined) updates.npwp          = rev.npwp_after;
+    return updates;
   };
 
   const handleInvoiceRoute = async (o, route) => {
@@ -6736,7 +6740,12 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles, aoName})
                       : null}
                 </div>
               )}
-              {o.info_tambahan && <div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {o.info_tambahan}</div>}
+              {(()=>{
+                const revIdx2=(o.revisions||[]).findIndex(r=>r.status==='pending_ops'&&r.ao_can_approve);
+                const rev2=revIdx2>=0?o.revisions[revIdx2]:null;
+                const infoToShow = (rev2&&rev2.info_after!==undefined) ? rev2.info_after : o.info_tambahan;
+                return infoToShow ? <div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {infoToShow}</div> : null;
+              })()}
 
               {/* Invoice number + foto */}
               <div style={{marginTop:10,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
