@@ -6716,6 +6716,9 @@ function AdminOnlineOrders({orders, onSelect}) {
 // ─── OPS QUEUE ─────────────────────────────────────────────────────
 function OpsQueue({orders, onUpdate, onSelect}) {
   const ready = orders.filter(o=>o.status==='invoiced');
+  const [techOpen, setTechOpen] = React.useState({}); // {id: bool}
+  const [techPick, setTechPick] = React.useState({}); // {id: name}
+  const TECH_LIST = ['Deden','Komeng'];
   return (
     <div style={{maxWidth:900}}>
       <div className="section-title">📥 Invoiced — Siap Diproses</div>
@@ -6730,10 +6733,38 @@ function OpsQueue({orders, onUpdate, onSelect}) {
                 {o.goods?.map((g,i)=><div key={i} style={{fontSize:13,color:'var(--text)'}}>• {g.qty}x {g.name} — {g.desc}</div>)}
               </div>
               {o.info_tambahan && <div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {o.info_tambahan}</div>}
+              {/* Inline teknisi picker */}
+              {techOpen[o.id] && (
+                <div style={{marginTop:12,padding:'10px 12px',background:'rgba(20,184,166,0.07)',border:'1px solid rgba(20,184,166,0.3)',borderRadius:8}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'var(--teal)',marginBottom:8}}>🔧 Pilih Teknisi</div>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+                    {TECH_LIST.map(n=>(
+                      <button key={n} onClick={()=>setTechPick(p=>({...p,[o.id]:n}))}
+                        style={{padding:'6px 14px',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',
+                          background:techPick[o.id]===n?'var(--teal)':'var(--bg3)',
+                          border:`1px solid ${techPick[o.id]===n?'var(--teal)':'var(--border2)'}`,
+                          color:techPick[o.id]===n?'#fff':'var(--text2)'}}>🔧 {n}
+                      </button>
+                    ))}
+                  </div>
+                  {techPick[o.id] && (
+                    <button className="btn-sm" style={{background:'var(--teal)',color:'#fff',fontWeight:700,width:'100%',padding:'8px',borderRadius:8,border:'none',cursor:'pointer'}}
+                      onClick={()=>{
+                        if(!window.confirm(`Assign langsung ke Teknisi ${techPick[o.id]}?`)) return;
+                        onUpdate(o.id,{status:'tech',tech_name:techPick[o.id],assigned_to:'tech',status_note:`Langsung ke teknisi ${techPick[o.id]}`});
+                        setTechOpen(t=>({...t,[o.id]:false})); setTechPick(p=>({...p,[o.id]:null}));
+                      }}>✓ Assign ke {techPick[o.id]}</button>
+                  )}
+                </div>
+              )}
             </div>
             <div style={{display:'flex',gap:8,flexDirection:'column',alignItems:'flex-end'}}>
               <span className={`badge ${STATUS_COLORS[o.status]}`}>{STATUS_LABELS[o.status]}</span>
               <button className="btn-secondary btn-sm" onClick={()=>onSelect(o)}>Lihat Detail</button>
+              <button className="btn-secondary btn-sm" style={{color:'var(--teal)',fontSize:11}}
+                onClick={()=>setTechOpen(t=>({...t,[o.id]:!t[o.id]}))}>
+                {techOpen[o.id]?'▲ Tutup':'🔧 Ke Teknisi'}
+              </button>
               <button className="btn-amber btn-sm" onClick={()=>onUpdate(o.id,{status:'prep',status_note:'Barang sedang disiapkan di gudang'})}>▶ Mulai Prep</button>
             </div>
           </div>
