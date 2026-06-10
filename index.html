@@ -610,21 +610,28 @@ function App() {
     const since = new Date(); since.setMonth(since.getMonth() - monthsBack);
     // npwp_file & po_file di-exclude — di-load on-demand via loadOrderFiles (lazy)
     const orderColsBase = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status';
-    const orderColsNew = ',upgrade_items,downgrade_items,has_component_change';
-    const buildOrderQ = (cols) => {
+    const orderColsNew = ',upgrade_items,downgrade_items,has_component_change,extra_couriers';
+    const buildOrderQ = (cols, useExtraCourier=false) => {
       let q = db.from('orders').select(cols)
         .gte('created_at', since.toISOString())
         .order('created_at',{ascending:false})
         .limit(500);
       if (role==='technician') q = q.eq('tech_name', userName);
-      else if (role==='courier') q = q.eq('courier_name', userName);
+      else if (role==='courier') {
+        if (useExtraCourier) {
+          // Load orders where courier is primary OR in extra_couriers array
+          q = q.or(`courier_name.eq.${userName},extra_couriers.cs.["${userName}"]`);
+        } else {
+          q = q.eq('courier_name', userName);
+        }
+      }
       else if (role==='sales') q = q.eq('sales_name', userName);
       return q;
     };
-    let {data,error} = await buildOrderQ(orderColsBase+orderColsNew);
+    let {data,error} = await buildOrderQ(orderColsBase+orderColsNew, role==='courier');
     // Fallback: jika kolom baru belum ada di DB, retry tanpa kolom tsb
     if (error && (error.message||'').includes('does not exist')) {
-      const res2 = await buildOrderQ(orderColsBase);
+      const res2 = await buildOrderQ(orderColsBase, false);
       data = res2.data; error = res2.error;
     }
     if (error) {
@@ -6861,6 +6868,8 @@ function OpsAssign({orders, onUpdate}) {
   const [reassignPick, setReassignPick] = useState({}); // {id: name}
   const [cancelDelivery, setCancelDelivery] = useState({}); // {id: 'open'|null}
   const [selfPickupPhoto, setSelfPickupPhoto] = useState({}); // {id: base64}
+  const [addKurir, setAddKurir] = useState({}); // {id: 'open'|null}
+  const [addKurirPick, setAddKurirPick] = useState({}); // {id: name}
 
   const AssignCard = ({o, defaultType}) => {
     const d = assignData[o.id]||{};
@@ -7029,16 +7038,24 @@ function OpsAssign({orders, onUpdate}) {
                   <div>
                     <div style={{fontWeight:600,fontSize:14}}>{o.customer_name}</div>
                     <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{o.goods?.map(g=>`${g.qty}x ${g.name}`).join(', ')}</div>
-                    <div style={{fontSize:12,color:'var(--blue)',marginTop:3}}>🚚 Kurir: <b>{o.courier_name}</b></div>
+                    <div style={{fontSize:12,color:'var(--blue)',marginTop:3}}>🚚 Kurir: <b>{o.courier_name}</b>
+                      {(o.extra_couriers||[]).map(ec=>(
+                        <span key={ec} style={{marginLeft:6,padding:'1px 7px',borderRadius:10,background:'rgba(59,130,246,0.13)',color:'var(--blue)',fontSize:11,fontWeight:600}}>+{ec}</span>
+                      ))}
+                    </div>
                   </div>
                   <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
                     <span className="badge badge-delivery">{STATUS_LABELS.on_delivery}</span>
                     <button className="btn-secondary btn-sm" style={{fontSize:11,color:'var(--amber)'}}
-                      onClick={()=>{setReassign(r=>({...r,[o.id]:r[o.id]?null:'tech'}));setCancelDelivery(c=>({...c,[o.id]:null}));}}>
-                      {reassign[o.id]?'▲ Tutup':'⚙️ Ubah → Teknisi'}
+                      onClick={()=>{setReassign(r=>({...r,[o.id]:r[o.id]?null:'tech'}));setCancelDelivery(c=>({...c,[o.id]:null}));setAddKurir(a=>({...a,[o.id]:null}));}}>
+                      {reassign[o.id]==='tech'?'▲ Tutup':'⚙️ Ubah → Teknisi'}
+                    </button>
+                    <button className="btn-secondary btn-sm" style={{fontSize:11,color:'var(--green)'}}
+                      onClick={()=>{setAddKurir(a=>({...a,[o.id]:a[o.id]?null:'open'}));setReassign(r=>({...r,[o.id]:null}));setCancelDelivery(c=>({...c,[o.id]:null}));}}>
+                      {addKurir[o.id]?'▲ Tutup':'➕ Tambah Kurir'}
                     </button>
                     <button className="btn-secondary btn-sm" style={{fontSize:11,color:'var(--red)'}}
-                      onClick={()=>{setCancelDelivery(c=>({...c,[o.id]:c[o.id]?null:'open'}));setReassign(r=>({...r,[o.id]:null}));}}>
+                      onClick={()=>{setCancelDelivery(c=>({...c,[o.id]:c[o.id]?null:'open'}));setReassign(r=>({...r,[o.id]:null}));setAddKurir(a=>({...a,[o.id]:null}));}}>
                       {cancelDelivery[o.id]?'▲ Tutup':'❌ Batal Kirim'}
                     </button>
                   </div>
@@ -7089,6 +7106,31 @@ function OpsAssign({orders, onUpdate}) {
                         <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>Customer akan ambil langsung, status tetap On Delivery</div>
                       </button>
                     </div>
+                  </div>
+                )}
+                {addKurir[o.id]==='open' && (
+                  <div style={{marginTop:12,borderTop:'1px solid var(--border)',background:'rgba(34,197,94,0.05)',borderRadius:8,padding:12}}>
+                    <div style={{fontSize:12,color:'var(--green)',fontWeight:700,marginBottom:8}}>➕ Tambah Kurir Kedua</div>
+                    <div style={{fontSize:11,color:'var(--text2)',marginBottom:10}}>Kurir utama: <b>{o.courier_name}</b>{(o.extra_couriers||[]).length>0&&` · Sudah tambahan: ${(o.extra_couriers||[]).join(', ')}`}</div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>
+                      {KURIR_LIST.filter(n=>n!==o.courier_name && !(o.extra_couriers||[]).includes(n)).map(n=>(
+                        <button key={n} onClick={()=>setAddKurirPick(p=>({...p,[o.id]:n}))}
+                          style={{padding:'6px 14px',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',
+                            background:addKurirPick[o.id]===n?'var(--green)':'var(--bg3)',
+                            border:`1px solid ${addKurirPick[o.id]===n?'var(--green)':'var(--border2)'}`,
+                            color:addKurirPick[o.id]===n?'#fff':'var(--text2)'}}>🚚 {n}
+                        </button>
+                      ))}
+                    </div>
+                    {addKurirPick[o.id] && (
+                      <button className="btn-green" style={{width:'100%',padding:'9px',fontWeight:700}} onClick={()=>{
+                        const newKurir = addKurirPick[o.id];
+                        if(!window.confirm(`Tambahkan ${newKurir} sebagai kurir kedua untuk order ${o.customer_name}?`)) return;
+                        const newExtra = [...(o.extra_couriers||[]), newKurir];
+                        onUpdate(o.id,{extra_couriers: newExtra, status_note:`Kurir tambahan: ${newKurir}`});
+                        setAddKurir(a=>({...a,[o.id]:null})); setAddKurirPick(p=>({...p,[o.id]:null}));
+                      }}>✓ Tambahkan {addKurirPick[o.id]}</button>
+                    )}
                   </div>
                 )}
               </div>
@@ -10894,7 +10936,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
     setTimeout(()=>setRefreshing(false), 600);
   };
 
-  const myOrders = (orders||[]).filter(o=>o.courier_name===courierName && ['on_delivery','tech'].includes(o.status));
+  const myOrders = (orders||[]).filter(o=>(['on_delivery','tech'].includes(o.status)) && (o.courier_name===courierName || (o.extra_couriers||[]).includes(courierName)));
   const myTasks = tasks.filter(t=>t.assigned_courier===courierName);
   const activeTasks = myTasks.filter(t=>['assigned','on_the_way','arrived','returning'].includes(t.status));
   const doneTasks = myTasks.filter(t=>t.status==='done');
@@ -14939,7 +14981,12 @@ function OrderDetailModal({order, onClose, onUpdate, onLoadFiles, role, courierN
             <div><label>No. HP</label><div style={{fontSize:14}}>{order.customer_phone}</div></div>
             <div><label>Pembayaran</label><div style={{fontSize:14}}>{order.payment_status}</div></div>
             <div><label>Pengiriman</label><div style={{fontSize:14}}>{order.delivery_method}</div></div>
-            <div><label>Kurir</label><div style={{fontSize:14}}>{order.courier_name||'—'}</div></div>
+            <div><label>Kurir</label><div style={{fontSize:14,display:'flex',flexWrap:'wrap',gap:6,alignItems:'center'}}>
+              {order.courier_name||'—'}
+              {(order.extra_couriers||[]).map(ec=>(
+                <span key={ec} style={{padding:'1px 8px',borderRadius:10,background:'rgba(59,130,246,0.13)',color:'var(--blue)',fontSize:12,fontWeight:600}}>+{ec}</span>
+              ))}
+            </div></div>
             <div>
               <label>No. Invoice</label>
               {!editingInvoice ? (
