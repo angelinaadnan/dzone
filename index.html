@@ -1261,7 +1261,7 @@ function App() {
 
         {role==='courier' && page==='summary' && <CourierSummary orders={orders} courierTasks={courierTasks} courierName={userName} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes}/>}
         {role==='technician' && page==='my_jobs' && <TechnicianJobs orders={orders} onUpdate={updateOrder} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} techName={userName} onSelect={setSelectedOrder} branchRequests={branchRequests} onUpdateBranch={updateBranchRequest}/>}
-        {role==='technician' && page==='summary' && <TechnicianSummary orders={orders} serviceIntakes={serviceIntakes} techName={userName} onUpdate={updateOrder} onUpdateSI={updateServiceIntake}/>}
+        {role==='technician' && page==='summary' && <TechnicianSummary orders={orders} serviceIntakes={serviceIntakes} techName={userName} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} branchRequests={branchRequests}/>}
         {role==='sales' && page==='new_service' && <ServiceIntakeEntry onSave={saveServiceIntake} createdByRole="sales" createdBy={userName} onDone={()=>setPage('my_orders')} allIntakes={serviceIntakes}/>}
         {role==='sales' && page==='minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} onDelete={deleteCourierTask} createdBy={userName} createdByRole="sales"/>}
         {role==='ops' && page==='new_service_ops' && <ServiceIntakeEntry onSave={saveServiceIntake} createdByRole="ops" createdBy={userName} onDone={()=>setPage('service_monitor')} allIntakes={serviceIntakes}/>}
@@ -8323,7 +8323,7 @@ function SIHistoryRow({si, isDone, techName, onUpdateSI}) {
   );
 }
 
-function TechnicianSummary({orders, serviceIntakes, techName, onUpdate, onUpdateSI}) {
+function TechnicianSummary({orders, serviceIntakes, techName, onUpdate, onUpdateSI, branchRequests}) {
   // Instalasi / upgrade jobs
   const myJobs = orders.filter(o=>o.tech_name===techName);
   const jobsDone = myJobs.filter(o=>['tech_done','on_delivery','delivered'].includes(o.status));
@@ -8333,6 +8333,11 @@ function TechnicianSummary({orders, serviceIntakes, techName, onUpdate, onUpdate
   const mySI = (serviceIntakes||[]).filter(si=>si.tech_assigned===techName);
   const siActive = mySI.filter(si=>['to_technician','post_sc_checking'].includes(si.status));
   const siDone = mySI.filter(si=>si.status==='done' || si.status==='returned');
+
+  // Tugas dari cabang
+  const branchTechAll  = (branchRequests||[]).flatMap(r=>(r.trips||[]).filter(t=>t.type==='tech'&&t.tech_name===techName).map(t=>({...t,_req:r})));
+  const branchTechDone = branchTechAll.filter(t=>t.status==='done');
+  const branchTechActive = branchTechAll.filter(t=>t.status!=='done');
 
   const [editingId, setEditingId] = React.useState(null);
   const [editComp, setEditComp] = React.useState(null);
@@ -8349,9 +8354,9 @@ function TechnicianSummary({orders, serviceIntakes, techName, onUpdate, onUpdate
     cancelEdit();
   };
 
-  const totalActive = jobsActive.length + siActive.length;
-  const totalDone = jobsDone.length + siDone.length;
-  const totalAll = myJobs.length + mySI.length;
+  const totalActive = jobsActive.length + siActive.length + branchTechActive.length;
+  const totalDone = jobsDone.length + siDone.length + branchTechDone.length;
+  const totalAll = myJobs.length + mySI.length + branchTechAll.length;
 
   return (
     <div style={{maxWidth:700}}>
@@ -8422,6 +8427,35 @@ function TechnicianSummary({orders, serviceIntakes, techName, onUpdate, onUpdate
         </div>
       )}
 
+
+      {/* Tugas dari Cabang */}
+      {branchTechAll.length>0 && (
+        <div className="card" style={{marginBottom:14}}>
+          <div style={{fontWeight:600,marginBottom:14}}>🏢 Riwayat Tugas Cabang ({branchTechAll.length})</div>
+          {branchTechAll.map((t,i)=>{
+            const r = t._req;
+            const items = (r.items||[]).map(it=>it.name||it).filter(Boolean);
+            return (
+              <div key={t.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                <div style={{display:'flex',gap:12,alignItems:'center'}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:500,fontSize:13}}>🏢 {r.branch_name||r.created_by||'Cabang'}</div>
+                    {items.length>0 && <div style={{fontSize:11,color:'var(--text2)',marginTop:2}}>{items.join(', ')}</div>}
+                    {t.note && <div style={{fontSize:11,color:'var(--amber)',marginTop:2}}>📝 {t.note}</div>}
+                    <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>
+                      {t.assigned_at && `Diterima: ${fmtDateTime(t.assigned_at)}`}
+                      {t.done_at && ` · ✅ Selesai: ${fmtDateTime(t.done_at)}`}
+                    </div>
+                  </div>
+                  <span className={`badge ${t.status==='done'?'badge-delivered':'badge-tech'}`}>
+                    {t.status==='done'?'Selesai':'Aktif'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {totalAll===0 && <div className="empty-state"><div className="icon">📊</div><div>Belum ada riwayat pekerjaan</div></div>}
     </div>
