@@ -437,7 +437,7 @@ function App() {
       loadOrders();
       if (isAdmin || isTech || isSales || isCabang || isCourier) loadServiceIntakes();
       if (isAdmin || isCourier) loadCourierTasks();
-      if (isAdmin || isCabang || isCourier) loadBranchRequests();
+      if (isAdmin || isCabang || isCourier || isTech) loadBranchRequests();
       if (isAdmin || isSales || isPembelian || isOnline || isCourier) loadPurchaseOrders();
       if (isAdmin || isCourier) loadCourierCheckins();
       if (isAdmin || isSales) loadQuotations();
@@ -467,7 +467,7 @@ function App() {
     if (isAdmin || isCourier) {
       ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'courier_tasks'}, ()=>debounceReload('tasks', loadCourierTasks));
     }
-    if (isAdmin || isCabang || isCourier) {
+    if (isAdmin || isCabang || isCourier || isTech) {
       ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'branch_requests'}, ()=>debounceReload('branch', loadBranchRequests));
     }
     if (isAdmin || isSales || isPembelian || isOnline || isCourier) {
@@ -630,7 +630,7 @@ function App() {
     };
     let {data,error} = await buildOrderQ(orderColsBase+orderColsNew, role==='courier');
     // Fallback: jika kolom baru belum ada di DB, retry tanpa kolom tsb
-    if (error && (error.message||'').includes('does not exist')) {
+    if (error && ((error.message||'').includes('does not exist') || (error.message||'').toLowerCase().includes('could not find'))) {
       const res2 = await buildOrderQ(orderColsBase, false);
       data = res2.data; error = res2.error;
     }
