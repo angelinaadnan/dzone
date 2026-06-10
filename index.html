@@ -437,7 +437,7 @@ function App() {
       loadOrders();
       if (isAdmin || isTech || isSales || isCabang || isCourier) loadServiceIntakes();
       if (isAdmin || isCourier) loadCourierTasks();
-      if (isAdmin || isCabang || isCourier || isTech) loadBranchRequests();
+      if (isAdmin || isCabang || isCourier) loadBranchRequests();
       if (isAdmin || isSales || isPembelian || isOnline || isCourier) loadPurchaseOrders();
       if (isAdmin || isCourier) loadCourierCheckins();
       if (isAdmin || isSales) loadQuotations();
@@ -467,7 +467,7 @@ function App() {
     if (isAdmin || isCourier) {
       ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'courier_tasks'}, ()=>debounceReload('tasks', loadCourierTasks));
     }
-    if (isAdmin || isCabang || isCourier || isTech) {
+    if (isAdmin || isCabang || isCourier) {
       ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'branch_requests'}, ()=>debounceReload('branch', loadBranchRequests));
     }
     if (isAdmin || isSales || isPembelian || isOnline || isCourier) {
@@ -1260,7 +1260,7 @@ function App() {
         {role==='courier' && page==='courier_job_tasks' && <CourierJobTasks tasks={courierTasks} onUpdate={updateCourierTask} onSaveServiceIntake={saveServiceIntake} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} branchRequests={branchRequests} onUpdateBranch={updateBranchRequest} purchaseOrders={purchaseOrders} onUpdatePO={updatePurchaseOrder} orders={orders} onUpdateOrder={updateOrder} courierName={userName} checkins={courierCheckins} onCheckin={saveCheckin} onSelectOrder={setSelectedOrder} onQueuePhoto={enqueuePendingPhoto} pendingCount={pendingPhotos.length} pendingCheckins={pendingCheckins} onRefresh={loadCourierTasks}/>}
 
         {role==='courier' && page==='summary' && <CourierSummary orders={orders} courierTasks={courierTasks} courierName={userName} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes}/>}
-        {role==='technician' && page==='my_jobs' && <TechnicianJobs orders={orders} onUpdate={updateOrder} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} techName={userName} onSelect={setSelectedOrder} branchRequests={branchRequests} onUpdateBranch={updateBranchRequest}/>}
+        {role==='technician' && page==='my_jobs' && <TechnicianJobs orders={orders} onUpdate={updateOrder} serviceIntakes={serviceIntakes} onUpdateSI={updateServiceIntake} techName={userName} onSelect={setSelectedOrder}/>}
         {role==='technician' && page==='summary' && <TechnicianSummary orders={orders} serviceIntakes={serviceIntakes} techName={userName} onUpdate={updateOrder} onUpdateSI={updateServiceIntake}/>}
         {role==='sales' && page==='new_service' && <ServiceIntakeEntry onSave={saveServiceIntake} createdByRole="sales" createdBy={userName} onDone={()=>setPage('my_orders')} allIntakes={serviceIntakes}/>}
         {role==='sales' && page==='minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} onDelete={deleteCourierTask} createdBy={userName} createdByRole="sales"/>}
@@ -7818,16 +7818,11 @@ function ComponentsForm({value, onChange}) {
   );
 }
 
-function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName, onSelect, branchRequests, onUpdateBranch}) {
+function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName, onSelect}) {
   // Tampilkan semua order yang di-assign ke teknisi ini dan belum selesai/dikirim
   const myJobs = orders.filter(o=>o.tech_name===techName && !['tech_done','on_delivery','delivered','cancelled','ao_serah'].includes(o.status));
   // Servisan yang di-assign ke teknisi ini
   const myServiceJobs = (serviceIntakes||[]).filter(si=>si.tech_assigned===techName && ['to_technician','post_sc_checking'].includes(si.status));
-  // Branch request tech assignments
-  const myBranchTech = (branchRequests||[]).flatMap(r=>
-    (r.trips||[]).filter(t=>t.type==='tech' && t.tech_name===techName && t.status==='waiting')
-      .map(t=>({req:r, entry:t}))
-  );
   const [photoData, setPhotoData]     = useState({}); // instalasi/upgrade photos
   const [siPhotoData, setSiPhotoData] = useState({}); // servis unit photos
   const [note, setNote] = useState({});
@@ -8105,34 +8100,6 @@ function SIHistoryRow({si, isDone, techName, onUpdateSI}) {
             onVerify={null} supervisorName={null} canVerify={false} showHistory={false}
           />
           {si.tech_components_verified && <div style={{marginTop:4,fontSize:11,color:'var(--green)'}}>🔒 Log komponen dikunci supervisor</div>}
-        </div>
-      )}
-
-      {/* ── Branch Request Tech Assignments ── */}
-      {myBranchTech.length>0 && (
-        <div style={{marginTop:20}}>
-          <div style={{fontSize:13,fontWeight:700,color:'var(--teal)',marginBottom:10}}>🏢 Tugas dari Cabang ({myBranchTech.length})</div>
-          {myBranchTech.map(({req, entry})=>(
-            <div key={entry.id} className="card" style={{marginBottom:10,borderLeft:'3px solid var(--teal)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:600,fontSize:14}}>🏢 {req.branch_name}</div>
-                  <div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>{(req.items||[]).map(it=>`${it.qty}x ${it.name}`).join(', ')}</div>
-                  {entry.note && <div style={{marginTop:6,fontSize:12,color:'var(--teal)',background:'rgba(20,184,166,0.08)',padding:'6px 10px',borderRadius:6}}>📝 {entry.note}</div>}
-                  <div style={{fontSize:11,color:'var(--text3)',marginTop:4}}>{fmtDateTime(entry.assigned_at)}</div>
-                  {req.notes && <div style={{fontSize:11,color:'var(--amber)',marginTop:4}}>ℹ {req.notes}</div>}
-                </div>
-                <button className="btn-green btn-sm" style={{fontWeight:700}}
-                  onClick={()=>{
-                    if(!window.confirm(`Tandai selesai tugas dari ${req.branch_name}?`)) return;
-                    const updatedTrips = (req.trips||[]).map(t=>t.id===entry.id?{...t,status:'done',done_at:new Date().toISOString(),done_by:techName}:t);
-                    onUpdateBranch(req.id,{trips:updatedTrips});
-                  }}>
-                  ✅ Selesai
-                </button>
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </div>
