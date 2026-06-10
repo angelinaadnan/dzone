@@ -13123,15 +13123,14 @@ function OpsBranchManager({requests, onUpdate}) {
 
   const confirmTech = (r) => {
     if (!techPick) { alert('Pilih teknisi dulu'); return; }
-    const existing = r.tech_queue||[];
-    const entry = {id: Date.now(), tech_name: techPick, note: techNote.trim(), status:'waiting', assigned_at: new Date().toISOString()};
-    onUpdate(r.id,{tech_queue:[...existing, entry]});
+    const entry = {id: Date.now(), type:'tech', tech_name: techPick, note: techNote.trim(), status:'waiting', assigned_at: new Date().toISOString()};
+    onUpdate(r.id,{trips:[...(r.trips||[]), entry]});
     cancelTech();
   };
 
   const doneTech = (r, entryId) => {
-    const updated = (r.tech_queue||[]).map(e=>e.id===entryId?{...e,status:'done',done_at:new Date().toISOString()}:e);
-    onUpdate(r.id,{tech_queue:updated});
+    const updated = (r.trips||[]).map(e=>e.id===entryId?{...e,status:'done',done_at:new Date().toISOString()}:e);
+    onUpdate(r.id,{trips:updated});
   };
 
   const confirmTrip = (r) => {
@@ -13139,7 +13138,8 @@ function OpsBranchManager({requests, onUpdate}) {
     const tripItems = (r.items||[]).filter((_,i)=>checkedItems[i]);
     if (tripItems.length===0) { alert('Pilih minimal 1 barang'); return; }
     const trips = r.trips||[];
-    const newTrip = {no: trips.length+1, courier: selectedCourier, items: tripItems, status:'pending', created_at: new Date().toISOString()};
+    const courierTrips = trips.filter(t=>t.type!=='tech');
+    const newTrip = {no: courierTrips.length+1, courier: selectedCourier, items: tripItems, status:'pending', created_at: new Date().toISOString()};
     const updatedItems = (r.items||[]).map((it,i)=>checkedItems[i]?{...it,in_trip:true}:it);
     const allInTrip = updatedItems.every(it=>it.in_trip);
     onUpdate(r.id,{trips:[...trips,newTrip], items:updatedItems, status: allInTrip?'partial':'partial'});
@@ -13282,9 +13282,9 @@ function OpsBranchManager({requests, onUpdate}) {
           )}
 
           {/* Teknisi queue display */}
-          {(r.tech_queue||[]).length>0 && (
+          {(r.trips||[]).filter(t=>t.type==='tech').length>0 && (
             <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:6}}>
-              {(r.tech_queue||[]).map(e=>(
+              {(r.trips||[]).filter(t=>t.type==='tech').map(e=>(
                 <div key={e.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderRadius:8,
                   background:e.status==='done'?'rgba(34,197,94,0.07)':'rgba(20,184,166,0.07)',
                   border:`1px solid ${e.status==='done'?'rgba(34,197,94,0.3)':'rgba(20,184,166,0.3)'}`}}>
@@ -13375,7 +13375,7 @@ function OpsBranchManager({requests, onUpdate}) {
                   <div style={{display:'flex',gap:8,marginTop:8}}>
                     <button className="btn-secondary btn-sm" onClick={cancelAssign}>Batal</button>
                     <button className="btn-green btn-sm" style={{flex:1}} onClick={()=>confirmTrip(r)}>
-                      ✓ Assign {selectedCourier?`"${selectedCourier}"`: 'Kurir'} untuk Trip #{(trips.length+1)}
+                      ✓ Assign {selectedCourier?`"${selectedCourier}"`: 'Kurir'} untuk Trip #{(trips.filter(t=>t.type!=='tech').length+1)}
                     </button>
                   </div>
                 </div>
