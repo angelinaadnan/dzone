@@ -6445,7 +6445,7 @@ function AdminOrders({orders, onUpdate, onSelect, currentUser}) {
                       };
                       if(pendingAdminRev.faktur_after!==undefined) updates.faktur_pajak = pendingAdminRev.faktur_after;
                       if(pendingAdminRev.npwp_after!==undefined) updates.npwp = pendingAdminRev.npwp_after;
-                      if(pendingAdminRev.info_after!==undefined) updates.info_tambahan = pendingAdminRev.info_after;
+                      const _newInfo=pendingAdminRev.info_after!==undefined?pendingAdminRev.info_after:pendingAdminRev.alasan; if(_newInfo!==undefined) updates.info_tambahan=_newInfo;
                       onUpdate(o.id, updates);
                     }}>📋 Apply Revisi</button>
                 </div>
@@ -6557,7 +6557,7 @@ function AdminInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
                 </div>
               )}
 
-              {(()=>{const pr=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin');const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||o.info_tambahan:o.info_tambahan;return it?<div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {it}{pr&&<span style={{color:'var(--teal)',marginLeft:6,fontSize:10,fontWeight:700}}>✏️ revisi</span>}</div>:null;})()}
+              {(()=>{const pr=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin')||[...(o.revisions||[])].reverse().find(r=>r.status==='applied'&&r.alasan);const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||o.info_tambahan:o.info_tambahan;return it?<div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {it}{pr&&<span style={{color:'var(--teal)',marginLeft:6,fontSize:10,fontWeight:700}}>✏️ revisi</span>}</div>:null;})()}
 
               <div style={{marginTop:12,display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                 <div>
@@ -6616,7 +6616,8 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles, aoName})
     const rev = o.revisions[revIdx];
     const updRevs = (o.revisions||[]).map((r,i)=>i===revIdx?{...r,status:'applied',ops_by:aoName||'admin_online',ops_at:new Date().toISOString(),applied_at:new Date().toISOString()}:r);
     const updates = {goods:rev.goods_after, revisions:updRevs};
-    if(rev.info_after   !== undefined) updates.info_tambahan = rev.info_after;
+    const newInfo = rev.info_after!==undefined ? rev.info_after : rev.alasan;
+    if(newInfo !== undefined) updates.info_tambahan = newInfo;
     if(rev.faktur_after !== undefined) updates.faktur_pajak  = rev.faktur_after;
     if(rev.npwp_after   !== undefined) updates.npwp          = rev.npwp_after;
     return updates;
@@ -6724,9 +6725,9 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles, aoName})
                 </div>
               )}
               {(()=>{
-                const revIdx2=(o.revisions||[]).reduce((li,r,i)=>(r.status==='pending_ops'&&r.ao_can_approve)?i:li,-1);
-                const rev2=revIdx2>=0?o.revisions[revIdx2]:null;
-                const infoToShow = rev2 ? (rev2.info_after!==undefined ? rev2.info_after : rev2.alasan) || o.info_tambahan : o.info_tambahan;
+                // cek pending dulu, kalau ga ada cek applied terakhir
+                const lastRev=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin')||[...(o.revisions||[])].reverse().find(r=>r.status==='applied'&&r.alasan);
+                const infoToShow = lastRev ? (lastRev.info_after!==undefined?lastRev.info_after:lastRev.alasan)||o.info_tambahan : o.info_tambahan;
                 return infoToShow ? <div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {infoToShow}</div> : null;
               })()}
 
@@ -6889,7 +6890,7 @@ function OpsQueue({orders, onUpdate, onSelect, currentUser}) {
               <div style={{marginTop:8}}>
                 {o.goods?.map((g,i)=><div key={i} style={{fontSize:13,color:'var(--text)'}}>• {g.qty}x {g.name} — {g.desc}</div>)}
               </div>
-              {(()=>{const pr=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin');const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||o.info_tambahan:o.info_tambahan;return it?<div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {it}{pr&&<span style={{color:'var(--teal)',marginLeft:6,fontSize:10,fontWeight:700}}>✏️ revisi</span>}</div>:null;})()}
+              {(()=>{const pr=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin')||[...(o.revisions||[])].reverse().find(r=>r.status==='applied'&&r.alasan);const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||o.info_tambahan:o.info_tambahan;return it?<div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {it}{pr&&<span style={{color:'var(--teal)',marginLeft:6,fontSize:10,fontWeight:700}}>✏️ revisi</span>}</div>:null;})()}
               {/* Revision indicator */}
               {(()=>{
                 const pendingOpsIdx = (o.revisions||[]).reduce((li,r,i)=>r.status==='pending_ops'?i:li,-1);
@@ -7551,7 +7552,7 @@ function CourierDeliveries({orders, onUpdate, courierName, onSelect, checkins, o
           <div style={{background:'var(--bg3)',borderRadius:8,padding:'10px 12px',marginBottom:12,fontSize:13}}>
             📍 {o.customer_address}
           </div>
-          {(()=>{const pr=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin');const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||o.info_tambahan:o.info_tambahan;return it?<div style={{background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'var(--amber)'}}>ℹ {it}</div>:null;})()}
+          {(()=>{const pr=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin')||[...(o.revisions||[])].reverse().find(r=>r.status==='applied'&&r.alasan);const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||o.info_tambahan:o.info_tambahan;return it?<div style={{background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'var(--amber)'}}>ℹ {it}</div>:null;})()}
           <div style={{marginBottom:10}}>
             {o.goods?.map((g,i)=><div key={i} style={{fontSize:13,padding:'4px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between'}}>
               <span>{g.qty}x {g.name}</span><span style={{color:'var(--text2)'}}>{g.desc}</span>
@@ -8199,7 +8200,7 @@ function TechnicianJobs({orders, onUpdate, serviceIntakes, onUpdateSI, techName,
               <div style={{background:'var(--bg3)',borderRadius:8,padding:'10px 12px',marginBottom:12,fontSize:13}}>
                 📍 {o.customer_address}
               </div>
-              {(()=>{const pr=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin');const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||o.info_tambahan:o.info_tambahan;return it?<div style={{background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'var(--amber)'}}>ℹ {it}{pr&&<span style={{color:'var(--teal)',marginLeft:6,fontSize:10,fontWeight:700}}>✏️ revisi</span>}</div>:null;})()}
+              {(()=>{const pr=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin')||[...(o.revisions||[])].reverse().find(r=>r.status==='applied'&&r.alasan);const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||o.info_tambahan:o.info_tambahan;return it?<div style={{background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8,padding:'8px 12px',marginBottom:12,fontSize:12,color:'var(--amber)'}}>ℹ {it}{pr&&<span style={{color:'var(--teal)',marginLeft:6,fontSize:10,fontWeight:700}}>✏️ revisi</span>}</div>:null;})()}
               <div style={{marginBottom:10}}>
                 {o.goods?.map((g,i)=>(
                   <div key={i} style={{fontSize:13,padding:'4px 0',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between'}}>
@@ -9068,7 +9069,7 @@ function AdminRevisionPanel({orders, onUpdateOrder, adminName}) {
     };
     if (rev.faktur_after !== undefined)  updates.faktur_pajak = rev.faktur_after;
     if (rev.npwp_after   !== undefined)  updates.npwp = rev.npwp_after;
-    if (rev.info_after   !== undefined)  updates.info_tambahan = rev.info_after;
+    const _ri=rev.info_after!==undefined?rev.info_after:rev.alasan; if(_ri!==undefined) updates.info_tambahan=_ri;
     onUpdateOrder(order.id, updates);
     // clear input
     setNewInvNum(n=>({...n,[key]:''}));
@@ -11605,7 +11606,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                       <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>📞 {o.customer_phone||'—'}</div>
                       <div style={{fontSize:13,fontWeight:600,color:'var(--blue)',marginTop:4}}>📍 {o.customer_address||'Alamat belum diisi'}</div>
                       <div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>{(o.goods||[]).map(g=>`${g.qty}x ${g.name}`).join(' · ')}</div>
-                      {(()=>{const pr=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin');const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||o.info_tambahan:o.info_tambahan;return it?<div style={{fontSize:11,color:'var(--amber)',marginTop:4}}>ℹ {it}</div>:null;})()}
+                      {(()=>{const pr=[...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin')||[...(o.revisions||[])].reverse().find(r=>r.status==='applied'&&r.alasan);const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||o.info_tambahan:o.info_tambahan;return it?<div style={{fontSize:11,color:'var(--amber)',marginTop:4}}>ℹ {it}</div>:null;})()}
                     </div>
                     <div style={{display:'flex',flexDirection:'column',gap:4,alignItems:'flex-end'}}>
                       <span className={`badge ${STATUS_COLORS[o.status]}`}>{STATUS_LABELS[o.status]}</span>
@@ -15381,7 +15382,7 @@ function OrderDetailModal({order, onClose, onUpdate, onLoadFiles, role, courierN
             {order.tech_name && <div><label>Teknisi</label><div style={{fontSize:14}}>{order.tech_name}</div></div>}
           </div>
           <div style={{marginBottom:4}}><label>Alamat</label><div style={{fontSize:13,color:'var(--text)'}}>{order.customer_address||'—'}</div></div>
-          {(()=>{const pr=[...(order.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin');const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||order.info_tambahan:order.info_tambahan;return it?<div style={{marginBottom:12,marginTop:8,background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',padding:'8px 12px',borderRadius:8,fontSize:12,color:'var(--amber)'}}>ℹ {it}{pr&&<span style={{color:'var(--teal)',marginLeft:6,fontSize:10,fontWeight:700}}>✏️ revisi</span>}</div>:null;})()}
+          {(()=>{const pr=[...(order.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin')||[...(order.revisions||[])].reverse().find(r=>r.status==='applied'&&r.alasan);const it=pr?(pr.info_after!==undefined?pr.info_after:pr.alasan)||order.info_tambahan:order.info_tambahan;return it?<div style={{marginBottom:12,marginTop:8,background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',padding:'8px 12px',borderRadius:8,fontSize:12,color:'var(--amber)'}}>ℹ {it}{pr&&<span style={{color:'var(--teal)',marginLeft:6,fontSize:10,fontWeight:700}}>✏️ revisi</span>}</div>:null;})()}
 
           {/* Blok Dokumen — tampil jika ada salah satu */}
           {(order.faktur_pajak || order.invoice_materai || order.has_po) && (
