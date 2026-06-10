@@ -1241,7 +1241,7 @@ function App() {
         {role==='sales' && page==='my_orders' && <MyOrders orders={orders.filter(o=>o.sales_name===userName||demoMode)} onSelect={setSelectedOrder} onUpdate={updateOrder} currentUser={userName}/>}
 
         {role==='admin' && page==='dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} onUpdateSI={updateServiceIntake} onUpdateTask={updateCourierTask} userRole="admin" userName={userName}/>}
-        {role==='admin' && page==='orders' && <AdminOrders orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
+        {role==='admin' && page==='orders' && <AdminOrders orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} currentUser={userName}/>}
         {role==='admin' && page==='invoicing' && <AdminInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
         {role==='ops' && page==='dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} onUpdateSI={updateServiceIntake} onUpdateTask={updateCourierTask} userRole="ops" userName={userName}/>}
         {role==='ops' && page==='queue' && <OpsQueue orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
@@ -1277,7 +1277,7 @@ function App() {
         {role==='supervisor' && page==='sup_kurir' && <CourierDailyMonitor orders={orders} courierTasks={courierTasks} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes} onRefresh={()=>{loadCourierTasks();loadCourierCheckins();loadOrders();loadServiceIntakes();loadBranchRequests();}}/>}
         {role==='supervisor' && page==='sup_minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} onDelete={deleteCourierTask} createdBy={userName} createdByRole="supervisor"/>}
         {role==='admin_online' && page==='ao_invoicing' && <AdminOnlineInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
-        {role==='admin_online' && page==='ao_orders' && <AdminOnlineOrders orders={orders} onSelect={setSelectedOrder}/>}
+        {role==='admin_online' && page==='ao_orders' && <AdminOnlineOrders orders={orders} onSelect={setSelectedOrder} onUpdate={updateOrder} aoName={userName}/>}
         {role==='admin_online' && page==='ao_tech_request' && <AdminOnlineTechRequest intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} createdBy={userName}/>}
         {role==='admin_online' && page==='ao_tasks' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName} createdByRole="admin_online"/>}
         {canAccessPesanBarang && page==='pesan_barang' && <PesanBarangPage orders={purchaseOrders} onSave={savePurchaseOrder} onUpdate={updatePurchaseOrder} createdBy={userName} role={role}/>}
@@ -3421,12 +3421,35 @@ function SupervisorOrders({orders, onSelect, onUpdate, currentUser, allowRevisi=
           </div>
           {(o.revisions||[]).length>0 && (()=>{
             const lastRev = o.revisions[o.revisions.length-1];
-            const pendingOps   = (o.revisions||[]).find(r=>r.status==='pending_ops');
+            const pendingOpsIdx = (o.revisions||[]).findIndex(r=>r.status==='pending_ops');
+            const pendingOps   = pendingOpsIdx>=0 ? o.revisions[pendingOpsIdx] : null;
             const pendingAdmin = (o.revisions||[]).find(r=>r.status==='pending_admin');
             const rejected     = (o.revisions||[]).filter(r=>r.status==='ops_rejected'||r.status==='ops_dismissed').slice(-1)[0];
             return (
-              <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)',fontSize:11}}>
-                {pendingOps && <div style={{color:'var(--amber)',marginBottom:3}}>🕐 Revisi menunggu persetujuan Ops · "{pendingOps.alasan}"</div>}
+              <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)',fontSize:11}} onClick={e=>e.stopPropagation()}>
+                {pendingOps && (
+                  <div style={{marginBottom:6}}>
+                    <div style={{color:'var(--amber)',marginBottom:4}}>🕐 Revisi menunggu persetujuan Ops · "{pendingOps.alasan}"</div>
+                    <div style={{fontSize:11,color:'var(--text2)',marginBottom:5}}>Sebelum: {fmtCurrency(pendingOps.total_before||0)} → Setelah: <b style={{color:'var(--accent2)'}}>{fmtCurrency(pendingOps.total_after||0)}</b></div>
+                    {!allowRevisi && (
+                      <div style={{display:'flex',gap:8}}>
+                        <button className="btn-sm" style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:6,padding:'5px 14px',fontWeight:700,cursor:'pointer',fontSize:11}}
+                          onClick={()=>{
+                            if(!window.confirm(`Setujui revisi "${pendingOps.alasan}" dari ${pendingOps.by}?`)) return;
+                            const updRev = (o.revisions||[]).map((r,i)=>i===pendingOpsIdx?{...r,status:'pending_admin',read_by_ops:true,ops_by:currentUser||'ops',ops_at:new Date().toISOString()}:r);
+                            onUpdate(o.id,{revisions:updRev});
+                          }}>✅ Setujui</button>
+                        <button className="btn-sm" style={{background:'transparent',color:'var(--red)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:6,padding:'5px 14px',cursor:'pointer',fontSize:11}}
+                          onClick={()=>{
+                            const note = window.prompt('Alasan tolak (opsional):','');
+                            if(note===null) return;
+                            const updRev = (o.revisions||[]).map((r,i)=>i===pendingOpsIdx?{...r,status:'ops_rejected',ops_by:currentUser||'ops',ops_at:new Date().toISOString(),ops_note:note}:r);
+                            onUpdate(o.id,{revisions:updRev});
+                          }}>❌ Tolak</button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {pendingAdmin && <div style={{color:'var(--blue)',marginBottom:3}}>📋 Revisi disetujui Ops, menunggu Admin memperbarui invoice</div>}
                 {rejected && <div style={{color:'var(--red)',marginBottom:3}}>❌ Revisi ditolak Ops — orderan dilanjutkan seperti biasa</div>}
                 {!pendingOps && !pendingAdmin && !rejected && <div style={{color:'var(--blue)'}}>📝 {o.revisions.length}x direvisi · terakhir oleh {lastRev.by} — "{lastRev.alasan}"</div>}
@@ -5930,11 +5953,18 @@ function MyOrders({orders, onSelect, onUpdate, currentUser}) {
             const lastRev = o.revisions[o.revisions.length-1];
             const pendingOps   = (o.revisions||[]).find(r=>r.status==='pending_ops');
             const pendingAdmin = (o.revisions||[]).find(r=>r.status==='pending_admin');
+            const activeRev    = pendingAdmin || pendingOps;
             const rejected     = (o.revisions||[]).filter(r=>r.status==='ops_rejected'||r.status==='ops_dismissed').slice(-1)[0];
             return (
               <div style={{marginTop:7,paddingTop:7,borderTop:'1px solid var(--border)',fontSize:11}}>
-                {pendingOps && <div style={{color:'var(--amber)'}}>🕐 Revisi menunggu persetujuan Ops · "{pendingOps.alasan}"</div>}
-                {pendingAdmin && <div style={{color:'var(--blue)'}}>📋 Revisi disetujui, menunggu Admin update invoice</div>}
+                {pendingOps && <div style={{color:'var(--amber)',marginBottom:2}}>🕐 Menunggu persetujuan Ops · "{pendingOps.alasan}"</div>}
+                {pendingAdmin && <div style={{color:'var(--blue)',marginBottom:2}}>📋 Revisi disetujui, menunggu Admin update invoice</div>}
+                {activeRev && (activeRev.goods_after||[]).length>0 && (
+                  <div style={{color:'var(--text2)',marginTop:2}}>
+                    Barang direvisi: <span style={{color:'var(--accent2)',fontWeight:600}}>{activeRev.goods_after.map(g=>g.name).join(', ')}</span>
+                    {' · '}<b style={{color:'var(--accent2)'}}>{fmtCurrency(activeRev.total_after)}</b>
+                  </div>
+                )}
                 {rejected && <div style={{color:'var(--red)'}}>❌ Revisi ditolak{rejected.ops_note?` · "${rejected.ops_note}"`:''}</div>}
                 {!pendingOps && !pendingAdmin && !rejected && <div style={{color:'var(--blue)'}}>📝 {o.revisions.length}x direvisi · "{lastRev.alasan}"</div>}
               </div>
@@ -6327,7 +6357,7 @@ function exportKomponenToExcel(kompOrders, kompSI) {
   XLSX.writeFile(wb, `DZ_Perubahan_Komponen_${date}.xlsx`);
 }
 
-function AdminOrders({orders, onUpdate, onSelect}) {
+function AdminOrders({orders, onUpdate, onSelect, currentUser}) {
   const [filter, setFilter] = useState('all');
   const filtered = filter==='all' ? orders : orders.filter(o=>o.status===filter);
   return (
@@ -6346,29 +6376,71 @@ function AdminOrders({orders, onUpdate, onSelect}) {
         ))}
       </div>
       {filtered.length===0 && <div className="empty-state"><div className="icon">📭</div><div>Tidak ada order</div></div>}
-      {filtered.map(o=>(
-        <div key={o.id} className="order-row" onClick={()=>onSelect(o)} style={{borderLeft:o.faktur_pajak?'3px solid var(--blue)':''}}>
-          <div style={{flex:'0 0 70px',fontFamily:'DM Mono',fontSize:11,color:'var(--text3)'}}>#{o.id?.slice(-6)}</div>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:500,display:'flex',alignItems:'center',gap:6}}>
-              {o.customer_name}
-              {o.faktur_pajak && <span style={{fontSize:10,padding:'1px 6px',borderRadius:10,background:'rgba(59,130,246,0.15)',color:'var(--blue)',fontWeight:700}}>FP</span>}
-              {o.invoice_materai && <span style={{fontSize:10,padding:'1px 6px',borderRadius:10,background:'rgba(100,116,139,0.15)',color:'var(--text2)',fontWeight:600}}>Materai</span>}
+      {filtered.map(o=>{
+        const pendingAdminIdx = (o.revisions||[]).findIndex(r=>r.status==='pending_admin');
+        const pendingAdminRev = pendingAdminIdx>=0 ? o.revisions[pendingAdminIdx] : null;
+        const pendingOps = (o.revisions||[]).find(r=>r.status==='pending_ops');
+        const hasRev = pendingAdminRev || pendingOps;
+        return (
+        <div key={o.id} style={{marginBottom:4}}>
+          <div className="order-row" onClick={()=>onSelect(o)} style={{borderLeft:pendingAdminRev?'3px solid var(--amber)':o.faktur_pajak?'3px solid var(--blue)':'',marginBottom:0,borderRadius:hasRev?'10px 10px 0 0':''}}>
+            <div style={{flex:'0 0 70px',fontFamily:'DM Mono',fontSize:11,color:'var(--text3)'}}>#{o.id?.slice(-6)}</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:500,display:'flex',alignItems:'center',gap:6}}>
+                {o.customer_name}
+                {o.faktur_pajak && <span style={{fontSize:10,padding:'1px 6px',borderRadius:10,background:'rgba(59,130,246,0.15)',color:'var(--blue)',fontWeight:700}}>FP</span>}
+                {o.invoice_materai && <span style={{fontSize:10,padding:'1px 6px',borderRadius:10,background:'rgba(100,116,139,0.15)',color:'var(--text2)',fontWeight:600}}>Materai</span>}
+                {pendingAdminRev && <span style={{fontSize:10,padding:'1px 6px',borderRadius:10,background:'rgba(251,191,36,0.2)',color:'var(--amber)',fontWeight:700}}>✏️ Revisi</span>}
+              </div>
+              <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>
+                {o.sales_name} · {fmtDate(o.date)}
+                {o.faktur_pajak && o.npwp && <span style={{marginLeft:6,fontFamily:'DM Mono',fontSize:11,color:'var(--blue)'}}>NPWP: {o.npwp}</span>}
+              </div>
             </div>
-            <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>
-              {o.sales_name} · {fmtDate(o.date)}
-              {o.faktur_pajak && o.npwp && <span style={{marginLeft:6,fontFamily:'DM Mono',fontSize:11,color:'var(--blue)'}}>NPWP: {o.npwp}</span>}
+            <div style={{flex:'0 0 130px',fontFamily:'Syne',fontWeight:700,fontSize:13,color:'var(--accent2)',textAlign:'right'}}>{fmtCurrency(pendingAdminRev?pendingAdminRev.total_after:totalOrder(o.goods))}</div>
+            <div style={{flex:'0 0 110px',textAlign:'center'}}>
+              {o.invoice_number ? <span className="tag" style={{fontFamily:'DM Mono',fontSize:11}}>{o.invoice_number}</span> : <span style={{color:'var(--text3)',fontSize:12}}>—</span>}
+            </div>
+            <div style={{flex:'0 0 120px',textAlign:'right'}}>
+              <span className={`badge ${STATUS_COLORS[o.status]||'badge-new'}`}>{STATUS_LABELS[o.status]||o.status}</span>
             </div>
           </div>
-          <div style={{flex:'0 0 130px',fontFamily:'Syne',fontWeight:700,fontSize:13,color:'var(--accent2)',textAlign:'right'}}>{fmtCurrency(totalOrder(o.goods))}</div>
-          <div style={{flex:'0 0 110px',textAlign:'center'}}>
-            {o.invoice_number ? <span className="tag" style={{fontFamily:'DM Mono',fontSize:11}}>{o.invoice_number}</span> : <span style={{color:'var(--text3)',fontSize:12}}>—</span>}
-          </div>
-          <div style={{flex:'0 0 120px',textAlign:'right'}}>
-            <span className={`badge ${STATUS_COLORS[o.status]||'badge-new'}`}>{STATUS_LABELS[o.status]||o.status}</span>
-          </div>
+          {hasRev && (
+            <div style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.25)',borderTop:'none',borderRadius:'0 0 10px 10px',padding:'9px 14px',fontSize:11}} onClick={e=>e.stopPropagation()}>
+              {pendingOps && !pendingAdminRev && (
+                <div style={{color:'var(--amber)'}}>🕐 Revisi menunggu persetujuan Ops · "{pendingOps.alasan}"</div>
+              )}
+              {pendingAdminRev && (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+                  <div>
+                    <div style={{color:'var(--amber)',marginBottom:3}}>📋 Revisi disetujui Ops · "{pendingAdminRev.alasan}" — menunggu Admin update invoice</div>
+                    <div style={{color:'var(--text2)'}}>Barang: {(pendingAdminRev.goods_after||[]).map(g=>g.name).join(', ')} · Total baru: <b style={{color:'var(--accent2)'}}>{fmtCurrency(pendingAdminRev.total_after)}</b></div>
+                  </div>
+                  <button className="btn-sm" style={{background:'var(--amber)',color:'#000',border:'none',borderRadius:6,padding:'6px 14px',fontWeight:700,cursor:'pointer',fontSize:11,whiteSpace:'nowrap'}}
+                    onClick={()=>{
+                      const invNum = window.prompt(`No. Invoice untuk revisi "${pendingAdminRev.alasan}"\n(kosongkan jika tidak berubah):`, o.invoice_number||'');
+                      if(invNum===null) return;
+                      const finalInv = invNum.trim() || o.invoice_number;
+                      if(!finalInv){alert('Nomor invoice wajib diisi!'); return;}
+                      const updatedRevs = (o.revisions||[]).map((r,i)=>i===pendingAdminIdx?{...r,status:'applied',applied_by:currentUser||'admin',applied_at:new Date().toISOString(),invoice_number:finalInv}:r);
+                      const updates = {
+                        revisions: updatedRevs,
+                        goods: pendingAdminRev.goods_after,
+                        status: 'invoiced',
+                        invoice_number: finalInv,
+                      };
+                      if(pendingAdminRev.faktur_after!==undefined) updates.faktur_pajak = pendingAdminRev.faktur_after;
+                      if(pendingAdminRev.npwp_after!==undefined) updates.npwp = pendingAdminRev.npwp_after;
+                      if(pendingAdminRev.info_after!==undefined) updates.info_tambahan = pendingAdminRev.info_after;
+                      onUpdate(o.id, updates);
+                    }}>📋 Apply Revisi</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -6683,7 +6755,7 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
 }
 
 // Admin Online — All Orders view (sama seperti AdminOrders tapi khusus SALES_AO)
-function AdminOnlineOrders({orders, onSelect}) {
+function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
   const [search, setSearch] = React.useState('');
   const myOrders = orders
     .filter(o=>SALES_AO.includes(o.sales_name))
@@ -6694,8 +6766,11 @@ function AdminOnlineOrders({orders, onSelect}) {
       <input placeholder="🔍 Cari customer / sales / invoice..." value={search} onChange={e=>setSearch(e.target.value)}
         style={{width:'100%',padding:'8px 12px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',marginBottom:14,fontSize:13,boxSizing:'border-box'}}/>
       {myOrders.length===0&&<div className="empty-state"><div className="icon">📋</div><div>Tidak ada data</div></div>}
-      {myOrders.map(o=>(
-        <div key={o.id} className="card" style={{marginBottom:10,cursor:'pointer'}} onClick={()=>onSelect(o)}>
+      {myOrders.map(o=>{
+        const pendingRev = (o.revisions||[]).findIndex(r=>r.status==='pending_ops'&&r.ao_can_approve);
+        const rev = pendingRev>=0 ? o.revisions[pendingRev] : null;
+        return (
+        <div key={o.id} className="card" style={{marginBottom:10,cursor:'pointer',borderLeft:rev?'3px solid var(--teal)':''}} onClick={()=>onSelect(o)}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10}}>
             <div>
               <div style={{fontWeight:600,fontSize:14}}>{o.customer_name}</div>
@@ -6707,8 +6782,32 @@ function AdminOnlineOrders({orders, onSelect}) {
               <div style={{fontFamily:'Syne',fontWeight:700,fontSize:13,color:'var(--accent2)'}}>{fmtCurrency(totalOrder(o.goods))}</div>
             </div>
           </div>
+          {rev && (
+            <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:11,color:'var(--teal)',fontWeight:600,marginBottom:6}}>✏️ Revisi menunggu persetujuan · "{rev.alasan}"</div>
+              <div style={{fontSize:11,color:'var(--text2)',marginBottom:8}}>
+                Sebelum: {fmtCurrency(rev.total_before)} → Setelah: <b style={{color:'var(--accent2)'}}>{fmtCurrency(rev.total_after)}</b>
+              </div>
+              <div style={{display:'flex',gap:8}}>
+                <button className="btn-sm" style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:6,padding:'6px 14px',fontWeight:700,cursor:'pointer',fontSize:12}}
+                  onClick={()=>{
+                    if(!window.confirm(`Setujui revisi "${rev.alasan}" dari ${rev.by}?`)) return;
+                    const updRev = (o.revisions||[]).map((r,i)=>i===pendingRev?{...r,status:'pending_admin',read_by_ops:true,ops_by:aoName||'admin_online',ops_at:new Date().toISOString()}:r);
+                    onUpdate(o.id,{revisions:updRev});
+                  }}>✅ Setujui</button>
+                <button className="btn-sm" style={{background:'transparent',color:'var(--red)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:6,padding:'6px 14px',cursor:'pointer',fontSize:12}}
+                  onClick={()=>{
+                    const reason = window.prompt('Alasan tolak (opsional):','');
+                    if(reason===null) return;
+                    const updRev = (o.revisions||[]).map((r,i)=>i===pendingRev?{...r,status:'ops_rejected',ops_by:aoName||'admin_online',ops_at:new Date().toISOString(),ops_note:reason}:r);
+                    onUpdate(o.id,{revisions:updRev});
+                  }}>❌ Tolak</button>
+              </div>
+            </div>
+          )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
