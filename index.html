@@ -13109,11 +13109,30 @@ function OpsBranchManager({requests, onUpdate}) {
   const [checkedItems, setCheckedItems] = React.useState({});
   const [selectedCourier, setSelectedCourier] = React.useState('');
   const [customCourier, setCustomCourier] = React.useState('');
+  const [techOpenId, setTechOpenId] = React.useState(null);
+  const [techPick, setTechPick] = React.useState('');
+  const [techNote, setTechNote] = React.useState('');
   const filtered = filter==='all' ? requests : requests.filter(r=>r.status===filter);
   const needAction = requests.filter(r=>r.status!=='completed').length;
+  const TECH_LIST = ['Deden','Komeng'];
 
-  const startAssign = (rid) => { setAssigningId(rid); setCheckedItems({}); setSelectedCourier(''); setCustomCourier(''); };
+  const startAssign = (rid) => { setAssigningId(rid); setCheckedItems({}); setSelectedCourier(''); setCustomCourier(''); setTechOpenId(null); };
   const cancelAssign = () => { setAssigningId(null); setCheckedItems({}); setSelectedCourier(''); setCustomCourier(''); };
+  const startTech = (rid) => { setTechOpenId(rid); setTechPick(''); setTechNote(''); setAssigningId(null); };
+  const cancelTech = () => { setTechOpenId(null); setTechPick(''); setTechNote(''); };
+
+  const confirmTech = (r) => {
+    if (!techPick) { alert('Pilih teknisi dulu'); return; }
+    const existing = r.tech_queue||[];
+    const entry = {id: Date.now(), tech_name: techPick, note: techNote.trim(), status:'waiting', assigned_at: new Date().toISOString()};
+    onUpdate(r.id,{tech_queue:[...existing, entry]});
+    cancelTech();
+  };
+
+  const doneTech = (r, entryId) => {
+    const updated = (r.tech_queue||[]).map(e=>e.id===entryId?{...e,status:'done',done_at:new Date().toISOString()}:e);
+    onUpdate(r.id,{tech_queue:updated});
+  };
 
   const confirmTrip = (r) => {
     if (!selectedCourier) { alert('Pilih kurir dulu'); return; }
@@ -13262,11 +13281,67 @@ function OpsBranchManager({requests, onUpdate}) {
             </div>
           )}
 
+          {/* Teknisi queue display */}
+          {(r.tech_queue||[]).length>0 && (
+            <div style={{marginTop:10,display:'flex',flexDirection:'column',gap:6}}>
+              {(r.tech_queue||[]).map(e=>(
+                <div key={e.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 10px',borderRadius:8,
+                  background:e.status==='done'?'rgba(34,197,94,0.07)':'rgba(20,184,166,0.07)',
+                  border:`1px solid ${e.status==='done'?'rgba(34,197,94,0.3)':'rgba(20,184,166,0.3)'}`}}>
+                  <span style={{fontSize:13}}>{e.status==='done'?'✅':'🔧'}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:12,fontWeight:700,color:e.status==='done'?'var(--green)':'var(--teal)'}}>
+                      {e.status==='done'?'Selesai Teknisi':'Sedang di Teknisi'}: <b>{e.tech_name}</b>
+                    </div>
+                    {e.note&&<div style={{fontSize:11,color:'var(--text2)',marginTop:1}}>📝 {e.note}</div>}
+                    <div style={{fontSize:10,color:'var(--text3)',marginTop:1}}>{fmtDateTime(e.assigned_at)}{e.done_at&&` → ${fmtDateTime(e.done_at)}`}</div>
+                  </div>
+                  {e.status==='waiting'&&(
+                    <button className="btn-sm" style={{background:'var(--green)',color:'#fff',border:'none',borderRadius:6,padding:'4px 10px',fontSize:11,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}
+                      onClick={()=>{if(window.confirm(`Teknisi ${e.tech_name} sudah selesai?`))doneTech(r,e.id);}}>
+                      ✅ Selesai
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Assign trip panel */}
           {pendingItems.length>0 && r.status!=='completed' && (
             <div style={{marginTop:12,paddingTop:10,borderTop:'1px solid var(--border)'}}>
-              {!isAssigning ? (
-                <button className="btn-primary btn-sm" onClick={()=>startAssign(r.id)}>+ Assign Trip Baru</button>
+              {!isAssigning && techOpenId!==r.id ? (
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <button className="btn-primary btn-sm" onClick={()=>startAssign(r.id)}>+ Assign Trip Baru</button>
+                  <button className="btn-secondary btn-sm" style={{color:'var(--teal)'}} onClick={()=>startTech(r.id)}>🔧 Ke Teknisi</button>
+                </div>
+              ) : techOpenId===r.id ? (
+                <div style={{background:'rgba(20,184,166,0.07)',border:'1px solid rgba(20,184,166,0.3)',borderRadius:8,padding:'12px 14px'}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'var(--teal)',marginBottom:10}}>🔧 Assign ke Teknisi</div>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>
+                    {TECH_LIST.map(n=>(
+                      <button key={n} onClick={()=>setTechPick(n)}
+                        style={{padding:'6px 14px',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',
+                          background:techPick===n?'var(--teal)':'var(--bg3)',
+                          border:`1px solid ${techPick===n?'var(--teal)':'var(--border2)'}`,
+                          color:techPick===n?'#fff':'var(--text2)'}}>🔧 {n}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    style={{width:'100%',padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,boxSizing:'border-box',marginBottom:10}}
+                    placeholder="Keterangan: Install Windows, Upgrade RAM, dll..."
+                    value={techNote}
+                    onChange={e=>setTechNote(e.target.value)}
+                  />
+                  <div style={{display:'flex',gap:8}}>
+                    <button className="btn-secondary btn-sm" onClick={cancelTech}>Batal</button>
+                    <button className="btn-sm" style={{flex:1,background:'var(--teal)',color:'#fff',border:'none',borderRadius:8,padding:'8px',fontWeight:700,cursor:'pointer',opacity:techPick?1:0.5}}
+                      onClick={()=>confirmTech(r)}>
+                      ✓ Assign ke {techPick||'Teknisi'}
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div>
                   <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:'var(--text2)'}}>Centang barang yang siap dikirim trip ini:</div>
