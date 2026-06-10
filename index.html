@@ -3176,7 +3176,7 @@ function RevisiOrderModal({order, onClose, onSave, currentUser}) {
   };
 
   const handleSave = async () => {
-    if(!alasan.trim()){alert('Wajib isi alasan revisi');return;}
+    if(!alasan.trim()){alert('Wajib isi catatan revisi');return;}
     if(cleanGoods.length===0){alert('Minimal ada 1 item barang dengan nama & qty > 0');return;}
     setSaving(true);
     const revEntry = {
@@ -3191,7 +3191,7 @@ function RevisiOrderModal({order, onClose, onSave, currentUser}) {
       faktur_after:  faktur,
       npwp_after:   faktur ? npwp : order.npwp,
       info_before: order.info_tambahan,
-      info_after:  infoTambahan,
+      info_after:  alasan, // catatan revisi MENGGANTIKAN info_tambahan lama
       status: 'pending_ops',  // menunggu persetujuan ops
       ao_can_approve: AO_APPROVER_SALES.includes((currentUser||'').toLowerCase()),
     };
@@ -3289,16 +3289,13 @@ function RevisiOrderModal({order, onClose, onSave, currentUser}) {
             )}
           </div>
 
-          {/* Info tambahan */}
-          <div style={{marginBottom:14}}>
-            <label>Info Tambahan / Catatan</label>
-            <textarea style={{...inp,minHeight:60,resize:'vertical'}} value={infoTambahan} onChange={e=>setInfoTambahan(e.target.value)} placeholder="Catatan khusus, permintaan customer, dll…"/>
-          </div>
-
-          {/* Alasan revisi — wajib */}
+          {/* Catatan revisi — wajib, juga menjadi info_tambahan baru */}
           <div style={{marginBottom:16,background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.25)',borderRadius:8,padding:'10px 12px'}}>
-            <label style={{color:'var(--amber)'}}>Alasan Revisi <span style={{color:'var(--red)'}}>*</span></label>
-            <input style={inp} value={alasan} onChange={e=>setAlasan(e.target.value)} placeholder="mis: customer minta kurangi qty, harga beda, tambah item baru, dll…"/>
+            <label style={{color:'var(--amber)'}}>📝 Catatan Revisi <span style={{color:'var(--red)'}}>*</span>
+              <span style={{fontWeight:400,fontSize:11,color:'var(--text3)',marginLeft:6,textTransform:'none',letterSpacing:0}}>(akan muncul di semua tampilan & menggantikan catatan lama)</span>
+            </label>
+            <textarea style={{...inp,minHeight:70,resize:'vertical'}} value={alasan} onChange={e=>setAlasan(e.target.value)} placeholder="mis: may upgrade tambah 512GB dan up Windows jadi Win 11 Pro, customer minta tambah item, dll…"/>
+            {order.info_tambahan && <div style={{marginTop:6,fontSize:11,color:'var(--text3)'}}>Catatan saat ini: <span style={{fontStyle:'italic'}}>"{order.info_tambahan.slice(0,80)}{order.info_tambahan.length>80?'…':''}"</span> → akan diganti</div>}
           </div>
 
           {/* Riwayat revisi */}
