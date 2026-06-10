@@ -1276,7 +1276,7 @@ function App() {
         {role==='ops' && page==='op_tech_log' && <SupervisorTech orders={orders} serviceIntakes={serviceIntakes} onUpdate={updateOrder} onUpdateSI={updateServiceIntake} supervisorName={userName} canVerify={false}/>}
         {role==='supervisor' && page==='sup_kurir' && <CourierDailyMonitor orders={orders} courierTasks={courierTasks} checkins={courierCheckins} purchaseOrders={purchaseOrders} branchRequests={branchRequests} serviceIntakes={serviceIntakes} onRefresh={()=>{loadCourierTasks();loadCourierCheckins();loadOrders();loadServiceIntakes();loadBranchRequests();}}/>}
         {role==='supervisor' && page==='sup_minta_kurir' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} onDelete={deleteCourierTask} createdBy={userName} createdByRole="supervisor"/>}
-        {role==='admin_online' && page==='ao_invoicing' && <AdminOnlineInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
+        {role==='admin_online' && page==='ao_invoicing' && <AdminOnlineInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles} aoName={userName}/>}
         {role==='admin_online' && page==='ao_orders' && <AdminOnlineOrders orders={orders} onSelect={setSelectedOrder} onUpdate={updateOrder} aoName={userName}/>}
         {role==='admin_online' && page==='ao_tech_request' && <AdminOnlineTechRequest intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} createdBy={userName}/>}
         {role==='admin_online' && page==='ao_tasks' && <SalesCourierTasks tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} createdBy={userName} createdByRole="admin_online"/>}
@@ -5723,7 +5723,12 @@ function QuotationPage({quotations, onSave, onUpdate, onSaveOrder, salesName, on
       customer_phone: freshQ.customer_phone||'',
       customer_address: freshQ.customer_address||'',
       goods: freshQ.goods,
-      info_tambahan: orderForm.info_tambahan || `[Dari Penawaran: ${freshQ.quotation_number}]${freshQ.notes?' — '+freshQ.notes:''}`,
+      info_tambahan: [
+        orderForm.info_tambahan || `[Dari Penawaran: ${freshQ.quotation_number}]${freshQ.notes?' — '+freshQ.notes:''}`,
+        orderForm.has_upgrade?'⬆️ Upgrade komponen':'',
+        orderForm.has_downgrade?'⬇️ Downgrade komponen':'',
+        orderForm.has_swap?'🔁 Swap/tukar komponen':'',
+      ].filter(Boolean).join(' | '),
       payment_status: orderForm.payment_status || 'Langsung Tagih',
       delivery_method: orderForm.delivery_method || 'Kirim Hari Ini Tidak Urgent',
       faktur_pajak: orderForm.faktur_pajak||false,
@@ -5734,9 +5739,6 @@ function QuotationPage({quotations, onSave, onUpdate, onSaveOrder, salesName, on
       po_file: orderForm.po_file==='__loading__' ? null : (orderForm.po_file||null),
       npwp: orderForm.npwp||'',
       npwp_file: orderForm.npwp_file==='__loading__' ? null : (orderForm.npwp_file||null),
-      has_upgrade: orderForm.has_upgrade||false,
-      has_downgrade: orderForm.has_downgrade||false,
-      has_swap: orderForm.has_swap||false,
       has_component_change: !!(orderForm.has_upgrade||orderForm.has_downgrade||orderForm.has_swap),
       status:'new',
       status_history:[{status:'new',time:new Date().toISOString(),note:`Converted dari ${freshQ.quotation_number}`,by:salesName}],
@@ -6510,10 +6512,24 @@ function AdminInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
 
               {/* Barang */}
               <div style={{marginTop:6,marginBottom:4}}>
-                {(o.goods||[]).map((g,i)=>{
-                  const disc=Number(g.discount)||0;
-                  return <div key={i} style={{fontSize:12,color:'var(--text)'}}>{g.qty}× {g.name}{g.desc?' — '+g.desc:''}{disc>0?<span style={{color:'var(--red)',marginLeft:4}}>-{fmtCurrency(disc)}</span>:null}</div>;
-                })}
+                {(()=>{
+                  const revIdx = (o.revisions||[]).findIndex(r=>r.status==='pending_ops'&&r.ao_can_approve);
+                  const rev = revIdx>=0 ? o.revisions[revIdx] : null;
+                  if(rev) return (
+                    <div style={{padding:'8px 10px',background:'rgba(20,184,166,0.08)',border:'1px solid rgba(20,184,166,0.3)',borderRadius:8,marginBottom:4}}>
+                      <div style={{fontWeight:700,color:'var(--teal)',fontSize:11,marginBottom:5}}>✏️ Revisi dari {rev.by} · "{rev.alasan}" — Barang FINAL:</div>
+                      {(rev.goods_after||[]).map((g,i)=>{
+                        const disc=Number(g.discount)||0;
+                        return <div key={i} style={{fontSize:12,color:'var(--text)'}}>{g.qty}× {g.name}{g.desc?' — '+g.desc:''}{disc>0?<span style={{color:'var(--red)',marginLeft:4}}>-{fmtCurrency(disc)}</span>:null}</div>;
+                      })}
+                      <div style={{marginTop:4,fontSize:11,color:'var(--teal)',fontWeight:600}}>Total: {fmtCurrency(rev.total_after)} · Invoice akan dibuat dengan barang ini ✓</div>
+                    </div>
+                  );
+                  return (o.goods||[]).map((g,i)=>{
+                    const disc=Number(g.discount)||0;
+                    return <div key={i} style={{fontSize:12,color:'var(--text)'}}>{g.qty}× {g.name}{g.desc?' — '+g.desc:''}{disc>0?<span style={{color:'var(--red)',marginLeft:4}}>-{fmtCurrency(disc)}</span>:null}</div>;
+                  });
+                })()}
               </div>
 
               {/* Tags */}
@@ -6591,7 +6607,7 @@ function AdminInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
 }
 
 // ─── ADMIN ONLINE INVOICING ────────────────────────────────────────
-function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
+function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles, aoName}) {
   const [srcFilter, setSrcFilter] = useState('all');
   const allNew = orders.filter(o=>o.status==='new');
   const pending = srcFilter==='all' ? allNew : allNew.filter(o=>getOrderSource(o)===srcFilter);
@@ -6610,11 +6626,21 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
     reader.readAsDataURL(file);
   };
 
+  // Helper: if order has pending_ops revision with ao_can_approve, apply it when invoicing
+  const getRevisionUpdates = (o) => {
+    const revIdx = (o.revisions||[]).findIndex(r=>r.status==='pending_ops'&&r.ao_can_approve);
+    if(revIdx<0) return {};
+    const rev = o.revisions[revIdx];
+    const updRevs = (o.revisions||[]).map((r,i)=>i===revIdx?{...r,status:'applied',ops_by:aoName||'admin_online',ops_at:new Date().toISOString(),applied_at:new Date().toISOString()}:r);
+    return {goods:rev.goods_after, revisions:updRevs};
+  };
+
   const handleInvoiceRoute = async (o, route) => {
     if (!invoiceNum[o.id]) { alert('Isi No. Invoice dulu'); return; }
     if (route==='tech' && !techPick[o.id]) { alert('Pilih nama teknisi dulu'); return; }
     const url = await uploadPhoto(photoData[o.id]||null,'invoice');
-    const base = {invoice_number:invoiceNum[o.id], admin_photo:url||null};
+    const revUpdates = getRevisionUpdates(o);
+    const base = {invoice_number:invoiceNum[o.id], admin_photo:url||null, ...revUpdates};
     if (route==='tech') {
       onUpdate(o.id,{...base, status:'tech', tech_name:techPick[o.id], assigned_to:'tech',
         status_note:`Invoice ${invoiceNum[o.id]} — perlu instalasi, ke Teknisi ${techPick[o.id]}`});
@@ -6758,12 +6784,18 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
             {/* Right column — only for non-pickup orders */}
             {!isPickup&&(
               <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
-                <div style={{fontFamily:'Syne',fontWeight:800,fontSize:16,color:'var(--accent2)'}}>{fmtCurrency(totalOrder(o.goods))}</div>
+                {(()=>{
+                  const revIdx=(o.revisions||[]).findIndex(r=>r.status==='pending_ops'&&r.ao_can_approve);
+                  const rev=revIdx>=0?o.revisions[revIdx]:null;
+                  const displayTotal = rev ? rev.total_after : totalOrder(o.goods);
+                  return <div style={{fontFamily:'Syne',fontWeight:800,fontSize:16,color:'var(--accent2)'}}>{fmtCurrency(displayTotal)}</div>;
+                })()}
                 <button className="btn-blue btn-sm" onClick={()=>onSelect(o)}>Lihat Detail</button>
                 <button className="btn-green btn-sm" onClick={async()=>{
                   if (!invoiceNum[o.id]) { alert('Isi No. Invoice dulu'); return; }
                   const url2 = await uploadPhoto(photoData[o.id]||null,'invoice');
-                  onUpdate(o.id,{status:'invoiced',status_note:`Invoice ${invoiceNum[o.id]} dibuat`,invoice_number:invoiceNum[o.id],admin_photo:url2||null});
+                  const revUpdates = getRevisionUpdates(o);
+                  onUpdate(o.id,{status:'invoiced',status_note:`Invoice ${invoiceNum[o.id]} dibuat`,invoice_number:invoiceNum[o.id],admin_photo:url2||null,...revUpdates});
                 }}>✓ Invoice Dibuat</button>
               </div>
             )}
