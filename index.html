@@ -3195,9 +3195,12 @@ function RevisiOrderModal({order, onClose, onSave, currentUser}) {
       status: 'pending_ops',  // menunggu persetujuan ops
       ao_can_approve: AO_APPROVER_SALES.includes((currentUser||'').toLowerCase()),
     };
-    // goods belum diubah dulu — ops harus approve dulu, baru admin apply
+    // Tandai semua pending_ops lama sebagai superseded — hanya 1 revisi pending_ops sekaligus
+    const cleanedRevs = (order.revisions||[]).map(r=>
+      r.status==='pending_ops' ? {...r, status:'superseded', superseded_at:new Date().toISOString()} : r
+    );
     await onSave(order.id, {
-      revisions: [...(order.revisions||[]), revEntry],
+      revisions: [...cleanedRevs, revEntry],
     });
     setSaving(false);
     onClose();
@@ -3418,7 +3421,7 @@ function SupervisorOrders({orders, onSelect, onUpdate, currentUser, allowRevisi=
           </div>
           {(o.revisions||[]).length>0 && (()=>{
             const lastRev = o.revisions[o.revisions.length-1];
-            const pendingOpsIdx = (o.revisions||[]).findIndex(r=>r.status==='pending_ops');
+            const pendingOpsIdx = (o.revisions||[]).reduce((li,r,i)=>r.status==='pending_ops'?i:li,-1);
             const pendingOps   = pendingOpsIdx>=0 ? o.revisions[pendingOpsIdx] : null;
             const pendingAdmin = (o.revisions||[]).find(r=>r.status==='pending_admin');
             const rejected     = (o.revisions||[]).filter(r=>r.status==='ops_rejected'||r.status==='ops_dismissed').slice(-1)[0];
@@ -5962,8 +5965,8 @@ function MyOrders({orders, onSelect, onUpdate, currentUser}) {
           </div>
           {(o.revisions||[]).length>0 && (()=>{
             const lastRev = o.revisions[o.revisions.length-1];
-            const pendingOps   = (o.revisions||[]).find(r=>r.status==='pending_ops');
-            const pendingAdmin = (o.revisions||[]).find(r=>r.status==='pending_admin');
+            const pendingOps   = [...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops');
+            const pendingAdmin = [...(o.revisions||[])].reverse().find(r=>r.status==='pending_admin');
             const activeRev    = pendingAdmin || pendingOps;
             const rejected     = (o.revisions||[]).filter(r=>r.status==='ops_rejected'||r.status==='ops_dismissed').slice(-1)[0];
             return (
@@ -6390,7 +6393,7 @@ function AdminOrders({orders, onUpdate, onSelect, currentUser}) {
       {filtered.map(o=>{
         const pendingAdminIdx = (o.revisions||[]).findIndex(r=>r.status==='pending_admin');
         const pendingAdminRev = pendingAdminIdx>=0 ? o.revisions[pendingAdminIdx] : null;
-        const pendingOps = (o.revisions||[]).find(r=>r.status==='pending_ops');
+        const pendingOps = [...(o.revisions||[])].reverse().find(r=>r.status==='pending_ops');
         const hasRev = pendingAdminRev || pendingOps;
         return (
         <div key={o.id} style={{marginBottom:4}}>
@@ -6493,7 +6496,7 @@ function AdminInvoicing({orders, onUpdate, onSelect, onLoadFiles}) {
               {/* Barang */}
               <div style={{marginTop:6,marginBottom:4}}>
                 {(()=>{
-                  const revIdx = (o.revisions||[]).findIndex(r=>r.status==='pending_ops'&&r.ao_can_approve);
+                  const revIdx = (o.revisions||[]).reduce((li,r,i)=>(r.status==='pending_ops'&&r.ao_can_approve)?i:li,-1);
                   const rev = revIdx>=0 ? o.revisions[revIdx] : null;
                   if(rev) return (
                     <div style={{padding:'8px 10px',background:'rgba(20,184,166,0.08)',border:'1px solid rgba(20,184,166,0.3)',borderRadius:8,marginBottom:4}}>
@@ -6608,7 +6611,7 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles, aoName})
 
   // Helper: if order has pending_ops revision with ao_can_approve, apply it when invoicing
   const getRevisionUpdates = (o) => {
-    const revIdx = (o.revisions||[]).findIndex(r=>r.status==='pending_ops'&&r.ao_can_approve);
+    const revIdx = (o.revisions||[]).reduce((li,r,i)=>(r.status==='pending_ops'&&r.ao_can_approve)?i:li,-1);
     if(revIdx<0) return {};
     const rev = o.revisions[revIdx];
     const updRevs = (o.revisions||[]).map((r,i)=>i===revIdx?{...r,status:'applied',ops_by:aoName||'admin_online',ops_at:new Date().toISOString(),applied_at:new Date().toISOString()}:r);
@@ -6721,7 +6724,7 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles, aoName})
                 </div>
               )}
               {(()=>{
-                const revIdx2=(o.revisions||[]).findIndex(r=>r.status==='pending_ops'&&r.ao_can_approve);
+                const revIdx2=(o.revisions||[]).reduce((li,r,i)=>(r.status==='pending_ops'&&r.ao_can_approve)?i:li,-1);
                 const rev2=revIdx2>=0?o.revisions[revIdx2]:null;
                 const infoToShow = (rev2&&rev2.info_after!==undefined) ? rev2.info_after : o.info_tambahan;
                 return infoToShow ? <div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {infoToShow}</div> : null;
@@ -6774,7 +6777,7 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles, aoName})
             {!isPickup&&(
               <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
                 {(()=>{
-                  const revIdx=(o.revisions||[]).findIndex(r=>r.status==='pending_ops'&&r.ao_can_approve);
+                  const revIdx=(o.revisions||[]).reduce((li,r,i)=>(r.status==='pending_ops'&&r.ao_can_approve)?i:li,-1);
                   const rev=revIdx>=0?o.revisions[revIdx]:null;
                   const displayTotal = rev ? rev.total_after : totalOrder(o.goods);
                   return <div style={{fontFamily:'Syne',fontWeight:800,fontSize:16,color:'var(--accent2)'}}>{fmtCurrency(displayTotal)}</div>;
@@ -6817,7 +6820,7 @@ function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
         style={{width:'100%',padding:'8px 12px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:8,color:'var(--text)',marginBottom:14,fontSize:13,boxSizing:'border-box'}}/>
       {myOrders.length===0&&<div className="empty-state"><div className="icon">📋</div><div>Tidak ada data</div></div>}
       {myOrders.map(o=>{
-        const pendingRev = (o.revisions||[]).findIndex(r=>r.status==='pending_ops'&&r.ao_can_approve);
+        const pendingRev = (o.revisions||[]).reduce((li,r,i)=>(r.status==='pending_ops'&&r.ao_can_approve)?i:li,-1);
         const rev = pendingRev>=0 ? o.revisions[pendingRev] : null;
         return (
         <div key={o.id} className="card" style={{marginBottom:10,cursor:'pointer',borderLeft:rev?'3px solid var(--teal)':''}} onClick={()=>onSelect(o)}>
@@ -6889,7 +6892,7 @@ function OpsQueue({orders, onUpdate, onSelect, currentUser}) {
               {o.info_tambahan && <div style={{marginTop:8,fontSize:12,color:'var(--amber)',background:'rgba(245,158,11,0.08)',padding:'6px 10px',borderRadius:8}}>ℹ {o.info_tambahan}</div>}
               {/* Revision indicator */}
               {(()=>{
-                const pendingOpsIdx = (o.revisions||[]).findIndex(r=>r.status==='pending_ops');
+                const pendingOpsIdx = (o.revisions||[]).reduce((li,r,i)=>r.status==='pending_ops'?i:li,-1);
                 const pendingOps = pendingOpsIdx>=0 ? o.revisions[pendingOpsIdx] : null;
                 if(!pendingOps) return null;
                 return (
@@ -15428,7 +15431,7 @@ function OrderDetailModal({order, onClose, onUpdate, onLoadFiles, role, courierN
           <hr className="divider"/>
           <div style={{fontWeight:600,marginBottom:10}}>Barang</div>
           {(()=>{
-            const rev = (order.revisions||[]).find(r=>r.status==='pending_ops'||r.status==='pending_admin');
+            const rev = [...(order.revisions||[])].reverse().find(r=>r.status==='pending_ops'||r.status==='pending_admin');
             if(!rev) return null;
             return (
               <div style={{marginBottom:12,padding:'10px 14px',background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.3)',borderRadius:10,fontSize:12}}>
