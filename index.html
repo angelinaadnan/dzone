@@ -12759,7 +12759,8 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
       if (si.status==='branch_done') return 'selesai';
       return 'proses'; // received or branch_in_progress
     }
-    // courier route
+    // courier route — done tapi belum terima di cabang
+    if (si.status==='done' && si.source_type==='branch' && si.return_status!=='returned' && !si.branch_returned_at) return 'kembali';
     if (si.status==='done') return 'selesai';
     if (['at_service_center','to_service_center','sc_pickup_assigned','sc_ekspedisi_waiting','back_from_sc','post_sc_checking'].includes(si.status)) return 'di_sc';
     return 'proses';
@@ -12908,6 +12909,7 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
   const buckets = {
     proses:       byRoute.filter(si=>getSvcBucket(si)==='proses'),
     di_sc:        byRoute.filter(si=>getSvcBucket(si)==='di_sc'),
+    kembali:      byRoute.filter(si=>getSvcBucket(si)==='kembali'),
     selesai:      byRoute.filter(si=>getSvcBucket(si)==='selesai'),
     di_cabang:    byRoute.filter(si=>getSvcBucket(si)==='di_cabang'),
     sudah_diambil:byRoute.filter(si=>getSvcBucket(si)==='sudah_diambil'),
@@ -12916,6 +12918,7 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
     {id:'all',         label:'Semua',            count:byRoute.length,            color:null},
     {id:'proses',      label:'🔄 Proses',         count:buckets.proses.length,     color:'var(--blue)'},
     {id:'di_sc',       label:'🏪 Di SC',           count:buckets.di_sc.length,      color:'var(--amber)'},
+    {id:'kembali',     label:'🚗 Kembali ke Cabang', count:buckets.kembali.length,  color:'var(--teal)'},
     {id:'selesai',     label:'✅ Selesai',         count:buckets.selesai.length,    color:'var(--teal)'},
     {id:'di_cabang',   label:'📦 Di Cabang',       count:buckets.di_cabang.length,  color:'var(--amber)'},
     {id:'sudah_diambil',label:'✓ Sudah Diambil',  count:buckets.sudah_diambil.length, color:'var(--green)'},
@@ -13036,6 +13039,8 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
         const backAtBranch = si.source_type==='branch' && si.return_status==='returned' && !si.branch_returned_at;
         // Sudah final dikembalikan ke customer oleh cabang
         const fullyDone = si.source_type==='branch' && !!si.branch_returned_at;
+        // Selesai dikerjakan di Dusit, menunggu/dalam perjalanan kembali ke cabang
+        const doneWaitingReturn = si.source_type==='branch' && si.status==='done' && si.return_status!=='returned' && !si.branch_returned_at;
         const borderColor = fullyDone ? 'var(--green)' : backAtBranch ? 'var(--amber)' : isBranchTech ? 'var(--teal)' : 'var(--border)';
         return (
           <div key={si.id} className="card" style={{marginBottom:10,borderLeft:`3px solid ${borderColor}`}}>
@@ -13054,6 +13059,7 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
                   {isBranchTech ? '🔧 Teknisi cabang'
                     : backAtBranch ? '📦 Barang sudah di cabang — tunggu diserahkan ke customer'
                     : fullyDone ? '✅ Sudah diserahkan ke customer'
+                    : doneWaitingReturn ? ('✅ Selesai diperbaiki'+(si.assigned_courier?' · antar balik: '+si.assigned_courier:' · menunggu antar balik ke cabang'))
                     : (hasKurir?'🚗 '+si.courier_name+' akan jemput':'⏳ Belum ada kurir')}
                   {' · '}{fmtDateTime(si.created_at)}
                 </div>
@@ -13062,7 +13068,7 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
                 <span className={`badge ${fullyDone?'badge-delivered':STATUS_SI[si.status]?.cls||'badge-new'}`}>
                   {fullyDone ? '📦 Selesai' : STATUS_SI[si.status]?.label||si.status}
                 </span>
-                {!isBranchTech && !backAtBranch && !fullyDone && (
+                {!isBranchTech && !backAtBranch && !fullyDone && !doneWaitingReturn && (
                   <button className="btn-secondary btn-sm" onClick={()=>setExpandRow(prev=>({...prev,[si.id]:!prev[si.id]}))}>
                     {hasKurir ? (expandRow[si.id]?'▲':'🔄 Ganti Kurir') : (expandRow[si.id]?'▲':'👤 Pilih Kurir')}
                   </button>
@@ -13073,7 +13079,7 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
             </div>
 
             {/* ── Kurir assign (only when not yet returned) ── */}
-            {!isBranchTech && !backAtBranch && !fullyDone && (expandRow[si.id]||!hasKurir) && (
+            {!isBranchTech && !backAtBranch && !fullyDone && !doneWaitingReturn && (expandRow[si.id]||!hasKurir) && (
               <div style={{marginTop:10,paddingTop:8,borderTop:'1px solid var(--border)'}}>
                 <div style={{fontSize:11,color:'var(--text2)',marginBottom:6}}>{hasKurir?'Ganti kurir:':'Assign kurir:'}</div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
@@ -13091,6 +13097,24 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* ── SELESAI DI DUSIT — konfirmasi terima di cabang ── */}
+            {doneWaitingReturn && (
+              <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)'}}>
+                <div style={{padding:'10px 12px',background:'rgba(20,184,166,0.08)',border:'1px solid rgba(20,184,166,0.3)',borderRadius:8,marginBottom:10,fontSize:12,color:'var(--teal)',fontWeight:600}}>
+                  ✅ Barang sudah selesai diperbaiki di Dusit
+                  {si.assigned_courier && <span style={{fontWeight:400,color:'var(--text2)',marginLeft:4}}>· antar balik via <b style={{color:'var(--teal)'}}>{si.assigned_courier}</b></span>}
+                </div>
+                <div style={{fontSize:12,color:'var(--text2)',marginBottom:8}}>Konfirmasi saat barang tiba kembali di cabang, lalu notify customer untuk ambil:</div>
+                <button style={{background:'var(--teal)',color:'#fff',border:'none',borderRadius:8,padding:'10px 20px',fontWeight:700,fontSize:13,cursor:'pointer'}}
+                  onClick={()=>{
+                    if(!window.confirm(`Konfirmasi barang ${si.unit_type} milik ${si.customer_name} sudah tiba di cabang?`)) return;
+                    onUpdate(si.id,{return_status:'returned',returned_at:new Date().toISOString()});
+                  }}>
+                  📦 Sudah Terima di Cabang
+                </button>
               </div>
             )}
 
