@@ -4808,6 +4808,17 @@ function NewOrderForm({onSave, salesName, onToast}) {
       </div>
 
       <div className="card" style={{marginBottom:16}}>
+        <div style={{fontSize:12,fontWeight:600,color:'var(--text2)',marginBottom:14,textTransform:'uppercase',letterSpacing:'0.05em'}}>🔧 Perubahan Komponen</div>
+        <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
+          <input type="checkbox" checked={!!form.has_component_change} onChange={e=>set('has_component_change',e.target.checked)} style={{width:16,height:16,accentColor:'var(--accent2)',cursor:'pointer'}}/>
+          <div>
+            <div style={{fontSize:13,fontWeight:600,color:form.has_component_change?'var(--accent2)':'var(--text2)'}}>Ada upgrade / downgrade / swap komponen?</div>
+            {form.has_component_change && <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>Detail item akan diisi oleh Ops saat assign ke teknisi</div>}
+          </div>
+        </label>
+      </div>
+
+      <div className="card" style={{marginBottom:16}}>
         <div style={{fontSize:12,fontWeight:600,color:'var(--text2)',marginBottom:14,textTransform:'uppercase',letterSpacing:'0.05em'}}>ℹ️ Info Tambahan & Pengiriman</div>
         <div className="form-row"><div><label>Info Tambahan (jam tutup, temui siapa, WA kontak di lokasi)</label><textarea rows={2} placeholder="Tutup jam 17:00, temui Pak Budi di gudang, WA: 0812-xxx" value={form.info_tambahan} onChange={e=>set('info_tambahan',e.target.value)}/></div></div>
         <div className="form-row form-row-3">
@@ -8493,7 +8504,7 @@ function AdminOnlineTechRequest({intakes, onSave, onUpdate, createdBy}) {
   const [showForm, setShowForm] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [filter, setFilter] = React.useState('all');
-  const emptyForm = {customer_name:'',customer_phone:'',unit_type:'Laptop',unit_model:'',work_type:'Upgrade',description:'',tech_assigned:'',qty:1};
+  const emptyForm = {customer_name:'',customer_phone:'',unit_type:'Laptop',unit_model:'',work_type:'Upgrade',description:'',tech_assigned:'',qty:1,has_component_change:false};
   const [form, setForm] = React.useState(emptyForm);
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
@@ -8525,6 +8536,7 @@ function AdminOnlineTechRequest({intakes, onSave, onUpdate, createdBy}) {
       ao_spec_from: null,
       ao_spec_to: null,
       ao_qty: Number(form.qty)||1,
+      has_component_change: !!(form.has_component_change),
     });
     setSaving(false);
     setForm(emptyForm);
@@ -8587,6 +8599,18 @@ function AdminOnlineTechRequest({intakes, onSave, onUpdate, createdBy}) {
               onChange={e=>set('description',e.target.value)}
               placeholder={AO_DESC_PLACEHOLDER[form.work_type]||'Jelaskan pekerjaan...'}
             />
+          </div>
+
+          {/* Perubahan Komponen */}
+          <div style={{marginBottom:14,padding:'12px 14px',background:'var(--bg3)',border:'1px solid var(--border2)',borderRadius:10}}>
+            <div style={{fontSize:11,fontWeight:700,color:'var(--text2)',marginBottom:10,textTransform:'uppercase',letterSpacing:'0.05em'}}>🔧 Perubahan Komponen</div>
+            <label style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}}>
+              <input type="checkbox" checked={!!form.has_component_change} onChange={e=>set('has_component_change',e.target.checked)} style={{width:16,height:16,accentColor:'var(--accent2)',cursor:'pointer'}}/>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:form.has_component_change?'var(--accent2)':'var(--text2)'}}>Ada upgrade / downgrade / swap komponen?</div>
+                {form.has_component_change && <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>Detail komponen akan diisi oleh Ops saat assign ke teknisi</div>}
+              </div>
+            </label>
           </div>
 
           {/* Pilih Teknisi */}
@@ -12159,7 +12183,7 @@ function BranchTitipKirimForm({onSave, onCancel, branchName, onToast}) {
     goods:[{qty:1,name:'',desc:'',price:''}],
     info_tambahan:'',
     invoice_materai:false, delivery_method:'Kirim Hari Ini Tidak Urgent', goods_ready:false, goods_status:'', payment_status:'Langsung Tagih',
-    proforma_file:null,
+    proforma_file:null, has_component_change:false,
     status:'new', status_history:[], tracking:[], assigned_to:null, courier_name:null
   });
   const [saving, setSaving] = React.useState(false);
@@ -12181,6 +12205,7 @@ function BranchTitipKirimForm({onSave, onCancel, branchName, onToast}) {
       source_branch: branchName,
       info_tambahan: `[Titip Kirim dari Cabang: ${branchName}]${form.info_tambahan?' — '+form.info_tambahan:''}`,
       proforma_file: form.proforma_file||null,
+      has_component_change: !!(form.has_component_change),
       status_history:[{status:'new', time:new Date().toISOString(), note:`Titip kirim masuk dari cabang ${branchName}`, by:branchName}],
     };
     const result = await onSave(order);
