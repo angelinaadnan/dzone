@@ -8528,7 +8528,7 @@ const AO_DESC_PLACEHOLDER = {
 };
 
 function AdminOnlineTechRequest({intakes, onSave, onUpdate, createdBy}) {
-  const myIntakes = (intakes||[]).filter(si=>si.created_by===createdBy && si.created_by_role==='admin_online');
+  const myIntakes = (intakes||[]).filter(si=>si.created_by_role==='admin_online');
   const [showForm, setShowForm] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [filter, setFilter] = React.useState('all');
