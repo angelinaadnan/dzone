@@ -700,7 +700,7 @@ function App() {
     }
     let {error} = await db.from('service_intakes').update(updates).eq('id',id);
     if (error && (error.message||'').toLowerCase().includes('column')) {
-      const safe = Object.fromEntries(Object.entries(updates).filter(([k])=>!['tech_note_edits','linked_courier_task_id'].includes(k)));
+      const safe = Object.fromEntries(Object.entries(updates).filter(([k])=>!['tech_note_edits','linked_courier_task_id','return_method'].includes(k)));
       ({error} = await db.from('service_intakes').update(safe).eq('id',id));
     }
     if (error) { showToast('Error: '+error.message,'error'); return; }
