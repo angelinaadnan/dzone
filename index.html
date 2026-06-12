@@ -8704,8 +8704,16 @@ function AdminOnlineTechRequest({intakes, onSave, onUpdate, createdBy}) {
               {si.customer_phone&&<div style={{fontSize:12,color:'var(--text2)',marginTop:1}}>📞 {si.customer_phone}</div>}
               <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>💻 {si.unit_type}</div>
             </div>
-            <span className={`badge ${si.status==='done'?'badge-delivered':'badge-tech'}`}>
-              {si.status==='done'?'✅ Selesai':'🔧 Dalam Proses'}
+            <span className={`badge ${
+              si.return_status==='returned'?'badge-delivered':
+              si.status==='done'&&si.assigned_courier&&si.return_method==='kurir_internal'?'badge-delivery':
+              si.status==='done'?'badge-amber':
+              'badge-tech'
+            }`}>
+              {si.return_status==='returned'?'✅ Selesai':
+               si.status==='done'&&si.assigned_courier&&si.return_method==='kurir_internal'?'🚚 Menunggu Kurir':
+               si.status==='done'?'📦 Perlu Kirim':
+               '🔧 Dalam Proses'}
             </span>
           </div>
           {si.ao_work_type && (
