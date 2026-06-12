@@ -435,7 +435,7 @@ function App() {
       if (isAbsensi) return; // absensi_only: cukup attendance saja
 
       loadOrders();
-      if (isAdmin || isTech || isSales || isCabang || isCourier) loadServiceIntakes();
+      if (isAdmin || isTech || isSales || isCabang || isCourier || isOnline) loadServiceIntakes();
       if (isAdmin || isCourier) loadCourierTasks();
       if (isAdmin || isCabang || isCourier || isTech) loadBranchRequests();
       if (isAdmin || isSales || isPembelian || isOnline || isCourier) loadPurchaseOrders();
@@ -461,7 +461,7 @@ function App() {
     if (!['absensi_only'].includes(role)) {
       ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'orders'}, ()=>debounceReload('orders', loadOrders));
     }
-    if (isAdmin || isTech || isSales || isCabang || isCourier) {
+    if (isAdmin || isTech || isSales || isCabang || isCourier || isOnline) {
       ch = ch.on('postgres_changes', {event:'*', schema:'public', table:'service_intakes'}, ()=>debounceReload('si', loadServiceIntakes));
     }
     if (isAdmin || isCourier) {
