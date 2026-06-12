@@ -1182,7 +1182,7 @@ function App() {
 
   if (!role) return <LoginScreen onLogin={doLogin} demoMode={demoMode}/>;
 
-  const BRANCH_REQUEST_ALLOWED = ['TC RIZAL','TC LUVI'];
+  const BRANCH_REQUEST_ALLOWED = ['TC RIZAL','TC LUVI','PS DARTIK'];
   const PESAN_BARANG_ALLOWED_SALES = ['Aldi','Eliwaty','Tio'];
   const canAccessPesanBarang = ['admin','ops','admin_pembelian','admin_online','supervisor'].includes(role)
     || (role==='sales' && PESAN_BARANG_ALLOWED_SALES.includes(userName));
@@ -3624,9 +3624,12 @@ function SupervisorBranch({requests}) {
             </span>
           </div>
           {(r.items||[]).map((it,i)=>(
-            <div key={i} style={{fontSize:13,display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid var(--border)',opacity:it.in_trip?0.6:1}}>
-              <span>{it.in_trip?'✓ ':''}{it.name}</span>
-              <span style={{color:'var(--text2)'}}>x{it.qty}</span>
+            <div key={i} style={{padding:'5px 0',borderBottom:'1px solid var(--border)',opacity:it.in_trip?0.6:1}}>
+              <div style={{fontSize:13,display:'flex',justifyContent:'space-between'}}>
+                <span>{it.in_trip?'✓ ':''}{it.name}</span>
+                <span style={{color:'var(--text2)'}}>x{it.qty}</span>
+              </div>
+              {it.notes&&<div style={{fontSize:11,color:'var(--amber)',marginTop:2,fontWeight:600}}>📝 {it.notes}</div>}
             </div>
           ))}
           {(r.trips||[]).length>0 && (
@@ -13647,10 +13650,13 @@ function OpsBranchManager({requests, onUpdate}) {
                 }}>
                   {isDel?'✓':isOn?'↗':''}
                 </div>
-                <div style={{flex:1,fontSize:12,fontWeight:600,color:isDel?'var(--text3)':'var(--text)',textDecoration:isDel?'line-through':'none'}}>
-                  {it.name}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:600,color:isDel?'var(--text3)':'var(--text)',textDecoration:isDel?'line-through':'none'}}>
+                    {it.name}
+                  </div>
+                  {it.notes&&<div style={{fontSize:11,color:'var(--amber)',marginTop:1,fontWeight:600}}>📝 {it.notes}</div>}
                 </div>
-                <div style={{fontSize:11,color:'var(--text2)'}}>×{it.qty}</div>
+                <div style={{fontSize:11,color:'var(--text2)',flexShrink:0}}>×{it.qty}</div>
                 <div style={{fontSize:10,textAlign:'right',flexShrink:0,minWidth:90}}>
                   {isDel&&<span style={{color:'var(--green)'}}>✓ Trip #{trip?.no}</span>}
                   {isOn&&<span style={{color:'var(--blue)'}}>🚚 {trip?.courier} · Trip #{trip?.no}</span>}
