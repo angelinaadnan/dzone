@@ -2683,6 +2683,13 @@ function PurchaseOrderCard({po, onUpdate, onEdit, userName, canMark, role}) {
             {totalNilai>0&&<span style={{color:'var(--amber)',fontWeight:600}}>Total: {fmtCurrency(totalNilai)}</span>}
             {trips.length>0&&<span style={{color:'var(--blue)'}}>🚚 {trips.length} trip</span>}
           </div>
+          {items.some(it=>it.notes)&&(
+            <div style={{marginTop:5}}>
+              {items.filter(it=>it.notes).map((it,ni)=>(
+                <div key={ni} style={{fontSize:11,color:'var(--amber)',marginTop:1}}>📝 <b>{it.name}</b>: {it.notes}</div>
+              ))}
+            </div>
+          )}
         </div>
         <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
           <span className={`badge ${po.status==='cancelled'?'badge-cancelled':allArrived?'badge-delivered':arrivedCount>0?'badge-tech':'badge-new'}`}>
@@ -2757,7 +2764,7 @@ function PurchaseOrderCard({po, onUpdate, onEdit, userName, canMark, role}) {
                   )}
                   <div style={{fontSize:12,color:'var(--text2)',marginTop:1}}>
                     {it.price>0&&<span>{fmtCurrency(it.price)}/unit · <b style={{color:'var(--amber)'}}>{fmtCurrency(it.price*total)}</b></span>}
-                    {it.notes&&<span style={{color:'var(--text3)'}}> · {it.notes}</span>}
+                    {it.notes&&<div style={{marginTop:4,fontSize:11,color:'var(--amber)',fontWeight:600}}>📝 {it.notes}</div>}
                   </div>
                   {arrived&&it.arrived_by&&<div style={{fontSize:11,color:'var(--green)',marginTop:3}}>✓ Semua diterima oleh <b>{it.arrived_by}</b> · {fmtDateTime(it.arrived_at)}</div>}
                   {!arrived&&received>0&&it.last_recv_by&&<div style={{fontSize:11,color:'var(--amber)',marginTop:2}}>📦 +{it.last_recv_qty} diterima oleh <b>{it.last_recv_by}</b> · {fmtDateTime(it.last_recv_at)} · sisa {remain}</div>}
@@ -2880,6 +2887,16 @@ function PurchaseOrderCard({po, onUpdate, onEdit, userName, canMark, role}) {
                     </div>
                   );
                 })()}
+                {(()=>{
+                  const tripItemsWithNotes=(trip.trip_items||(trip.item_indices||[]).map(idx=>({idx,qty:null}))).filter(ti=>items[ti.idx]?.notes);
+                  return tripItemsWithNotes.length>0?(
+                    <div style={{marginTop:5}}>
+                      {tripItemsWithNotes.map((ti,ni)=>(
+                        <div key={ni} style={{fontSize:11,color:'var(--amber)',marginTop:1}}>📝 <b>{items[ti.idx]?.name}</b>: {items[ti.idx]?.notes}</div>
+                      ))}
+                    </div>
+                  ):null;
+                })()}
 
                 {trip.note&&<div style={{fontSize:11,color:'var(--text2)',marginTop:4}}>📝 {trip.note}</div>}
                 <div style={{fontSize:11,color:'var(--text3)',marginTop:4,display:'flex',gap:14,flexWrap:'wrap'}}>
@@ -2969,6 +2986,7 @@ function PurchaseOrderCard({po, onUpdate, onEdit, userName, canMark, role}) {
                               <span style={{fontSize:12,fontWeight:600}}>{it.name}</span>
                               <span style={{fontSize:11,color:'var(--text3)'}}>sisa {remain} {it.unit||'unit'}</span>
                             </div>
+                            {it.notes&&<div style={{marginLeft:22,marginTop:3,fontSize:11,color:'var(--amber)',fontWeight:600}}>📝 {it.notes}</div>}
                             {checked&&(
                               <div style={{display:'flex',alignItems:'center',gap:6,marginTop:5,marginLeft:22}}>
                                 <span style={{fontSize:11,color:'var(--text2)'}}>Qty dibawa:</span>
