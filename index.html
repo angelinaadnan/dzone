@@ -8508,9 +8508,29 @@ function AdminOnlineTechRequest({intakes, onSave, onUpdate, createdBy}) {
   const [form, setForm] = React.useState(emptyForm);
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
+  // Return shipping state
+  const [returnMode, setReturnMode] = React.useState({}); // {siId: 'kurir'|'ekspedisi'|'self'|null}
+  const [ekspForm, setEkspForm] = React.useState({});     // {siId: {name:'', resi:''}}
+  const setEksp = (id,k,v) => setEkspForm(f=>({...f,[id]:{...(f[id]||{}), [k]:v}}));
+
+  const doReturn = async (siId, method, extra={}) => {
+    const now = new Date().toISOString();
+    if (method==='kurir') {
+      // assign ke kurir lalu ops yg konfirmasi returned
+      await onUpdate(siId, {assigned_courier: extra.kurir, return_method:'kurir_internal'});
+    } else if (method==='ekspedisi') {
+      const label = `${extra.name||'Ekspedisi'}${extra.resi?' — Resi: '+extra.resi:''}`;
+      await onUpdate(siId, {assigned_courier: label, return_status:'returned', returned_at:now, return_method:'ekspedisi'});
+    } else if (method==='self') {
+      await onUpdate(siId, {assigned_courier:'Ambil Sendiri', return_status:'returned', returned_at:now, return_method:'self'});
+    }
+    setReturnMode(m=>({...m,[siId]:null}));
+  };
+
   const filtered = filter==='all' ? myIntakes : myIntakes.filter(si=>{
     if(filter==='pending') return ['to_technician','post_sc_checking'].includes(si.status);
-    if(filter==='done') return si.status==='done';
+    if(filter==='done') return si.status==='done' && si.return_status!=='returned';
+    if(filter==='returned') return si.return_status==='returned';
     return true;
   });
 
@@ -8634,9 +8654,16 @@ function AdminOnlineTechRequest({intakes, onSave, onUpdate, createdBy}) {
       )}
 
       {/* Filter */}
-      <div style={{display:'flex',gap:6,marginBottom:14}}>
-        {[['all','Semua'],['pending','Proses'],['done','Selesai']].map(([v,l])=>(
-          <button key={v} className={filter===v?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilter(v)}>{l} {v!=='all'&&`(${myIntakes.filter(si=>v==='pending'?si.status==='to_technician':si.status==='done').length})`}</button>
+      <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
+        {[
+          ['all','Semua', myIntakes.length],
+          ['pending','🔧 Proses', myIntakes.filter(si=>['to_technician','post_sc_checking'].includes(si.status)).length],
+          ['done','📦 Perlu Kirim', myIntakes.filter(si=>si.status==='done'&&si.return_status!=='returned').length],
+          ['returned','✅ Selesai', myIntakes.filter(si=>si.return_status==='returned').length],
+        ].map(([v,l,cnt])=>(
+          <button key={v} className={filter===v?'btn-primary btn-sm':'btn-secondary btn-sm'} onClick={()=>setFilter(v)}>
+            {l}{cnt>0?` (${cnt})`:' (0)'}
+          </button>
         ))}
       </div>
 
@@ -8671,6 +8698,96 @@ function AdminOnlineTechRequest({intakes, onSave, onUpdate, createdBy}) {
           {si.tech_components&&(si.tech_components.masuk?.length||si.tech_components.keluar?.length)&&(
             <CompLogDisplay comp={si.tech_components} verified={si.tech_components_verified} onVerify={null} supervisorName={null} canVerify={false} showHistory={false}/>
           )}
+
+          {/* ── RETURN SHIPPING — tampil ketika teknisi selesai ── */}
+          {si.status==='done' && si.return_status!=='returned' && (
+            <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border)'}}>
+              {/* Sudah ada kurir/metode, tapi belum returned */}
+              {si.assigned_courier && si.return_method==='kurir_internal' ? (
+                <div style={{fontSize:12,color:'var(--text2)'}}>
+                  🚚 Kurir: <b>{si.assigned_courier}</b> · <span style={{color:'var(--amber)'}}>Menunggu konfirmasi pengiriman dari Ops</span>
+                  <button className="btn-secondary btn-sm" style={{marginLeft:8,fontSize:10,color:'var(--red)'}} onClick={()=>onUpdate(si.id,{assigned_courier:null,return_method:null})}>✕ Batal</button>
+                </div>
+              ) : (
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:'var(--teal)',marginBottom:8}}>📦 Atur Pengiriman Balik ke Customer:</div>
+                  {!returnMode[si.id] && (
+                    <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                      <button className="btn-secondary btn-sm" onClick={()=>setReturnMode(m=>({...m,[si.id]:'kurir'}))}>🚚 Kurir Internal</button>
+                      <button className="btn-secondary btn-sm" style={{color:'var(--blue)'}} onClick={()=>setReturnMode(m=>({...m,[si.id]:'ekspedisi'}))}>📦 Ekspedisi Online</button>
+                      <button className="btn-secondary btn-sm" style={{color:'var(--green)'}} onClick={()=>setReturnMode(m=>({...m,[si.id]:'self'}))}>🚶 Ambil Sendiri</button>
+                    </div>
+                  )}
+                  {/* Kurir Internal — pilih dari list, ops yang konfirmasi returned */}
+                  {returnMode[si.id]==='kurir' && (
+                    <div>
+                      <div style={{fontSize:11,color:'var(--text2)',marginBottom:6}}>Pilih kurir pengiriman:</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                        {KURIR_LIST.map(n=>(
+                          <button key={n} className="btn-secondary btn-sm" onClick={()=>doReturn(si.id,'kurir',{kurir:n})}>{n}</button>
+                        ))}
+                        <button className="btn-secondary btn-sm" style={{color:'var(--text3)'}} onClick={()=>setReturnMode(m=>({...m,[si.id]:null}))}>← Batal</button>
+                      </div>
+                    </div>
+                  )}
+                  {/* Ekspedisi Online — isi nama ekspedisi + resi → langsung selesai */}
+                  {returnMode[si.id]==='ekspedisi' && (
+                    <div style={{background:'rgba(59,130,246,0.07)',border:'1px solid rgba(59,130,246,0.2)',borderRadius:8,padding:'12px 14px'}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'var(--blue)',marginBottom:10}}>📦 Ekspedisi Online — isi detail lalu konfirmasi</div>
+                      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:8}}>
+                        <div style={{flex:'1 1 140px'}}>
+                          <label style={{fontSize:11}}>Nama Ekspedisi</label>
+                          <input style={{padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border2)',borderRadius:7,color:'var(--text)',fontSize:13,width:'100%',boxSizing:'border-box'}}
+                            placeholder="JNE / J&T / Tokopedia..."
+                            value={ekspForm[si.id]?.name||''}
+                            onChange={e=>setEksp(si.id,'name',e.target.value)}
+                          />
+                        </div>
+                        <div style={{flex:'1 1 160px'}}>
+                          <label style={{fontSize:11}}>Nomor Resi</label>
+                          <input style={{padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border2)',borderRadius:7,color:'var(--text)',fontSize:13,width:'100%',boxSizing:'border-box',fontFamily:'DM Mono'}}
+                            placeholder="Resi pengiriman..."
+                            value={ekspForm[si.id]?.resi||''}
+                            onChange={e=>setEksp(si.id,'resi',e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div style={{display:'flex',gap:8}}>
+                        <button className="btn-primary btn-sm" style={{background:'var(--blue)'}}
+                          onClick={()=>{
+                            const d=ekspForm[si.id]||{};
+                            if(!d.name?.trim()){alert('Isi nama ekspedisi dulu');return;}
+                            if(!d.resi?.trim()){alert('Isi nomor resi dulu');return;}
+                            if(!window.confirm(`Konfirmasi sudah dikirim via ${d.name} — Resi: ${d.resi}?`)) return;
+                            doReturn(si.id,'ekspedisi',d);
+                          }}>✅ Konfirmasi Sudah Dikirim</button>
+                        <button className="btn-secondary btn-sm" onClick={()=>setReturnMode(m=>({...m,[si.id]:null}))}>← Batal</button>
+                      </div>
+                    </div>
+                  )}
+                  {/* Ambil Sendiri */}
+                  {returnMode[si.id]==='self' && (
+                    <div style={{background:'rgba(34,197,94,0.07)',border:'1px solid rgba(34,197,94,0.25)',borderRadius:8,padding:'12px 14px'}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'var(--green)',marginBottom:8}}>🚶 Ambil Sendiri — Konfirmasi</div>
+                      <div style={{fontSize:12,color:'var(--text2)',marginBottom:10}}>Konfirmasi barang sudah diambil langsung oleh customer?</div>
+                      <div style={{display:'flex',gap:8}}>
+                        <button className="btn-green btn-sm" onClick={()=>{if(!window.confirm('Konfirmasi customer sudah ambil barang?'))return; doReturn(si.id,'self');}}>✅ Ya, Sudah Diambil</button>
+                        <button className="btn-secondary btn-sm" onClick={()=>setReturnMode(m=>({...m,[si.id]:null}))}>← Batal</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sudah selesai dikembalikan */}
+          {si.return_status==='returned' && (
+            <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)',fontSize:12,color:'var(--green)'}}>
+              ✅ Selesai — dikirim via <b>{si.assigned_courier}</b> · {si.returned_at&&fmtDateTime(si.returned_at)}
+            </div>
+          )}
+
           <RequestCancelButton item={si} onUpdate={onUpdate} style={{marginTop:6}}/>
           {si.status==='cancel_requested' && (
             <div style={{marginTop:5,fontSize:11,color:'var(--red)',padding:'4px 8px',background:'rgba(239,68,68,0.07)',borderRadius:6}}>
