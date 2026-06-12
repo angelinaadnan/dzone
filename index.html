@@ -15279,7 +15279,14 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
               <div style={{fontSize:12,fontWeight:600,marginBottom:8,color:'var(--text2)'}}>
                 🚚 {si.source_type==='branch' ? `Pengiriman Balik ke Cabang ${si.branch_name||''}:` : 'Pengiriman Balik ke Customer:'}
               </div>
-              {!returnMode && (
+              {/* AO-created: return diatur oleh Admin Online di halaman Minta Teknisi mereka */}
+              {si.created_by_role==='admin_online' && !returnMode && (
+                <div style={{padding:'8px 12px',background:'rgba(108,99,255,0.07)',border:'1px solid rgba(108,99,255,0.2)',borderRadius:8,fontSize:12,color:'var(--accent2)',display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                  <span>⏳ Menunggu <b>{si.created_by||'Admin Online'}</b> atur pengiriman balik</span>
+                  <button className="btn-secondary btn-sm" style={{color:'var(--blue)',fontSize:11}} onClick={()=>setReturnMode('reroute_tech')}>🔧 Ke Teknisi Dulu</button>
+                </div>
+              )}
+              {si.created_by_role!=='admin_online' && !returnMode && (
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                   <button className="btn-secondary btn-sm" onClick={()=>setReturnMode('kurir')}>🚚 Kurir Internal</button>
                   <button className="btn-secondary btn-sm" onClick={()=>setReturnMode('self')}>🚶 Ambil Sendiri</button>
