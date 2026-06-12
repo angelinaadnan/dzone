@@ -3522,7 +3522,13 @@ function SupervisorServiceCard({si, allIntakes}) {
           {si.source_type==='branch' && <div style={{fontSize:11,color:'var(--blue)',marginTop:2}}>🏢 Dari Cabang: {si.branch_name}</div>}
           <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{fmtDateTime(si.created_at)}</div>
           {si.assigned_courier && si.status==='done' && <div style={{fontSize:12,color:'var(--text2)',marginTop:3}}>🚚 Antar balik: {si.assigned_courier}</div>}
+          {((si.complaints||[]).length>0 || si.complaint_notes) && (
+            <div style={{fontSize:11,color:'var(--amber)',marginTop:3}}>
+              ⚠ {[...(si.complaints||[]),si.complaint_notes].filter(Boolean).join(' · ')}
+            </div>
+          )}
           {si.ops_note && <div style={{fontSize:11,marginTop:4,padding:'4px 8px',background:'rgba(245,158,11,0.1)',borderRadius:5,color:'var(--amber)'}}>📝 <b>Ops:</b> {si.ops_note}</div>}
+          {si.tech_note && <div style={{fontSize:11,marginTop:4,padding:'3px 7px',background:'rgba(34,197,94,0.08)',borderRadius:5,color:'var(--green)'}}>✓ <b>Tech:</b> {si.tech_note}</div>}
         </div>
         <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
           <span className={`badge ${STATUS_SI[si.status]?.cls||'badge-new'}`} style={{whiteSpace:'nowrap'}}>{STATUS_SI[si.status]?.label||si.status}</span>
@@ -3632,6 +3638,7 @@ function SupervisorBranch({requests}) {
               {it.notes&&<div style={{fontSize:11,color:'var(--amber)',marginTop:2,fontWeight:600}}>📝 {it.notes}</div>}
             </div>
           ))}
+          {r.notes&&<div style={{fontSize:12,color:'var(--text2)',marginTop:6,fontStyle:'italic'}}>📝 {r.notes}</div>}
           {(r.trips||[]).length>0 && (
             <div style={{marginTop:8}}>
               {r.trips.map(t=>(
@@ -13218,6 +13225,11 @@ function BranchServicePage({intakes, onSave, onUpdate, branchName, branchMembers
                   )}
                 </div>
                 <div style={{fontSize:12,color:'var(--text2)',marginTop:2}}>{si.unit_type}{si.serial_number?' · '+si.serial_number:''}</div>
+                {((si.complaints||[]).length>0 || si.complaint_notes) && (
+                  <div style={{fontSize:11,color:'var(--amber)',marginTop:2}}>⚠ {[...(si.complaints||[]),si.complaint_notes].filter(Boolean).join(' · ')}</div>
+                )}
+                {si.ops_note && <div style={{fontSize:11,color:'var(--amber)',marginTop:2,padding:'2px 7px',background:'rgba(245,158,11,0.08)',borderRadius:4}}>📝 Ops: {si.ops_note}</div>}
+                {si.tech_note && <div style={{fontSize:11,color:'var(--green)',marginTop:2,padding:'2px 7px',background:'rgba(34,197,94,0.07)',borderRadius:4}}>✓ Tech: {si.tech_note}</div>}
                 <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>
                   {isBranchTech ? '🔧 Teknisi cabang'
                     : backAtBranch ? '📦 Barang sudah di cabang — tunggu diserahkan ke customer'
@@ -14564,7 +14576,8 @@ function CourierService({intakes, onSave, onUpdate, courierName}) {
               <div style={{fontSize:13,marginBottom:10,color:'var(--text2)'}}>🏢 Cabang: <b>{si.branch_name}</b></div>
               <div style={{fontSize:12,marginBottom:10}}>
                 <span style={{color:'var(--text2)'}}>Unit:</span> {si.unit_type}{si.serial_number?' · '+si.serial_number:''}<br/>
-                {(si.complaints||[]).length>0 && <span style={{color:'var(--amber)'}}>⚠ {si.complaints.slice(0,2).join(', ')}</span>}
+                {(si.complaints||[]).length>0 && <span style={{color:'var(--amber)'}}>⚠ {si.complaints.join(' · ')}</span>}
+                {si.complaint_notes && <div style={{fontSize:11,color:'var(--text3)',marginTop:1,fontStyle:'italic'}}>+ {si.complaint_notes}</div>}
               </div>
               <button className="btn-green" style={{width:'100%',padding:'9px'}} onClick={()=>
                 onUpdate(si.id,{courier_picked_up:true, courier_picked_up_at:new Date().toISOString()})
@@ -14853,7 +14866,9 @@ function ServiceCardOps({si, onUpdate, onSelect}) {
           <div style={{fontSize:13,color:'var(--text2)',marginTop:2}}>{si.unit_type}{si.serial_number?' · S/N: '+si.serial_number:''}</div>
           <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>Kurir jemput: {si.courier_name} · {fmtDateTime(si.created_at)}</div>
           {si.source_type==='branch' && <div style={{fontSize:11,color:'var(--blue)',marginTop:2}}>🏢 Dari Cabang: <b>{si.branch_name}</b> — barang kembali ke cabang setelah selesai</div>}
-          {(si.complaints||[]).length>0 && <div style={{fontSize:11,color:'var(--amber)',marginTop:3}}>⚠ {si.complaints.slice(0,2).join(', ')}</div>}
+          {(si.complaints||[]).length>0 && <div style={{fontSize:11,color:'var(--amber)',marginTop:3}}>⚠ {si.complaints.join(' · ')}</div>}
+          {si.complaint_notes && <div style={{fontSize:11,color:'var(--text3)',marginTop:1,fontStyle:'italic'}}>↳ {si.complaint_notes}</div>}
+          {si.tech_note && <div style={{fontSize:11,color:'var(--green)',marginTop:3,padding:'3px 7px',background:'rgba(34,197,94,0.08)',borderRadius:5}}>✓ Tech: {si.tech_note}</div>}
         </div>
         <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6,flexShrink:0}}>
           {(()=>{
