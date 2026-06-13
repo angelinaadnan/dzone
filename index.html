@@ -11946,9 +11946,9 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           setPhotoMsg(prev=>(({[bk]:_,...r})=>r)(prev));
                           if(!branchPhotos[bk]){alert('Upload foto bukti pengiriman ke cabang dulu');return;}
                           setSiPhotos(p=>({...p,[bk+'_gps']:true}));
-                          const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
+                          const startLoc=trip.transit_start_location||getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                           setSiPhotos(p=>({...p,[bk+'_gps']:false}));
-                          const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
+                          const km=startLoc&&loc?await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng):null;
                           if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`📍 Tiba di cabang: ${r.branch_name}${km?' · '+km+' km':''}`});
                           const branchPhotoUrl = await uploadPhoto(branchPhotos[bk]||null, 'branch', 0, setUploadMsg(bk));
                           if (!branchPhotoUrl) {
@@ -12014,9 +12014,9 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         setPhotoMsg(prev=>(({['sip_'+k]:_,...r})=>r)(prev));
                         if(!siPhotos[k]){alert('Upload foto bukti tiba di cabang dulu');return;}
                         setSiPhotos(p=>({...p,[k+'_gps']:true}));
-                        const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
+                        const startLoc=s.cb_transit_start_location||getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
-                        const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
+                        const km=startLoc&&loc?await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng):null;
                         if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`✅ Tiba & jemput di cabang: ${s.branch_name}${km?' · '+km+' km':''}`});
                         const pickupPhotoUrl = await uploadPhoto(siPhotos[k], 'si_pickup', 0, setUploadMsg('sip_'+k));
                         if (!pickupPhotoUrl) {
@@ -12074,7 +12074,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         setPhotoMsg(prev=>(({['scr_'+k]:_,...r})=>r)(prev));
                         if(!siPhotos[k]){alert('Upload bukti tanda terima dari SC dulu');return;}
                         setSiPhotos(p=>({...p,[k+'_gps']:true}));
-                        const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
+                        const startLoc=s.sc_transit_start_location||getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
                         const km=startLoc&&loc?await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng):null;
                         if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`✅ Tiba di SC: ${s.service_center_name}${km?' · '+km+' km':''}`});
@@ -12146,6 +12146,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                       setTransitLoading(l=>({...l,['scp_'+s.id]:true}));
                       let loc=null; try{loc=await getGPS();}catch(e){}
                       if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`▶ Mulai menuju SC (ambil): ${scName}`});
+                      await onUpdateSI(s.id,{...(loc?{scp_transit_start_location:loc}:{})});
                       setSiPhotos(p=>({...p,[k+'_intransit']:true,...(loc?{[k+'_startloc']:loc}:{})}));
                       setTransitLoading(l=>({...l,['scp_'+s.id]:false}));
                     }}>{transitLoading['scp_'+s.id]?'📡 GPS...':'▶ Mulai Perjalanan — '+scName}</button>)
@@ -12161,7 +12162,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         setPhotoMsg(prev=>(({['scp_'+k]:_,...r})=>r)(prev));
                         if(!siPhotos[k]){alert('Upload foto bukti pengambilan dari SC dulu');return;}
                         setSiPhotos(p=>({...p,[k+'_gps']:true}));
-                        const startLoc=siPhotos[k+'_startloc']||getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
+                        const startLoc=s.scp_transit_start_location||siPhotos[k+'_startloc']||getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
                         const km=startLoc&&loc?await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng):null;
                         if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`✅ Ambil dari SC: ${scName}${km?' · '+km+' km':''}`});
@@ -12228,9 +12229,9 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           setPhotoMsg(prev=>(({['ret_'+retKey]:_,...r})=>r)(prev));
                           if(!siPhotos[retKey]){alert('Foto bukti serah terima wajib diupload dulu');return;}
                           setRetGps(true);
-                          const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
+                          const startLoc=s.return_transit_start_location||getLastCheckin()||null; let loc=null; try{loc=await getGPS();}catch(e){}
                           setRetGps(false);
-                          const rKm=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
+                          const rKm=startLoc&&loc?await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng):null;
                           const dest2=s.source_type==='branch'?s.branch_name:s.customer_name;
                           if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`📍 Serah terima ke ${dest2}${rKm?' · '+rKm+' km':''}`});
                           const retPhotoUrl = await uploadPhoto(siPhotos[retKey], 'si_return', 0, setUploadMsg('ret_'+retKey));
