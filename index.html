@@ -7605,7 +7605,7 @@ function CourierDeliveries({orders, onUpdate, courierName, onSelect, checkins, o
                 setDeparted(d=>({...d,[o.id]:{loading:true}}));
                 let loc=null; try{loc=await getGPS();}catch(e){}
                 setDeparted(d=>({...d,[o.id]:{loading:false,loc,time:new Date().toISOString()}}));
-                if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`🛵 Berangkat antar order: ${o.customer_name}`});
+                if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`🛵 Berangkat antar order: ${o.customer_name}`});
               }}>
               {departed[o.id]?.loading?'📡 Mengambil GPS...':'🛵 Berangkat — Catat Lokasi Awal'}
             </button>
@@ -11449,7 +11449,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
     if(loc) updates.end_location=loc;
     if(startLoc&&loc) updates.distance_km = await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng);
     await onUpdateOrder(o.id,updates);
-    if(loc&&onCheckin) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Terkirim ke ${o.customer_name}${updates.distance_km?' · '+updates.distance_km+' km':''}`});
+    if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`✅ Terkirim ke ${o.customer_name}${updates.distance_km?' · '+updates.distance_km+' km':''}`});
     setOrderDelivering(d=>({...d,[o.id]:false}));
   };
   const handleSIPhoto = (key,e) => { const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onloadend=()=>setSiPhotos(p=>({...p,[key]:r.result})); r.readAsDataURL(f); };
@@ -11795,7 +11795,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                     <button className="btn-primary" style={{width:'100%',padding:'11px',fontWeight:700,fontSize:13}} disabled={transitLoading['ord_'+o.id]} onClick={async()=>{
                       setTransitLoading(l=>({...l,['ord_'+o.id]:true}));
                       let loc=null; try{loc=await getGPS();}catch(e){}
-                      if(loc&&onCheckin) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`▶ Mulai perjalanan ke ${o.customer_name}`});
+                      if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`▶ Mulai perjalanan ke ${o.customer_name}`});
                       await onUpdateOrder(o.id,{in_transit:true,transit_started_at:new Date().toISOString(),...(loc?{transit_start_location:loc}:{})});
                       setTransitLoading(l=>({...l,['ord_'+o.id]:false}));
                     }}>{transitLoading['ord_'+o.id]?'📡 GPS...':'▶ Mulai Perjalanan — '+o.customer_name}</button>)
@@ -11856,7 +11856,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         const tk='sup_'+po.id+'_'+p.no;
                         setTransitLoading(l=>({...l,[tk]:true}));
                         let loc=null; try{loc=await getGPS();}catch(e){}
-                        if(loc&&onCheckin) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`▶ Mulai menuju supplier: ${po.supplier_name}`});
+                        if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`▶ Mulai menuju supplier: ${po.supplier_name}`});
                         const updatedPickups=(po.pickups||[]).map(t=>t.no===p.no?{...t,in_transit:true,transit_started_at:new Date().toISOString(),...(loc?{transit_start_location:loc}:{})}:t);
                         await onUpdatePO(po.id,{pickups:updatedPickups});
                         setTransitLoading(l=>({...l,[tk]:false}));
@@ -11929,7 +11929,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                       <button className="btn-primary" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={transitLoading['br_'+bk]} onClick={async()=>{
                         setTransitLoading(l=>({...l,['br_'+bk]:true}));
                         let loc=null; try{loc=await getGPS();}catch(e){}
-                        if(loc&&onCheckin) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`▶ Mulai menuju cabang: ${r.branch_name}`});
+                        if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`▶ Mulai menuju cabang: ${r.branch_name}`});
                         const updatedTrips=(r.trips||[]).map(t=>t.no===trip.no?{...t,in_transit:true,transit_started_at:new Date().toISOString(),...(loc?{transit_start_location:loc}:{})}:t);
                         await onUpdateBranch(r.id,{trips:updatedTrips});
                         setTransitLoading(l=>({...l,['br_'+bk]:false}));
@@ -11949,7 +11949,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                           setSiPhotos(p=>({...p,[bk+'_gps']:false}));
                           const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
-                          if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`📍 Tiba di cabang: ${r.branch_name}${km?' · '+km+' km':''}`});
+                          if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`📍 Tiba di cabang: ${r.branch_name}${km?' · '+km+' km':''}`});
                           const branchPhotoUrl = await uploadPhoto(branchPhotos[bk]||null, 'branch', 0, setUploadMsg(bk));
                           if (!branchPhotoUrl) {
                             if (onQueuePhoto) {
@@ -11997,7 +11997,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                     <button className="btn-primary" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={transitLoading['cb_'+s.id]} onClick={async()=>{
                       setTransitLoading(l=>({...l,['cb_'+s.id]:true}));
                       let loc=null; try{loc=await getGPS();}catch(e){}
-                      if(loc&&onCheckin) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`▶ Mulai menuju cabang: ${s.branch_name}`});
+                      if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`▶ Mulai menuju cabang: ${s.branch_name}`});
                       await onUpdateSI(s.id,{cb_in_transit:true,cb_transit_started_at:new Date().toISOString(),...(loc?{cb_transit_start_location:loc}:{})});
                       setTransitLoading(l=>({...l,['cb_'+s.id]:false}));
                     }}>{transitLoading['cb_'+s.id]?'📡 GPS...':'▶ Mulai Perjalanan — '+s.branch_name}</button>)
@@ -12017,7 +12017,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
                         const km=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
-                        if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Tiba & jemput di cabang: ${s.branch_name}${km?' · '+km+' km':''}`});
+                        if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`✅ Tiba & jemput di cabang: ${s.branch_name}${km?' · '+km+' km':''}`});
                         const pickupPhotoUrl = await uploadPhoto(siPhotos[k], 'si_pickup', 0, setUploadMsg('sip_'+k));
                         if (!pickupPhotoUrl) {
                           if (onQueuePhoto) {
@@ -12058,7 +12058,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                     <button className="btn-primary" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={transitLoading['sc_'+s.id]} onClick={async()=>{
                       setTransitLoading(l=>({...l,['sc_'+s.id]:true}));
                       let loc=null; try{loc=await getGPS();}catch(e){}
-                      if(loc&&onCheckin) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`▶ Mulai menuju SC: ${s.service_center_name}`});
+                      if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`▶ Mulai menuju SC: ${s.service_center_name}`});
                       await onUpdateSI(s.id,{sc_in_transit:true,sc_transit_started_at:new Date().toISOString(),...(loc?{sc_transit_start_location:loc}:{})});
                       setTransitLoading(l=>({...l,['sc_'+s.id]:false}));
                     }}>{transitLoading['sc_'+s.id]?'📡 GPS...':'▶ Mulai Perjalanan — '+s.service_center_name}</button>)
@@ -12077,7 +12077,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         const startLoc=getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
                         const km=startLoc&&loc?await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng):null;
-                        if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Tiba di SC: ${s.service_center_name}${km?' · '+km+' km':''}`});
+                        if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`✅ Tiba di SC: ${s.service_center_name}${km?' · '+km+' km':''}`});
                         const scReceiptPhotoUrl = await uploadPhoto(siPhotos[k], 'sc_receipt', 0, setUploadMsg('scr_'+k));
                         if (!scReceiptPhotoUrl) {
                           if (onQueuePhoto) {
@@ -12145,7 +12145,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                     <button className="btn-primary" style={{width:'100%',padding:'11px',fontWeight:700}} disabled={transitLoading['scp_'+s.id]} onClick={async()=>{
                       setTransitLoading(l=>({...l,['scp_'+s.id]:true}));
                       let loc=null; try{loc=await getGPS();}catch(e){}
-                      if(loc&&onCheckin) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`▶ Mulai menuju SC (ambil): ${scName}`});
+                      if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`▶ Mulai menuju SC (ambil): ${scName}`});
                       setSiPhotos(p=>({...p,[k+'_intransit']:true,...(loc?{[k+'_startloc']:loc}:{})}));
                       setTransitLoading(l=>({...l,['scp_'+s.id]:false}));
                     }}>{transitLoading['scp_'+s.id]?'📡 GPS...':'▶ Mulai Perjalanan — '+scName}</button>)
@@ -12164,7 +12164,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         const startLoc=siPhotos[k+'_startloc']||getLastCheckin(); let loc=null; try{loc=await getGPS();}catch(e){}
                         setSiPhotos(p=>({...p,[k+'_gps']:false}));
                         const km=startLoc&&loc?await getRoadDistanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng):null;
-                        if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`✅ Ambil dari SC: ${scName}${km?' · '+km+' km':''}`});
+                        if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`✅ Ambil dari SC: ${scName}${km?' · '+km+' km':''}`});
                         const scPickupPhotoUrl = await uploadPhoto(siPhotos[k]||null, 'sc_pickup', 0, setUploadMsg('scp_'+k));
                         if (!scPickupPhotoUrl) {
                           if (onQueuePhoto) {
@@ -12211,7 +12211,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                         setTransitLoading(l=>({...l,['ret_'+s.id]:true}));
                         let loc=null; try{loc=await getGPS();}catch(e){}
                         const dest=s.source_type==='branch'?s.branch_name:s.customer_name;
-                        if(loc&&onCheckin) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`▶ Mulai antar balik ke: ${dest}`});
+                        if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`▶ Mulai antar balik ke: ${dest}`});
                         await onUpdateSI(s.id,{return_in_transit:true,return_transit_started_at:new Date().toISOString(),...(loc?{return_transit_start_location:loc}:{})});
                         setTransitLoading(l=>({...l,['ret_'+s.id]:false}));
                       }}>{transitLoading['ret_'+s.id]?'📡 GPS...':'▶ Mulai Perjalanan — '+(s.source_type==='branch'?s.branch_name:s.customer_name)}</button>)
@@ -12232,7 +12232,7 @@ function CourierJobTasks({tasks, onUpdate, onSaveServiceIntake, serviceIntakes, 
                           setRetGps(false);
                           const rKm=startLoc&&loc?parseFloat(distanceKm(startLoc.lat,startLoc.lng,loc.lat,loc.lng).toFixed(2)):null;
                           const dest2=s.source_type==='branch'?s.branch_name:s.customer_name;
-                          if(onCheckin&&loc) onCheckin({courier_name:courierName,lat:loc.lat,lng:loc.lng,note:`📍 Serah terima ke ${dest2}${rKm?' · '+rKm+' km':''}`});
+                          if(onCheckin) onCheckin({courier_name:courierName,lat:loc?.lat||null,lng:loc?.lng||null,note:`📍 Serah terima ke ${dest2}${rKm?' · '+rKm+' km':''}`});
                           const retPhotoUrl = await uploadPhoto(siPhotos[retKey], 'si_return', 0, setUploadMsg('ret_'+retKey));
                           if (!retPhotoUrl) {
                             if (onQueuePhoto) {
