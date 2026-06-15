@@ -1240,10 +1240,10 @@ function App() {
         {role==='sales' && page==='quotations' && <QuotationPage quotations={quotations} onSave={saveQuotation} onUpdate={updateQuotation} onSaveOrder={saveOrder} salesName={userName} onToast={showToast}/>}
         {role==='sales' && page==='my_orders' && <MyOrders orders={orders.filter(o=>o.sales_name===userName||demoMode)} onSelect={setSelectedOrder} onUpdate={updateOrder} currentUser={userName}/>}
 
-        {role==='admin' && page==='dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} onUpdateSI={updateServiceIntake} onUpdateTask={updateCourierTask} userRole="admin" userName={userName}/>}
+        {role==='admin' && page==='dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} onUpdateSI={updateServiceIntake} onUpdateTask={updateCourierTask} onUpdateBranch={updateBranchRequest} userRole="admin" userName={userName}/>}
         {role==='admin' && page==='orders' && <AdminOrders orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} currentUser={userName}/>}
         {role==='admin' && page==='invoicing' && <AdminInvoicing orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} onLoadFiles={loadOrderFiles}/>}
-        {role==='ops' && page==='dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} onUpdateSI={updateServiceIntake} onUpdateTask={updateCourierTask} userRole="ops" userName={userName}/>}
+        {role==='ops' && page==='dashboard' && <OpsDashboard orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} purchaseOrders={purchaseOrders} checkins={courierCheckins} onUpdateOrder={updateOrder} onUpdateSI={updateServiceIntake} onUpdateTask={updateCourierTask} onUpdateBranch={updateBranchRequest} userRole="ops" userName={userName}/>}
         {role==='ops' && page==='queue' && <OpsQueue orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder} currentUser={userName}/>}
         {role==='ops' && page==='op_orders' && <SupervisorOrders orders={orders} onSelect={setSelectedOrder} onUpdate={updateOrder} currentUser={userName} allowRevisi={false} hideNew={true}/>}
         {role==='ops' && page==='op_tasks' && <OpsTaskManager tasks={courierTasks} onSave={saveCourierTask} onUpdate={updateCourierTask} opsName={userName} onSaveServiceIntake={saveServiceIntake} allIntakes={serviceIntakes}/>}
@@ -9336,11 +9336,12 @@ function AdminRevisionPanel({orders, onUpdateOrder, adminName}) {
 }
 
 // Panel shown in ops dashboard — all pending cancel requests
-function CancelRequestsPanel({orders, serviceIntakes, courierTasks, onUpdateOrder, onUpdateSI, onUpdateTask}) {
+function CancelRequestsPanel({orders, serviceIntakes, courierTasks, branchRequests, onUpdateOrder, onUpdateSI, onUpdateTask, onUpdateBranch}) {
   const cancelOrders  = (orders||[]).filter(o=>o.status==='cancel_requested');
   const cancelSI      = (serviceIntakes||[]).filter(si=>si.status==='cancel_requested');
   const cancelTasks   = (courierTasks||[]).filter(t=>t.status==='cancel_requested');
-  const total = cancelOrders.length + cancelSI.length + cancelTasks.length;
+  const cancelBranch  = (branchRequests||[]).filter(r=>r.status==='cancel_requested');
+  const total = cancelOrders.length + cancelSI.length + cancelTasks.length + cancelBranch.length;
   const [expanded, setExpanded] = React.useState(true);
 
   if (total === 0) return null;
@@ -9349,12 +9350,14 @@ function CancelRequestsPanel({orders, serviceIntakes, courierTasks, onUpdateOrde
     if(type==='order')  onUpdateOrder(item.id,{status:'cancelled', cancel_approved_at: new Date().toISOString()});
     if(type==='si')     onUpdateSI(item.id,   {status:'cancelled', cancel_approved_at: new Date().toISOString()});
     if(type==='task')   onUpdateTask(item.id,  {status:'cancelled', cancel_approved_at: new Date().toISOString()});
+    if(type==='branch') onUpdateBranch(item.id,{status:'cancelled', cancel_approved_at: new Date().toISOString()});
   };
   const reject = (type, item) => {
     const prev = item.cancel_prev_status || (type==='order'?'new':type==='si'?'received':'pending');
     if(type==='order')  onUpdateOrder(item.id,{status:prev, cancel_reason:null, cancel_prev_status:null, cancel_requested_at:null});
     if(type==='si')     onUpdateSI(item.id,   {status:prev, cancel_reason:null, cancel_prev_status:null, cancel_requested_at:null});
     if(type==='task')   onUpdateTask(item.id,  {status:prev, cancel_reason:null, cancel_prev_status:null, cancel_requested_at:null});
+    if(type==='branch') onUpdateBranch(item.id,{status:prev||'pending', cancel_reason:null, cancel_prev_status:null, cancel_requested_at:null});
   };
 
   const Row = ({type, item, name, sub}) => (
@@ -9414,6 +9417,12 @@ function CancelRequestsPanel({orders, serviceIntakes, courierTasks, onUpdateOrde
             <Row key={t.id} type="task" item={t}
               name={`✅ ${t.task_type} — ${t.contact_name||t.description||'—'}`}
               sub={`Dibuat: ${t.created_by} · Status sebelum: ${TASK_STATUS[t.cancel_prev_status]?.label||t.cancel_prev_status}`}
+            />
+          ))}
+          {cancelBranch.map(r=>(
+            <Row key={r.id} type="branch" item={r}
+              name={`📦 Request Barang — ${r.branch_name}`}
+              sub={`${(r.items||[]).length} item · Diminta: ${r.requested_by||r.branch_name}`}
             />
           ))}
         </>
@@ -9913,7 +9922,7 @@ function FakturPajakCheckPanel({orders, onUpdateOrder, userName, userRole}) {
 }
 
 // ─── OPS / ADMIN DASHBOARD ────────────────────────────────────────
-function OpsDashboard({orders, serviceIntakes, courierTasks, branchRequests, purchaseOrders, checkins, onUpdateOrder, onUpdateSI, onUpdateTask, userRole, userName}) {
+function OpsDashboard({orders, serviceIntakes, courierTasks, branchRequests, purchaseOrders, checkins, onUpdateOrder, onUpdateSI, onUpdateTask, onUpdateBranch, userRole, userName}) {
   const today     = new Date().toISOString().split('T')[0];
   const thisMonth = new Date().toISOString().slice(0,7);
   const si  = serviceIntakes||[];
@@ -10026,7 +10035,7 @@ function OpsDashboard({orders, serviceIntakes, courierTasks, branchRequests, pur
       {userRole==='ops' && onUpdateOrder && <RevisionNotificationsPanel orders={orders} onUpdateOrder={onUpdateOrder} opsName={userName}/>}
       {userRole==='admin' && onUpdateOrder && <AdminRevisionPanel orders={orders} onUpdateOrder={onUpdateOrder} adminName={userName}/>}
       {(userRole==='admin'||userRole==='supervisor') && <FakturPajakCheckPanel orders={orders} onUpdateOrder={onUpdateOrder} userName={userName} userRole={userRole}/>}
-      <CancelRequestsPanel orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} onUpdateOrder={onUpdateOrder} onUpdateSI={onUpdateSI} onUpdateTask={onUpdateTask}/>
+      <CancelRequestsPanel orders={orders} serviceIntakes={serviceIntakes} courierTasks={courierTasks} branchRequests={branchRequests} onUpdateOrder={onUpdateOrder} onUpdateSI={onUpdateSI} onUpdateTask={onUpdateTask} onUpdateBranch={onUpdateBranch}/>
 
       {/* ── SUPERVISOR: New Order + Invoiced panels ── */}
       {userRole==='supervisor' && (()=>{
@@ -12560,11 +12569,19 @@ function BranchTitipKirimPage({orders, onSave, onUpdate, branchName, branchMembe
               <div style={{textAlign:'right',flexShrink:0}}>
                 <div style={{fontSize:11,fontWeight:700,color:sc.color,marginBottom:4}}>{sc.label}</div>
                 <div style={{fontSize:10,color:'var(--text3)'}}>{fmtDateTime(o.created_at)}</div>
-                {o.status==='new'&&onUpdate&&(
-                  <button className="btn-secondary btn-sm" style={{marginTop:6,fontSize:11,color:'var(--red)',borderColor:'var(--red)'}}
-                    onClick={()=>{if(window.confirm('Batalkan titip kirim ini?')) onUpdate(o.id,{status:'cancelled',cancel_reason:'Dibatalkan oleh cabang',cancelled_at:new Date().toISOString()});}}>
-                    ✕ Batal
-                  </button>
+                {!['delivered','cancelled','cancel_requested'].includes(o.status)&&onUpdate&&(
+                  o.status==='new'
+                    ? <button className="btn-secondary btn-sm" style={{marginTop:6,fontSize:11,color:'var(--red)',borderColor:'var(--red)'}}
+                        onClick={()=>{if(window.confirm('Batalkan titip kirim ini?')) onUpdate(o.id,{status:'cancelled',cancel_reason:'Dibatalkan oleh cabang',cancelled_at:new Date().toISOString()});}}>
+                        ✕ Batal
+                      </button>
+                    : <button className="btn-secondary btn-sm" style={{marginTop:6,fontSize:11,color:'var(--amber)',borderColor:'var(--amber)'}}
+                        onClick={()=>{const alasan=window.prompt('Alasan minta batal (opsional):','');if(alasan===null)return;onUpdate(o.id,{status:'cancel_requested',cancel_reason:alasan.trim()||'Minta batal oleh cabang',cancel_prev_status:o.status,cancel_requested_at:new Date().toISOString()});}}>
+                        ⚠ Minta Batal
+                      </button>
+                )}
+                {o.status==='cancel_requested'&&(
+                  <div style={{marginTop:6,fontSize:10,color:'var(--amber)',fontWeight:600}}>⏳ Menunggu approval ops</div>
                 )}
               </div>
             </div>
@@ -12759,13 +12776,24 @@ function BranchRequestPage({requests, onSave, onUpdate, branchName, branchMember
               {r.notes&&<div style={{fontSize:12,color:'var(--text2)',marginTop:3,fontStyle:'italic'}}>📝 {r.notes}</div>}
             </div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
-              {r.status==='pending'&&inProgressCount===0&&deliveredCount===0&&onUpdate&&(<>
-                <button className="btn-secondary btn-sm" onClick={()=>setEditReq(r)} style={{fontSize:11,padding:'4px 10px'}}>✏️ Edit</button>
-                <button className="btn-secondary btn-sm" style={{fontSize:11,padding:'4px 10px',color:'var(--red)',borderColor:'var(--red)'}}
-                  onClick={()=>{if(window.confirm('Batalkan request barang ini?')) onUpdate(r.id,{status:'cancelled',cancelled_at:new Date().toISOString(),cancel_reason:'Dibatalkan oleh cabang'});}}>
-                  ✕ Batal
-                </button>
+              {!['cancelled','cancel_requested'].includes(r.status)&&!allDone&&onUpdate&&(<>
+                {inProgressCount===0&&deliveredCount===0&&(
+                  <button className="btn-secondary btn-sm" onClick={()=>setEditReq(r)} style={{fontSize:11,padding:'4px 10px'}}>✏️ Edit</button>
+                )}
+                {inProgressCount===0&&deliveredCount===0
+                  ? <button className="btn-secondary btn-sm" style={{fontSize:11,padding:'4px 10px',color:'var(--red)',borderColor:'var(--red)'}}
+                      onClick={()=>{if(window.confirm('Batalkan request barang ini?')) onUpdate(r.id,{status:'cancelled',cancelled_at:new Date().toISOString(),cancel_reason:'Dibatalkan oleh cabang'});}}>
+                      ✕ Batal
+                    </button>
+                  : <button className="btn-secondary btn-sm" style={{fontSize:11,padding:'4px 10px',color:'var(--amber)',borderColor:'var(--amber)'}}
+                      onClick={()=>{const alasan=window.prompt('Alasan minta batal (opsional):','');if(alasan===null)return;onUpdate(r.id,{status:'cancel_requested',cancel_reason:alasan.trim()||'Minta batal oleh cabang',cancel_prev_status:r.status,cancel_requested_at:new Date().toISOString()});}}>
+                      ⚠ Minta Batal
+                    </button>
+                }
               </>)}
+              {r.status==='cancel_requested'&&(
+                <div style={{fontSize:10,color:'var(--amber)',fontWeight:600}}>⏳ Menunggu ops</div>
+              )}
               <span className={`badge ${allDone?'badge-delivered':r.status==='cancelled'?'badge-cancelled':inProgressCount>0||deliveredCount>0?'badge-delivery':'badge-new'}`}>
                 {allDone?'✅ Semua Diterima':r.status==='cancelled'?'✕ Dibatalkan':inProgressCount>0?'🚚 Sedang Dikirim':deliveredCount>0?`📦 ${deliveredCount}/${totalItems} Diterima`:'⏳ Menunggu Ops'}
               </span>
