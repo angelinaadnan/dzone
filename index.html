@@ -1252,7 +1252,7 @@ function App() {
         {role==='cabang' && page==='branch_dashboard' && <BranchDashboard requests={branchRequests} intakes={serviceIntakes} orders={orders} branchName={userName} branchMembers={getBranchMembers(userName)} onNavigate={setPage}/>}
         {role==='cabang' && page==='branch_request' && <BranchRequestPage requests={branchRequests} onSave={saveBranchRequest} onUpdate={updateBranchRequest} branchName={userName} branchMembers={getBranchMembers(userName)}/>}
         {role==='cabang' && page==='branch_service' && <BranchServicePage intakes={serviceIntakes} onSave={saveServiceIntake} onUpdate={updateServiceIntake} branchName={userName} branchMembers={getBranchMembers(userName)}/>}
-        {role==='cabang' && page==='branch_titip_kirim' && <BranchTitipKirimPage orders={orders} onSave={saveOrder} branchName={userName} branchMembers={getBranchMembers(userName)} onToast={showToast}/>}
+        {role==='cabang' && page==='branch_titip_kirim' && <BranchTitipKirimPage orders={orders} onSave={saveOrder} onUpdate={updateOrder} branchName={userName} branchMembers={getBranchMembers(userName)} onToast={showToast}/>}
         {role==='cabang' && page==='branch_history' && <BranchHistory requests={branchRequests} intakes={serviceIntakes} orders={orders} branchName={userName} branchMembers={getBranchMembers(userName)}/>}
         {role==='ops' && page==='assign' && <OpsAssign orders={orders} onUpdate={updateOrder}/>}
         {role==='ops' && page==='tech_ready' && <OpsTechReady orders={orders} onUpdate={updateOrder} onSelect={setSelectedOrder}/>}
@@ -12508,7 +12508,7 @@ function BranchTitipKirimForm({onSave, onCancel, branchName, onToast}) {
   );
 }
 
-function BranchTitipKirimPage({orders, onSave, branchName, branchMembers, onToast}) {
+function BranchTitipKirimPage({orders, onSave, onUpdate, branchName, branchMembers, onToast}) {
   const members = branchMembers || [branchName];
   const [showForm, setShowForm] = React.useState(false);
   const myOrders = (orders||[])
@@ -12560,6 +12560,12 @@ function BranchTitipKirimPage({orders, onSave, branchName, branchMembers, onToas
               <div style={{textAlign:'right',flexShrink:0}}>
                 <div style={{fontSize:11,fontWeight:700,color:sc.color,marginBottom:4}}>{sc.label}</div>
                 <div style={{fontSize:10,color:'var(--text3)'}}>{fmtDateTime(o.created_at)}</div>
+                {o.status==='new'&&onUpdate&&(
+                  <button className="btn-secondary btn-sm" style={{marginTop:6,fontSize:11,color:'var(--red)',borderColor:'var(--red)'}}
+                    onClick={()=>{if(window.confirm('Batalkan titip kirim ini?')) onUpdate(o.id,{status:'cancelled',cancel_reason:'Dibatalkan oleh cabang',cancelled_at:new Date().toISOString()});}}>
+                    ✕ Batal
+                  </button>
+                )}
               </div>
             </div>
 
@@ -12753,11 +12759,15 @@ function BranchRequestPage({requests, onSave, onUpdate, branchName, branchMember
               {r.notes&&<div style={{fontSize:12,color:'var(--text2)',marginTop:3,fontStyle:'italic'}}>📝 {r.notes}</div>}
             </div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
-              {r.status==='pending'&&onUpdate&&(
+              {r.status==='pending'&&inProgressCount===0&&deliveredCount===0&&onUpdate&&(<>
                 <button className="btn-secondary btn-sm" onClick={()=>setEditReq(r)} style={{fontSize:11,padding:'4px 10px'}}>✏️ Edit</button>
-              )}
-              <span className={`badge ${allDone?'badge-delivered':inProgressCount>0||deliveredCount>0?'badge-delivery':'badge-new'}`}>
-                {allDone?'✅ Semua Diterima':inProgressCount>0?'🚚 Sedang Dikirim':deliveredCount>0?`📦 ${deliveredCount}/${totalItems} Diterima`:'⏳ Menunggu Ops'}
+                <button className="btn-secondary btn-sm" style={{fontSize:11,padding:'4px 10px',color:'var(--red)',borderColor:'var(--red)'}}
+                  onClick={()=>{if(window.confirm('Batalkan request barang ini?')) onUpdate(r.id,{status:'cancelled',cancelled_at:new Date().toISOString(),cancel_reason:'Dibatalkan oleh cabang'});}}>
+                  ✕ Batal
+                </button>
+              </>)}
+              <span className={`badge ${allDone?'badge-delivered':r.status==='cancelled'?'badge-cancelled':inProgressCount>0||deliveredCount>0?'badge-delivery':'badge-new'}`}>
+                {allDone?'✅ Semua Diterima':r.status==='cancelled'?'✕ Dibatalkan':inProgressCount>0?'🚚 Sedang Dikirim':deliveredCount>0?`📦 ${deliveredCount}/${totalItems} Diterima`:'⏳ Menunggu Ops'}
               </span>
             </div>
           </div>
