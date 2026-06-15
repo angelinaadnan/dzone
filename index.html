@@ -6973,7 +6973,7 @@ function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
 
 // ─── OPS QUEUE ─────────────────────────────────────────────────────
 function OpsQueue({orders, onUpdate, onSelect, currentUser}) {
-  const ready = orders.filter(o=>o.status==='invoiced');
+  const ready = orders.filter(o=>o.status==='invoiced' && !SALES_AO.includes(o.sales_name));
   const [techOpen, setTechOpen] = React.useState({}); // {id: bool}
   const [techPick, setTechPick] = React.useState({}); // {id: name}
   const TECH_LIST = ['Deden','Komeng'];
@@ -7181,7 +7181,7 @@ function OpsTechReady({orders, onUpdate, onSelect}) {
 
 // ─── OPS ASSIGN ────────────────────────────────────────────────────
 function OpsAssign({orders, onUpdate}) {
-  const inPrep = orders.filter(o=>o.status==='prep');
+  const inPrep = orders.filter(o=>o.status==='prep' && !SALES_AO.includes(o.sales_name));
   const techDone = orders.filter(o=>o.status==='tech_done');
   const [assignData, setAssignData] = useState({});
   const [reassign, setReassign] = useState({}); // {id: 'courier'|'tech'|null}
