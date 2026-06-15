@@ -6850,18 +6850,17 @@ function AdminOnlineInvoicing({orders, onUpdate, onSelect, onLoadFiles, aoName})
 // Admin Online — All Orders view (sama seperti AdminOrders tapi khusus SALES_AO)
 function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
   const [search, setSearch] = React.useState('');
-  const [ekspedisiOpen, setEkspedisiOpen] = React.useState({});
+  const [pengirimanOpen, setPengirimanOpen] = React.useState({});
   const [ekspedisiForm, setEkspedisiForm] = React.useState({});
   const [saving, setSaving] = React.useState({});
 
-  const toggleEkspedisi = (id) => setEkspedisiOpen(p=>({...p,[id]:!p[id]}));
   const setField = (id,k,v) => setEkspedisiForm(p=>({...p,[id]:{...(p[id]||{}),[k]:v}}));
 
   const submitEkspedisi = async (o) => {
     const form = ekspedisiForm[o.id]||{};
     if(!form.nama?.trim()) { alert('Nama ekspedisi wajib diisi'); return; }
     if(!form.resi?.trim()) { alert('Nomor resi wajib diisi'); return; }
-    setSaving(p=>({...p,[o.id]:true}));
+    setSaving(p=>({...p,[o.id]:'eks'}));
     await onUpdate(o.id, {
       status: 'delivered',
       delivery_method: form.nama.trim(),
@@ -6870,11 +6869,25 @@ function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
       courier_name: form.nama.trim(),
       status_note: `Dikirim via ${form.nama.trim()}, resi: ${form.resi.trim()}`,
     });
-    setSaving(p=>({...p,[o.id]:false}));
-    setEkspedisiOpen(p=>({...p,[o.id]:false}));
+    setSaving(p=>({...p,[o.id]:null}));
+    setPengirimanOpen(p=>({...p,[o.id]:null}));
   };
 
-  const EKSPEDISI_STATUSES = ['invoiced','prep','tech_done','ao_serah','on_delivery'];
+  const submitKurirInternal = async (o) => {
+    setSaving(p=>({...p,[o.id]:'kurir'}));
+    await onUpdate(o.id, {delivery_method:'Kurir Internal'});
+    setSaving(p=>({...p,[o.id]:null}));
+    setPengirimanOpen(p=>({...p,[o.id]:null}));
+  };
+
+  const submitAmbilSendiri = async (o) => {
+    setSaving(p=>({...p,[o.id]:'ambil'}));
+    await onUpdate(o.id, {delivery_method:'Di Pickup Sendiri', status:'ao_serah'});
+    setSaving(p=>({...p,[o.id]:null}));
+    setPengirimanOpen(p=>({...p,[o.id]:null}));
+  };
+
+  const ACTIVE_STATUSES = ['invoiced','prep','tech','tech_done'];
 
   const myOrders = orders
     .filter(o=>SALES_AO.includes(o.sales_name))
@@ -6901,12 +6914,63 @@ function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
               <div style={{fontFamily:'Syne',fontWeight:700,fontSize:13,color:'var(--accent2)'}}>{fmtCurrency(totalOrder(o.goods))}</div>
             </div>
           </div>
-          {/* ── Kirim via Ekspedisi ── */}
-          {EKSPEDISI_STATUSES.includes(o.status) && (
+          {/* ── Pilih Metode Pengiriman (khusus SALES_AO) ── */}
+          {SALES_AO.includes(o.sales_name) && ACTIVE_STATUSES.includes(o.status) && !o.delivery_method && (
             <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}} onClick={e=>e.stopPropagation()}>
-              {!ekspedisiOpen[o.id] ? (
+              {!pengirimanOpen[o.id] ? (
+                <button className="btn-secondary btn-sm" style={{fontSize:12,color:'var(--accent2)',borderColor:'var(--accent2)'}}
+                  onClick={()=>setPengirimanOpen(p=>({...p,[o.id]:'choose'}))}>
+                  🚀 Pilih Metode Pengiriman
+                </button>
+              ) : pengirimanOpen[o.id]==='choose' ? (
+                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <button className="btn-secondary btn-sm" style={{fontSize:12,color:'var(--green)',borderColor:'var(--green)'}}
+                    disabled={saving[o.id]} onClick={()=>submitKurirInternal(o)}>
+                    {saving[o.id]==='kurir'?'Menyimpan...':'🚚 Kurir Internal'}
+                  </button>
+                  <button className="btn-secondary btn-sm" style={{fontSize:12,color:'var(--teal)',borderColor:'var(--teal)'}}
+                    disabled={saving[o.id]} onClick={()=>submitAmbilSendiri(o)}>
+                    {saving[o.id]==='ambil'?'Menyimpan...':'🤝 Ambil Sendiri'}
+                  </button>
+                  <button className="btn-secondary btn-sm" style={{fontSize:12,color:'var(--blue)',borderColor:'var(--blue)'}}
+                    onClick={()=>setPengirimanOpen(p=>({...p,[o.id]:'eks'}))}>
+                    📦 Ekspedisi Online
+                  </button>
+                  <button className="btn-secondary btn-sm" style={{fontSize:11}}
+                    onClick={()=>setPengirimanOpen(p=>({...p,[o.id]:null}))}>✕</button>
+                </div>
+              ) : (
+                <div style={{background:'rgba(59,130,246,0.07)',border:'1px solid rgba(59,130,246,0.25)',borderRadius:8,padding:'12px'}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'var(--blue)',marginBottom:10}}>📦 Input Pengiriman Ekspedisi</div>
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:8}}>
+                    {['JNE','J&T','SiCepat','Anteraja','Ninja','POS','Tiki','Lion Parcel'].map(eks=>(
+                      <button key={eks} className={ekspedisiForm[o.id]?.nama===eks?'btn-primary btn-sm':'btn-secondary btn-sm'}
+                        style={{fontSize:11}} onClick={()=>setField(o.id,'nama',eks)}>{eks}</button>
+                    ))}
+                  </div>
+                  <input placeholder="Atau ketik nama ekspedisi lain..." value={ekspedisiForm[o.id]?.nama||''}
+                    onChange={e=>setField(o.id,'nama',e.target.value)}
+                    style={{width:'100%',padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,boxSizing:'border-box',marginBottom:8}}/>
+                  <input placeholder="Nomor Resi / Tracking..." value={ekspedisiForm[o.id]?.resi||''}
+                    onChange={e=>setField(o.id,'resi',e.target.value)}
+                    style={{width:'100%',padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,boxSizing:'border-box',marginBottom:10}}/>
+                  <div style={{display:'flex',gap:8}}>
+                    <button className="btn-primary btn-sm" style={{flex:1}} disabled={saving[o.id]==='eks'}
+                      onClick={()=>submitEkspedisi(o)}>
+                      {saving[o.id]==='eks'?'Menyimpan...':'✅ Konfirmasi Terkirim'}
+                    </button>
+                    <button className="btn-secondary btn-sm" onClick={()=>setPengirimanOpen(p=>({...p,[o.id]:'choose'}))}>← Kembali</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {/* Ekspedisi already chosen — show resi input for non-SALES_AO or late entry */}
+          {!SALES_AO.includes(o.sales_name) && ['invoiced','prep','tech_done','ao_serah','on_delivery'].includes(o.status) && (
+            <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}} onClick={e=>e.stopPropagation()}>
+              {!pengirimanOpen[o.id] ? (
                 <button className="btn-secondary btn-sm" style={{fontSize:12,color:'var(--blue)',borderColor:'var(--blue)'}}
-                  onClick={()=>toggleEkspedisi(o.id)}>
+                  onClick={()=>setPengirimanOpen(p=>({...p,[o.id]:'eks'}))}>
                   📦 Kirim via Ekspedisi Online
                 </button>
               ) : (
@@ -6925,11 +6989,11 @@ function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
                     onChange={e=>setField(o.id,'resi',e.target.value)}
                     style={{width:'100%',padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,boxSizing:'border-box',marginBottom:10}}/>
                   <div style={{display:'flex',gap:8}}>
-                    <button className="btn-primary btn-sm" style={{flex:1}} disabled={saving[o.id]}
+                    <button className="btn-primary btn-sm" style={{flex:1}} disabled={saving[o.id]==='eks'}
                       onClick={()=>submitEkspedisi(o)}>
-                      {saving[o.id]?'Menyimpan...':'✅ Konfirmasi Terkirim'}
+                      {saving[o.id]==='eks'?'Menyimpan...':'✅ Konfirmasi Terkirim'}
                     </button>
-                    <button className="btn-secondary btn-sm" onClick={()=>toggleEkspedisi(o.id)}>Batal</button>
+                    <button className="btn-secondary btn-sm" onClick={()=>setPengirimanOpen(p=>({...p,[o.id]:null}))}>Batal</button>
                   </div>
                 </div>
               )}
@@ -6973,7 +7037,7 @@ function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
 
 // ─── OPS QUEUE ─────────────────────────────────────────────────────
 function OpsQueue({orders, onUpdate, onSelect, currentUser}) {
-  const ready = orders.filter(o=>o.status==='invoiced' && !SALES_AO.includes(o.sales_name));
+  const ready = orders.filter(o=>o.status==='invoiced' && (!SALES_AO.includes(o.sales_name) || o.delivery_method==='Kurir Internal'));
   const [techOpen, setTechOpen] = React.useState({}); // {id: bool}
   const [techPick, setTechPick] = React.useState({}); // {id: name}
   const TECH_LIST = ['Deden','Komeng'];
@@ -7181,7 +7245,7 @@ function OpsTechReady({orders, onUpdate, onSelect}) {
 
 // ─── OPS ASSIGN ────────────────────────────────────────────────────
 function OpsAssign({orders, onUpdate}) {
-  const inPrep = orders.filter(o=>o.status==='prep' && !SALES_AO.includes(o.sales_name));
+  const inPrep = orders.filter(o=>o.status==='prep' && (!SALES_AO.includes(o.sales_name) || o.delivery_method==='Kurir Internal'));
   const techDone = orders.filter(o=>o.status==='tech_done');
   const [assignData, setAssignData] = useState({});
   const [reassign, setReassign] = useState({}); // {id: 'courier'|'tech'|null}
