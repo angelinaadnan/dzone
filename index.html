@@ -6915,7 +6915,7 @@ function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
             </div>
           </div>
           {/* ── Pilih Metode Pengiriman (khusus SALES_AO) ── */}
-          {SALES_AO.includes(o.sales_name) && ACTIVE_STATUSES.includes(o.status) && (
+          {SALES_AO.includes(o.sales_name) && ACTIVE_STATUSES.includes(o.status) && !o.delivery_method && (
             <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}} onClick={e=>e.stopPropagation()}>
               {!pengirimanOpen[o.id] ? (
                 <button className="btn-secondary btn-sm" style={{fontSize:12,color:'var(--accent2)',borderColor:'var(--accent2)'}}
