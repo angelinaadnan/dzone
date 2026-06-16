@@ -6479,7 +6479,7 @@ function AdminOrders({orders, onUpdate, onSelect, currentUser}) {
                       const updates = {
                         revisions: updatedRevs,
                         goods: pendingAdminRev.goods_after,
-                        status: 'invoiced',
+                        status: ['delivered','on_delivery','cancelled'].includes(o.status) ? o.status : 'invoiced',
                         invoice_number: finalInv,
                       };
                       if(pendingAdminRev.faktur_after!==undefined) updates.faktur_pajak = pendingAdminRev.faktur_after;
