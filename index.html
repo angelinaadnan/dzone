@@ -6999,6 +6999,33 @@ function AdminOnlineOrders({orders, onSelect, onUpdate, aoName}) {
               )}
             </div>
           )}
+          {/* AO order: delivery_method sudah ada (bukan Kurir/Ambil) tapi belum delivered — tampilkan resi input */}
+          {SALES_AO.includes(o.sales_name) && o.delivery_method &&
+           o.delivery_method!=='Kurir Internal' && o.delivery_method!=='Di Pickup Sendiri' &&
+           !['delivered','cancelled'].includes(o.status) && (
+            <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}} onClick={e=>e.stopPropagation()}>
+              {!pengirimanOpen[o.id] ? (
+                <button className="btn-secondary btn-sm" style={{fontSize:12,color:'var(--blue)',borderColor:'var(--blue)'}}
+                  onClick={()=>{setField(o.id,'nama',o.delivery_method);setPengirimanOpen(p=>({...p,[o.id]:'eks'}));}}>
+                  📦 Input Resi {o.delivery_method}
+                </button>
+              ) : (
+                <div style={{background:'rgba(59,130,246,0.07)',border:'1px solid rgba(59,130,246,0.25)',borderRadius:8,padding:'12px'}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'var(--blue)',marginBottom:10}}>📦 {o.delivery_method} — Input Nomor Resi</div>
+                  <input placeholder="Nomor Resi / Tracking..." value={ekspedisiForm[o.id]?.resi||''}
+                    onChange={e=>setField(o.id,'resi',e.target.value)}
+                    style={{width:'100%',padding:'7px 10px',background:'var(--bg3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:12,boxSizing:'border-box',marginBottom:10}}/>
+                  <div style={{display:'flex',gap:8}}>
+                    <button className="btn-primary btn-sm" style={{flex:1}} disabled={saving[o.id]==='eks'}
+                      onClick={()=>submitEkspedisi(o)}>
+                      {saving[o.id]==='eks'?'Menyimpan...':'✅ Konfirmasi Terkirim'}
+                    </button>
+                    <button className="btn-secondary btn-sm" onClick={()=>setPengirimanOpen(p=>({...p,[o.id]:null}))}>Batal</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {o.status==='delivered' && o.tracking && (
             <div style={{marginTop:6,paddingTop:6,borderTop:'1px solid var(--border)',fontSize:11,color:'var(--text2)'}}>
               📦 {o.delivery_method||'Ekspedisi'} · Resi: <b style={{color:'var(--text)',fontFamily:'DM Mono'}}>{o.tracking}</b>
