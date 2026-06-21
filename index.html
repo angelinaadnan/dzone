@@ -14162,6 +14162,10 @@ function QuotationPrintView(_ref108) {
     _React$useState178 = _slicedToArray(_React$useState177, 2),
     ppnMode = _React$useState178[0],
     _setPpnMode = _React$useState178[1];
+  var _React$useStatePN = React.useState('incl'),
+    _React$useStatePNA = _slicedToArray(_React$useStatePN, 2),
+    ppnNoteStyle = _React$useStatePNA[0],
+    setPpnNoteStyle = _React$useStatePNA[1];
   var _React$useState179 = React.useState(defaultPpn === 'ppn' ? 'adl' : 'saijan'),
     _React$useState180 = _slicedToArray(_React$useState179, 2),
     rekeningKey = _React$useState180[0],
@@ -14183,6 +14187,7 @@ function QuotationPrintView(_ref108) {
   var setPpnMode = function setPpnMode(mode) {
     _setPpnMode(mode);
     setRekeningKey(mode === 'ppn' ? 'adl' : 'saijan');
+    if (mode === 'nonppn') setPpnNoteStyle('incl');
   };
 
   // ── Bank account data ──────────────────────────────────────────────
@@ -14228,7 +14233,7 @@ function QuotationPrintView(_ref108) {
   var afterD = subTotal - overDisc;
   var ppnPct = Number(q.ppn_percent) || 11;
   // Harga sudah termasuk PPN — "pisah" = ekstrak komponen PPN dari total, BUKAN tambah
-  var showPpnBreak = ppnMode === 'ppn' && !q.ppn_included; // tampilkan baris DPP + PPN
+  var showPpnBreak = ppnMode === 'ppn' && ppnNoteStyle === 'pisah'; // tampilkan baris DPP + PPN
   var ppnAmt = showPpnBreak ? Math.round(afterD - afterD / (1 + ppnPct / 100)) : 0;
   var dpp = showPpnBreak ? afterD - ppnAmt : afterD;
   var biaya = Number(q.biaya_lainlain) || 0;
@@ -14450,6 +14455,25 @@ function QuotationPrintView(_ref108) {
           return setPpnMode(t);
         }
       }, lbl);
+    })), ppnMode === 'ppn' && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 6,
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: 11
+      }
+    }, "Keterangan PPN:"), [['incl', '✅ Incl PPN'], ['none', '🚫 Tanpa Keterangan'], ['pisah', '📊 Pisah DPP+PPN']].map(function(_r) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: _r[0],
+        style: btnToggle(ppnNoteStyle === _r[0]),
+        onClick: function(){ setPpnNoteStyle(_r[0]); }
+      }, _r[1]);
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
@@ -14753,12 +14777,17 @@ function QuotationPrintView(_ref108) {
         fontSize: 12,
         marginBottom: 14
       }
-    }, ppnMode === 'ppn' && /*#__PURE__*/React.createElement("div", {
+    }, ppnMode === 'ppn' && ppnNoteStyle === 'incl' && /*#__PURE__*/React.createElement("div", {
       style: {
         fontWeight: 700,
         marginBottom: 6
       }
-    }, showPpnBreak ? 'Harga sudah termasuk PPN (rincian di atas).' : 'Harga sudah termasuk PPN.'), ppnMode === 'nonppn' && /*#__PURE__*/React.createElement("div", {
+    }, 'Harga sudah termasuk PPN.'), ppnMode === 'ppn' && ppnNoteStyle === 'pisah' && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        marginBottom: 6
+      }
+    }, 'Harga sudah termasuk PPN (rincian di atas).'), ppnMode === 'nonppn' && /*#__PURE__*/React.createElement("div", {
       style: {
         fontWeight: 700,
         marginBottom: 6
@@ -14773,7 +14802,7 @@ function QuotationPrintView(_ref108) {
         fontSize: 12,
         marginBottom: 16
       }
-    }, ppnMode === 'ppn' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", null, "*) ", showPpnBreak ? "Harga sudah termasuk PPN ".concat(ppnPct, "% (terinci di tabel total)") : 'Harga sudah termasuk PPN')), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", null, "*) Penawaran berlaku ", q.validity_days || 3, " hari sejak diterbitkan"))), q.notes && /*#__PURE__*/React.createElement("div", {
+    }, ppnMode === 'ppn' && ppnNoteStyle === 'incl' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", null, "*) Harga sudah termasuk PPN")), ppnMode === 'ppn' && ppnNoteStyle === 'pisah' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", null, "*) Harga sudah termasuk PPN ".concat(ppnPct, "% (terinci di tabel total)"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", null, "*) Penawaran berlaku ", q.validity_days || 3, " hari sejak diterbitkan"))), q.notes && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         marginBottom: 14,
