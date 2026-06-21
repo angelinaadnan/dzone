@@ -14219,6 +14219,14 @@ function QuotationPrintView(_ref108) {
         no: '4805056666',
         name: 'SUSANTI'
       }]
+    },
+    liana: {
+      label: 'Liana',
+      accounts: [{
+        bank: 'BCA',
+        no: '4808608888',
+        name: 'LIANA SOFIANI'
+      }]
     }
   };
   var rekening = REKENING_DATA[rekeningKey];
@@ -14497,7 +14505,7 @@ function QuotationPrintView(_ref108) {
         onClick: function onClick() {
           return setRekeningKey(k);
         }
-      }, k === 'adl' ? '🏦 ADL' : k === 'saijan' ? '👤 Saijan' : '👤 Susanti');
+      }, k === 'adl' ? '🏦 ADL' : '👤 ' + v.label);
     })));
   };
   var printA4 = function printA4() {
