@@ -8191,7 +8191,7 @@ function PurchaseOrderCard(_ref60) {
       fontWeight: 700,
       color: 'var(--text2)'
     }
-  }, "\uD83D\uDE9A Riwayat Trip Jemput Barang dari Supplier"), /*#__PURE__*/React.createElement("span", {style:{fontSize:10,color:'var(--text3)',fontWeight:400,marginLeft:6}},"(bukan trip antar ke customer)"), canManagePickup && !allArrived && /*#__PURE__*/React.createElement("button", {
+  }, "\uD83D\uDE9A Riwayat Trip Pengiriman"), canManagePickup && !allArrived && /*#__PURE__*/React.createElement("button", {
     className: "btn-primary btn-sm",
     onClick: function onClick() {
       setAddingTrip(true);
@@ -44206,21 +44206,7 @@ function OrderDetailModal(_ref278) {
     style: {
       fontSize: 14
     }
-  }, order.tech_name), order.status === 'tech_done' && role === 'ops' && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 8,
-      padding: '10px 12px',
-      background: 'rgba(20,184,166,0.1)',
-      border: '1px solid rgba(20,184,166,0.4)',
-      borderRadius: 8,
-      fontSize: 12,
-      color: 'var(--teal)',
-      fontWeight: 700,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8
-    }
-  }, "✅ Teknisi selesai — pergi ke tab ", /*#__PURE__*/React.createElement("b", null, "🔧 Siap Kirim"), " untuk assign kurir pengiriman ke customer")), /*#__PURE__*/React.createElement("div", {
+  }, order.tech_name))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 4
     }
