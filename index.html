@@ -17213,6 +17213,11 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
     };
 
     // ── GPS Rute (leg-by-leg) ──
+    var extractKmNote = function extractKmNote(note) {
+      if (!note) return '';
+      var m = String(note).match(/[·•]\s*([\d.]+)\s*km/i);
+      return m ? parseFloat(m[1]) : '';
+    };
     var gpsRows = [];
     courierData.forEach(function (c) {
       c.legs.forEach(function (leg, i) {
@@ -17220,6 +17225,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'Kurir': c.name,
           'Leg': i + 1,
           'Dari': safeTxt(leg.from.note),
+          'Jarak Tempuh (km)': extractKmNote(leg.from.note),
           'Jam Dari': leg.from.created_at ? new Date(leg.from.created_at).toLocaleString('id-ID') : '',
           'Lat Dari': leg.from.lat || '',
           'Lng Dari': leg.from.lng || '',
@@ -17240,6 +17246,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'Kurir': c.name,
           'Leg': 1,
           'Dari': safeTxt(pt.note),
+          'Jarak Tempuh (km)': extractKmNote(pt.note),
           'Jam Dari': pt.created_at ? new Date(pt.created_at).toLocaleString('id-ID') : '',
           'Lat Dari': pt.lat || '',
           'Lng Dari': pt.lng || '',
