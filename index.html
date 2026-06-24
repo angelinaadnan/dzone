@@ -13677,7 +13677,7 @@ function QuotationForm(_ref106) {
     }));
   };
   var subTotal = (form.goods || []).reduce(function (s, g) {
-    return s + (Number(g.price) || 0) * (Number(g.qty) || 1) - (Number(g.discount) || 0);
+    return s + (Number(g.price) || 0) * (Number(g.qty) || 1) - (Number(g.discount) || 0) * (Number(g.qty) || 1);
   }, 0);
   var overallDisc = Number(form.overall_discount) || 0;
   var afterDisc = subTotal - overallDisc;
@@ -14236,7 +14236,7 @@ function QuotationPrintView(_ref108) {
   // ── Totals ─────────────────────────────────────────────────────────
   var goods = q.goods || [];
   var subTotal = goods.reduce(function (s, g) {
-    return s + (Number(g.price) || 0) * (Number(g.qty) || 1) - (Number(g.discount) || 0);
+    return s + (Number(g.price) || 0) * (Number(g.qty) || 1) - (Number(g.discount) || 0) * (Number(g.qty) || 1);
   }, 0);
   var overDisc = Number(q.overall_discount) || 0;
   var afterD = subTotal - overDisc;
@@ -14676,14 +14676,14 @@ function QuotationPrintView(_ref108) {
         textAlign: 'right',
         width: '10%'
       })
-    }, "Diskon"), /*#__PURE__*/React.createElement("th", {
+    }, "Diskon/item"), /*#__PURE__*/React.createElement("th", {
       style: _objectSpread(_objectSpread({}, th), {}, {
         textAlign: 'right',
         width: '21%'
       })
     }, "Total"))), /*#__PURE__*/React.createElement("tbody", null, goods.map(function (g, i) {
       var disc = Number(g.discount) || 0;
-      var rowTotal = (Number(g.price) || 0) * (Number(g.qty) || 1) - disc;
+      var rowTotal = (Number(g.price) || 0) * (Number(g.qty) || 1) - disc * (Number(g.qty) || 1);
       return /*#__PURE__*/React.createElement("tr", {
         key: i
       }, /*#__PURE__*/React.createElement("td", {
@@ -15024,13 +15024,13 @@ function QuotationPrintView(_ref108) {
       textAlign: 'right',
       width: '12%'
     })
-  }, "Diskon"), /*#__PURE__*/React.createElement("th", {
+  }, "Diskon/item"), /*#__PURE__*/React.createElement("th", {
     style: _objectSpread(_objectSpread({}, th), {}, {
       textAlign: 'right',
       width: '18%'
     })
   }, "Total Harga"))), /*#__PURE__*/React.createElement("tbody", null, goods.map(function (g, i) {
-    var lineTotal = (Number(g.price) || 0) * (Number(g.qty) || 1) - (Number(g.discount) || 0);
+    var lineTotal = (Number(g.price) || 0) * (Number(g.qty) || 1) - (Number(g.discount) || 0) * (Number(g.qty) || 1);
     return /*#__PURE__*/React.createElement("tr", {
       key: i
     }, /*#__PURE__*/React.createElement("td", {
