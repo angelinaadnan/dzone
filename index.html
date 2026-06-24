@@ -14510,13 +14510,24 @@ function QuotationPrintView(_ref108) {
     })));
   };
   var printA4 = function printA4() {
+    var printEl = document.getElementById('print-area');
+    if (!printEl) { window.print(); return; }
+    var clone = printEl.cloneNode(true);
+    clone.id = '__print_clone__';
+    clone.style.cssText = 'position:static;width:100%;padding:0;border-radius:0;box-shadow:none;background:#fff;';
+    var wrapper = document.createElement('div');
+    wrapper.id = '__print_wrapper__';
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
     var el = document.createElement('style');
     el.id = '__a4_override__';
-    el.textContent = '@media print { @page { size: A4 portrait; margin: 12mm 15mm; } }';
+    el.textContent = '@media print { @page { size: A4 portrait; margin: 12mm 15mm; } html,body{height:auto!important;overflow:visible!important;} body>*:not(#__print_wrapper__){display:none!important;} #__print_wrapper__{display:block!important;} #__print_clone__,#__print_clone__ *{visibility:visible!important;} .no-print{display:none!important;} }';
     document.head.appendChild(el);
     var cleanup = function cleanup() {
       var s = document.getElementById('__a4_override__');
       if (s) s.remove();
+      var w = document.getElementById('__print_wrapper__');
+      if (w) w.remove();
       window.removeEventListener('afterprint', cleanup);
     };
     window.addEventListener('afterprint', cleanup);
