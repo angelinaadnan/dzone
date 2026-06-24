@@ -15998,6 +15998,10 @@ function QuotationPage(_ref124) {
     _React$useState208 = _slicedToArray(_React$useState207, 2),
     filterStatus = _React$useState208[0],
     setFilterStatus = _React$useState208[1];
+  var _React$useStateSQ = React.useState(''),
+    _React$useStateSQ2 = _slicedToArray(_React$useStateSQ, 2),
+    searchQ = _React$useStateSQ2[0],
+    setSearchQ = _React$useStateSQ2[1];
   var _React$useState209 = React.useState(null),
     _React$useState210 = _slicedToArray(_React$useState209, 2),
     converting = _React$useState210[0],
@@ -16028,6 +16032,15 @@ function QuotationPage(_ref124) {
   var filtered = filterStatus === 'all' ? myQ : myQ.filter(function (q) {
     return q.status === filterStatus;
   });
+  var displayQ = searchQ.trim() ? filtered.filter(function (q) {
+    var s = searchQ.toLowerCase();
+    if ((q.customer_name || '').toLowerCase().includes(s)) return true;
+    if ((q.quotation_number || '').toLowerCase().includes(s)) return true;
+    if ((q.goods || []).some(function (g) { return (g.name || '').toLowerCase().includes(s); })) return true;
+    var d = q.created_at ? new Date(q.created_at).toLocaleDateString('id-ID') : '';
+    if (d.includes(s)) return true;
+    return false;
+  }) : filtered;
   var counts = Object.fromEntries(Object.keys(QT_STATUS).map(function (s) {
     return [s, myQ.filter(function (q) {
       return q.status === s;
@@ -16261,11 +16274,22 @@ function QuotationPage(_ref124) {
         opacity: 0.7
       }
     }, "(", cnt, ")"));
-  })), filtered.length === 0 && /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12, position: 'relative' }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    placeholder: "\uD83D\uDD0D Cari nama customer, barang, nomor, atau tanggal...",
+    value: searchQ,
+    onChange: function onChange(e) { return setSearchQ(e.target.value); },
+    style: { paddingLeft: 14, paddingRight: searchQ ? 32 : 14 }
+  }), searchQ && /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() { return setSearchQ(''); },
+    style: { position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text3)', lineHeight: 1 }
+  }, "\u00D7")), displayQ.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("div", {
     className: "icon"
-  }, "\uD83D\uDCC4"), /*#__PURE__*/React.createElement("div", null, filterStatus === 'all' ? 'Belum ada penawaran' : 'Tidak ada di kategori ini'), (!supervisorMode || canCreate) && /*#__PURE__*/React.createElement("button", {
+  }, searchQ ? "\uD83D\uDD0D" : "\uD83D\uDCC4"), /*#__PURE__*/React.createElement("div", null, searchQ ? "Tidak ada hasil untuk \"".concat(searchQ, "\"") : filterStatus === 'all' ? 'Belum ada penawaran' : 'Tidak ada di kategori ini'), (!supervisorMode || canCreate) && !searchQ && /*#__PURE__*/React.createElement("button", {
     className: "btn-primary",
     style: {
       marginTop: 12
@@ -16273,7 +16297,7 @@ function QuotationPage(_ref124) {
     onClick: function onClick() {
       return setView('form');
     }
-  }, "+ Buat Penawaran Pertama")), filtered.map(function (q) {
+  }, "+ Buat Penawaran Pertama")), displayQ.map(function (q) {
     var sc = QT_STATUS[q.status] || QT_STATUS.draft;
     var total = totalOrder(q.goods);
     var isConverting = converting === q.id;
