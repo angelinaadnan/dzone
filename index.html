@@ -14521,7 +14521,7 @@ function QuotationPrintView(_ref108) {
     document.body.appendChild(wrapper);
     var el = document.createElement('style');
     el.id = '__a4_override__';
-    el.textContent = '@media print { *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;} @page { size: A4 portrait; margin: 8mm 10mm; } html,body{height:auto!important;overflow:visible!important;} body>*:not(#__print_wrapper__){display:none!important;} #__print_wrapper__{display:block!important;} #__print_clone__,#__print_clone__ *{visibility:visible!important;} .no-print{display:none!important;} }';
+    el.textContent = '@media print { *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;} @page { size: A4 portrait; margin: 8mm 10mm; } html,body{height:auto!important;overflow:visible!important;background:#fff!important;color:#111!important;} body>*:not(#__print_wrapper__){display:none!important;} #__print_wrapper__{display:block!important;} #__print_clone__{color:#111!important;background:#fff!important;} #__print_clone__,#__print_clone__ *{visibility:visible!important;} .no-print{display:none!important;} }';
     document.head.appendChild(el);
     var cleanup = function cleanup() {
       var s = document.getElementById('__a4_override__');
