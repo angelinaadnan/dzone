@@ -44189,7 +44189,26 @@ function OrderDetailModal(_ref278) {
         fontWeight: 600
       }
     }, "+", ec);
-  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "No. Invoice"), !editingInvoice ? /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Status Barang"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: order.goods_status ? 600 : 400,
+      color: order.goods_status ? 'var(--accent2)' : 'var(--text3)'
+    }
+  }, order.goods_status || '—')), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Perubahan Komponen"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14
+    }
+  }, order.has_component_change ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--amber)',
+      fontWeight: 600
+    }
+  }, "⚠️ Ada Swap / Upgrade / Downgrade") : /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--text3)'
+    }
+  }, "Tidak ada"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "No. Invoice"), !editingInvoice ? /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
