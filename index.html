@@ -25220,20 +25220,15 @@ function AdminOnlineTechRequest(_ref167) {
       style: {
         background: 'var(--blue)'
       },
-      onClick: async function onClick() {
+      onClick: function onClick() {
         var _d$name2, _d$resi;
         var d = ekspForm[si.id] || {};
-        if (!((_d$name2 = d.name) !== null && _d$name2 !== void 0 && _d$name2.trim())) {
-          alert('Isi nama ekspedisi dulu');
-          return;
-        }
-        if (!((_d$resi = d.resi) !== null && _d$resi !== void 0 && _d$resi.trim())) {
-          alert('Isi nomor resi dulu');
-          return;
-        }
+        if (!((_d$name2 = d.name) !== null && _d$name2 !== void 0 && _d$name2.trim())) { alert('Isi nama ekspedisi dulu'); return; }
+        if (!((_d$resi = d.resi) !== null && _d$resi !== void 0 && _d$resi.trim())) { alert('Isi nomor resi dulu'); return; }
         if (!window.confirm("Konfirmasi sudah dikirim via ".concat(d.name, " \u2014 Resi: ").concat(d.resi, "?"))) return;
-        var _photoUrl = returnPhoto[si.id] ? await uploadPhoto(returnPhoto[si.id], 'si_return') : null;
-        doReturn(si.id, 'ekspedisi', _objectSpread({}, d, { photoUrl: _photoUrl }));
+        var _siId = si.id, _d = d;
+        var _p = returnPhoto[_siId] ? uploadPhoto(returnPhoto[_siId], 'si_return') : Promise.resolve(null);
+        _p.then(function(url) { doReturn(_siId, 'ekspedisi', _objectSpread(_objectSpread({}, _d), {}, { photoUrl: url })); });
       }
     }, "\u2705 Konfirmasi Sudah Dikirim"), /*#__PURE__*/React.createElement("button", {
       className: "btn-secondary btn-sm",
@@ -25280,10 +25275,11 @@ function AdminOnlineTechRequest(_ref167) {
       }
     }, /*#__PURE__*/React.createElement("button", {
       className: "btn-green btn-sm",
-      onClick: async function onClick() {
+      onClick: function onClick() {
         if (!window.confirm('Konfirmasi customer sudah ambil barang?')) return;
-        var _selfPhotoUrl = returnPhoto[si.id] ? await uploadPhoto(returnPhoto[si.id], 'si_return') : null;
-        doReturn(si.id, 'self', { photoUrl: _selfPhotoUrl });
+        var _siId2 = si.id;
+        var _p2 = returnPhoto[_siId2] ? uploadPhoto(returnPhoto[_siId2], 'si_return') : Promise.resolve(null);
+        _p2.then(function(url) { doReturn(_siId2, 'self', { photoUrl: url }); });
       }
     }, "\u2705 Ya, Sudah Diambil"), /*#__PURE__*/React.createElement("button", {
       className: "btn-secondary btn-sm",
