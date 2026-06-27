@@ -20171,7 +20171,7 @@ function OpsTechReady(_ref149) {
     return o.status === 'tech_done' && !(SALES_AO.includes(o.sales_name) && o.delivery_method === 'Di Pickup Sendiri');
   });
   var siPendingKurir = (serviceIntakes || []).filter(function (si) {
-    return si.return_status === 'assigned' && si.assigned_courier && si.return_method === 'kurir_internal';
+    return si.assigned_courier && si.return_method === 'kurir_internal' && (!si.return_status || si.return_status === 'assigned');
   });
   var _useState61 = useState({}),
     _useState62 = _slicedToArray(_useState61, 2),
@@ -24500,7 +24500,8 @@ function AdminOnlineTechRequest(_ref167) {
             _context73.next = 5;
             return onUpdate(siId, {
               assigned_courier: extra.kurir,
-              return_method: 'kurir_internal'
+              return_method: 'kurir_internal',
+              return_status: 'assigned'
             });
           case 5:
             _context73.next = 16;
@@ -24988,7 +24989,7 @@ function AdminOnlineTechRequest(_ref167) {
         paddingTop: 10,
         borderTop: '1px solid var(--border)'
       }
-    }, si.assigned_courier && si.return_method === 'kurir_internal' ? /*#__PURE__*/React.createElement("div", {
+    }, si.assigned_courier && si.return_method === 'kurir_internal' && si.return_status === 'in_delivery' ? /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--blue)' } }, "\uD83D\uDE9A Kurir ", /*#__PURE__*/React.createElement("b", null, si.assigned_courier), " \xB7 Sedang dalam perjalanan mengantar balik") : si.assigned_courier && si.return_method === 'kurir_internal' ? /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: 'var(--text2)'
@@ -25007,7 +25008,8 @@ function AdminOnlineTechRequest(_ref167) {
       onClick: function onClick() {
         return onUpdate(si.id, {
           assigned_courier: null,
-          return_method: null
+          return_method: null,
+          return_status: null
         });
       }
     }, "\u2715 Batal")) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
