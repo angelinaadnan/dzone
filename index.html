@@ -24511,6 +24511,16 @@ function AdminOnlineTechRequest(_ref167) {
     _React$useState256 = _slicedToArray(_React$useState255, 2),
     ekspForm = _React$useState256[0],
     setEkspForm = _React$useState256[1]; // {siId: {name:'', resi:''}}
+  var _React$useState_rp = React.useState({}),
+    _React$useState_rp2 = _slicedToArray(_React$useState_rp, 2),
+    returnPhoto = _React$useState_rp2[0],
+    setReturnPhoto = _React$useState_rp2[1];
+  var handleReturnPhoto = function handleReturnPhoto(siId, e) {
+    var file = e.target.files[0]; if (!file) return;
+    var reader = new FileReader();
+    reader.onloadend = function() { setReturnPhoto(function(p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, siId, reader.result)); }); };
+    reader.readAsDataURL(file);
+  };
   var setEksp = function setEksp(id, k, v) {
     return setEkspForm(function (f) {
       return _objectSpread(_objectSpread({}, f), {}, _defineProperty({}, id, _objectSpread(_objectSpread({}, f[id] || {}), {}, _defineProperty({}, k, v))));
@@ -24567,6 +24577,7 @@ function AdminOnlineTechRequest(_ref167) {
               return_status: 'returned',
               returned_at: now,
               return_method: 'self'
+              return_photo: extra.photoUrl || null,
             });
           case 16:
             setReturnMode(function (m) {
@@ -25188,6 +25199,17 @@ function AdminOnlineTechRequest(_ref167) {
       onChange: function onChange(e) {
         return setEksp(si.id, 'resi', e.target.value);
       }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: { marginBottom: 10, marginTop: 8 }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 }
+    }, "\uD83D\uDCF8 Foto Bukti Resi (opsional)"), /*#__PURE__*/React.createElement("input", {
+      type: "file", accept: "image/*", capture: "environment",
+      onChange: function onChange(e) { return handleReturnPhoto(si.id, e); }
+    }), returnPhoto[si.id] && /*#__PURE__*/React.createElement("img", {
+      src: returnPhoto[si.id],
+      style: { width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6, marginTop: 4 },
+      alt: "bukti resi"
     }))), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
@@ -25198,7 +25220,7 @@ function AdminOnlineTechRequest(_ref167) {
       style: {
         background: 'var(--blue)'
       },
-      onClick: function onClick() {
+      onClick: async function onClick() {
         var _d$name2, _d$resi;
         var d = ekspForm[si.id] || {};
         if (!((_d$name2 = d.name) !== null && _d$name2 !== void 0 && _d$name2.trim())) {
@@ -25210,7 +25232,8 @@ function AdminOnlineTechRequest(_ref167) {
           return;
         }
         if (!window.confirm("Konfirmasi sudah dikirim via ".concat(d.name, " \u2014 Resi: ").concat(d.resi, "?"))) return;
-        doReturn(si.id, 'ekspedisi', d);
+        var _photoUrl = returnPhoto[si.id] ? await uploadPhoto(returnPhoto[si.id], 'si_return') : null;
+        doReturn(si.id, 'ekspedisi', _objectSpread({}, d, { photoUrl: _photoUrl }));
       }
     }, "\u2705 Konfirmasi Sudah Dikirim"), /*#__PURE__*/React.createElement("button", {
       className: "btn-secondary btn-sm",
@@ -25240,15 +25263,27 @@ function AdminOnlineTechRequest(_ref167) {
         marginBottom: 10
       }
     }, "Konfirmasi barang sudah diambil langsung oleh customer?"), /*#__PURE__*/React.createElement("div", {
+      style: { marginBottom: 10 }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 }
+    }, "\uD83D\uDCF8 Foto Bukti Pengambilan (opsional)"), /*#__PURE__*/React.createElement("input", {
+      type: "file", accept: "image/*", capture: "environment",
+      onChange: function onChange(e) { return handleReturnPhoto(si.id, e); }
+    }), returnPhoto[si.id] && /*#__PURE__*/React.createElement("img", {
+      src: returnPhoto[si.id],
+      style: { width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6, marginTop: 4 },
+      alt: "bukti"
+    })), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         gap: 8
       }
     }, /*#__PURE__*/React.createElement("button", {
       className: "btn-green btn-sm",
-      onClick: function onClick() {
+      onClick: async function onClick() {
         if (!window.confirm('Konfirmasi customer sudah ambil barang?')) return;
-        doReturn(si.id, 'self');
+        var _selfPhotoUrl = returnPhoto[si.id] ? await uploadPhoto(returnPhoto[si.id], 'si_return') : null;
+        doReturn(si.id, 'self', { photoUrl: _selfPhotoUrl });
       }
     }, "\u2705 Ya, Sudah Diambil"), /*#__PURE__*/React.createElement("button", {
       className: "btn-secondary btn-sm",
