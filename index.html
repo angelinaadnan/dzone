@@ -20171,8 +20171,13 @@ function OpsTechReady(_ref149) {
     return o.status === 'tech_done' && !(SALES_AO.includes(o.sales_name) && o.delivery_method === 'Di Pickup Sendiri');
   });
   var siPendingKurir = (serviceIntakes || []).filter(function (si) {
-    return si.status === 'done' && si.assigned_courier && (!si.return_status || si.return_status === 'assigned') && si.return_method !== 'ekspedisi' && si.return_method !== 'self';
+  var siNeedCourier = (serviceIntakes || []).filter(function (si) {
+    return si.status === 'done' && !si.assigned_courier && si.return_status !== 'returned' && si.return_method !== 'self';
   });
+  var siPendingDispatch = (serviceIntakes || []).filter(function (si) {
+    return si.status === 'done' && si.assigned_courier && si.return_status !== 'returned' && si.return_status !== 'in_delivery' && si.return_method !== 'ekspedisi' && si.return_method !== 'self';
+  });
+  var siPendingKurir = [].concat(_toConsumableArray(siNeedCourier), _toConsumableArray(siPendingDispatch));
   var _useState61 = useState({}),
     _useState62 = _slicedToArray(_useState61, 2),
     selected = _useState62[0],
@@ -20573,26 +20578,26 @@ function OpsTechReady(_ref149) {
     }, "🔧 Teknisi: ", si.tech_assigned || '—')), /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: 'right',
-        minWidth: 130
+        minWidth: 140
       }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, si.assigned_courier ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         fontWeight: 700,
-        color: 'var(--blue)'
+        color: 'var(--blue)',
+        marginBottom: 4
       }
-    }, "🚚 Kurir: ", si.assigned_courier), /*#__PURE__*/React.createElement("span", {
+    }, "\uD83D\uDE9A Kurir: ", si.assigned_courier), /*#__PURE__*/React.createElement("span", {
       className: "badge",
       style: {
-        marginTop: 4,
         display: 'inline-block',
         background: 'rgba(59,130,246,0.15)',
         color: 'var(--blue)'
       }
-    }, "Menunggu Kirim"), onUpdateSI && /*#__PURE__*/React.createElement("button", {
+    }, "Siap Dispatch"), onUpdateSI && /*#__PURE__*/React.createElement("button", {
       className: "btn-primary btn-sm",
       style: {
-        marginTop: 8,
+        marginTop: 6,
         width: '100%'
       },
       onClick: function onClick() {
@@ -20601,7 +20606,35 @@ function OpsTechReady(_ref149) {
           return_dispatched_at: new Date().toISOString()
         });
       }
-    }, "✅ Konfirmasi Dikirim"))));
+    }, "\u2705 Konfirmasi Dikirim")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: 'var(--amber)',
+        marginBottom: 6
+      }
+    }, "\u26A0\uFE0F Assign Kurir:"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4
+      }
+    }, KURIR_LIST.map(function (n) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: n,
+        className: "btn-secondary btn-sm",
+        style: {
+          fontSize: 11
+        },
+        onClick: function onClick() {
+          return onUpdateSI && onUpdateSI(si.id, {
+            assigned_courier: n,
+            return_method: 'kurir_internal',
+            return_status: 'assigned'
+          });
+        }
+      }, n);
+    }))));
   })));
 }
 
