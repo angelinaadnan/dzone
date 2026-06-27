@@ -24561,7 +24561,8 @@ function AdminOnlineTechRequest(_ref167) {
               assigned_courier: label,
               return_status: 'returned',
               returned_at: now,
-              return_method: 'ekspedisi'
+              return_method: 'ekspedisi',
+              return_photo: extra.photoUrl || null
             });
           case 11:
             _context73.next = 16;
@@ -24576,7 +24577,7 @@ function AdminOnlineTechRequest(_ref167) {
               assigned_courier: 'Ambil Sendiri',
               return_status: 'returned',
               returned_at: now,
-              return_method: 'self'
+              return_method: 'self',
               return_photo: extra.photoUrl || null,
             });
           case 16:
