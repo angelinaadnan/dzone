@@ -123,9 +123,20 @@
     .no-print { display: none !important; }
   }
 </style>
+<script>
+window.__errors = [];
+window.onerror = function(msg, src, line, col, err) {
+  window.__errors.push({msg: msg, src: src, line: line, col: col});
+  var d = document.getElementById('__errdiv');
+  if (!d) { d = document.createElement('div'); d.id='__errdiv'; d.style.cssText='position:fixed;top:0;left:0;right:0;background:#ff0000;color:#fff;padding:12px;font-size:13px;z-index:999999;white-space:pre-wrap;max-height:60vh;overflow:auto;'; document.body.appendChild(d); }
+  d.innerText += 'LINE ' + line + ':' + col + ' — ' + msg + '\n[' + src + ']\n\n';
+};
+window.addEventListener('unhandledrejection', function(e) {
+  window.onerror('Unhandled Promise: ' + (e.reason && e.reason.message || e.reason), 'promise', 0, 0, e.reason);
+});
+</script>
 </head>
 <body>
-<div id="deploy-test" style="position:fixed;top:0;left:0;background:lime;color:black;padding:8px;font-size:20px;z-index:99999">DEPLOY OK - v05b1c97</div>
 <div id="root"></div>
 <script>
 function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
