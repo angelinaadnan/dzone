@@ -2015,7 +2015,7 @@ function App() {
             safe = Object.fromEntries(Object.entries(updates).filter(function (_ref8) {
               var _ref9 = _slicedToArray(_ref8, 1),
                 k = _ref9[0];
-              return !['tech_note_edits', 'linked_courier_task_id', 'return_method'].includes(k);
+              return !['tech_note_edits', 'linked_courier_task_id'].includes(k);
             }));
             _context9.next = 12;
             return db.from('service_intakes').update(safe).eq('id', id);
@@ -20171,7 +20171,7 @@ function OpsTechReady(_ref149) {
     return o.status === 'tech_done' && !(SALES_AO.includes(o.sales_name) && o.delivery_method === 'Di Pickup Sendiri');
   });
   var siPendingKurir = (serviceIntakes || []).filter(function (si) {
-    return si.assigned_courier && si.return_method === 'kurir_internal' && (!si.return_status || si.return_status === 'assigned');
+    return si.status === 'done' && si.assigned_courier && (!si.return_status || si.return_status === 'assigned') && si.return_method !== 'ekspedisi' && si.return_method !== 'self';
   });
   var _useState61 = useState({}),
     _useState62 = _slicedToArray(_useState61, 2),
