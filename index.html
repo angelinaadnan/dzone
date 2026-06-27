@@ -3975,7 +3975,9 @@ function App() {
     onUpdate: updateOrder
   }), role === 'ops' && page === 'tech_ready' && /*#__PURE__*/React.createElement(OpsTechReady, {
     orders: orders,
+    serviceIntakes: serviceIntakes,
     onUpdate: updateOrder,
+    onUpdateSI: updateServiceIntake,
     onSelect: setSelectedOrder
   }), role === 'ops' && page === 'service_monitor' && /*#__PURE__*/React.createElement(OpsServiceMonitor, {
     intakes: serviceIntakes,
@@ -20003,10 +20005,15 @@ function OpsQueue(_ref148) {
 var KURIR_LIST = ['Putra', 'Asep', 'Gilang', 'Adit', 'Hendro', 'Munji', 'Sadam', 'Nikam'];
 function OpsTechReady(_ref149) {
   var orders = _ref149.orders,
+    serviceIntakes = _ref149.serviceIntakes,
     onUpdate = _ref149.onUpdate,
+    onUpdateSI = _ref149.onUpdateSI,
     onSelect = _ref149.onSelect;
   var techDone = orders.filter(function (o) {
     return o.status === 'tech_done' && !(SALES_AO.includes(o.sales_name) && o.delivery_method === 'Di Pickup Sendiri');
+  });
+  var siPendingKurir = (serviceIntakes || []).filter(function (si) {
+    return si.return_status === 'assigned' && si.assigned_courier && si.return_method === 'kurir_internal';
   });
   var _useState61 = useState({}),
     _useState62 = _slicedToArray(_useState61, 2),
@@ -20350,7 +20357,94 @@ function OpsTechReady(_ref149) {
         return onSelect(o);
       }
     }, "\uD83D\uDCC4 Lihat Detail"))));
-  }));
+  }), siPendingKurir.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "section-title",
+    style: {
+      marginTop: 24
+    }
+  }, "🚚 Antar Balik — Servis Unit", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 400,
+      color: 'var(--text2)',
+      fontFamily: 'DM Sans',
+      marginLeft: 8
+    }
+  }, "(", siPendingKurir.length, " item)")), siPendingKurir.map(function (si) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: si.id,
+      className: "card",
+      style: {
+        marginBottom: 10,
+        borderLeft: '3px solid var(--blue)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 14
+      }
+    }, si.customer_name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: 'var(--text2)',
+        marginTop: 2
+      }
+    }, si.unit_type || '', si.unit_model ? ' \xB7 ' + si.unit_model : ''), si.description && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: 'var(--text3)',
+        marginTop: 2
+      }
+    }, si.description), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: 'var(--text3)',
+        marginTop: 4
+      }
+    }, "🔧 Teknisi: ", si.tech_assigned || '—')), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: 'right',
+        minWidth: 130
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: 'var(--blue)'
+      }
+    }, "🚚 Kurir: ", si.assigned_courier), /*#__PURE__*/React.createElement("span", {
+      className: "badge",
+      style: {
+        marginTop: 4,
+        display: 'inline-block',
+        background: 'rgba(59,130,246,0.15)',
+        color: 'var(--blue)'
+      }
+    }, "Menunggu Kirim"), onUpdateSI && /*#__PURE__*/React.createElement("button", {
+      className: "btn-primary btn-sm",
+      style: {
+        marginTop: 8,
+        width: '100%'
+      },
+      onClick: function onClick() {
+        return onUpdateSI(si.id, {
+          return_status: 'in_delivery',
+          return_dispatched_at: new Date().toISOString()
+        });
+      }
+    }, "✅ Konfirmasi Dikirim"))));
+  })));
 }
 
 // ─── OPS ASSIGN ────────────────────────────────────────────────────
