@@ -3887,6 +3887,7 @@ function App() {
     onUpdateBranch: updateBranchRequest,
     userRole: "admin",
     userName: userName
+    onNavigate: setPage
   }), role === 'admin' && page === 'orders' && /*#__PURE__*/React.createElement(AdminOrders, {
     orders: orders,
     onUpdate: updateOrder,
@@ -3910,6 +3911,7 @@ function App() {
     onUpdateBranch: updateBranchRequest,
     userRole: "ops",
     userName: userName
+    onNavigate: setPage
   }), role === 'ops' && page === 'queue' && /*#__PURE__*/React.createElement(OpsQueue, {
     orders: orders,
     onUpdate: updateOrder,
@@ -4060,6 +4062,7 @@ function App() {
     onUpdateOrder: updateOrder,
     userRole: "supervisor",
     userName: userName
+    onNavigate: setPage
   }), role === 'supervisor' && page === 'sup_new_order' && /*#__PURE__*/React.createElement(NewOrderForm, {
     onSave: saveOrder,
     salesName: userName,
@@ -29908,12 +29911,14 @@ function OpsDashboard(_ref192) {
   }, "\uD83D\uDCEC Servis Selesai \u2014 Belum Diantar Balik (", siNeedReturn.length, ")"), siNeedReturn.slice(0, 5).map(function (s) {
     return /*#__PURE__*/React.createElement("div", {
       key: s.id,
+      onClick: function onClick() { return onNavigate && onNavigate('tech_ready'); },
       style: {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '7px 0',
-        borderBottom: '1px solid var(--border)'
+        borderBottom: '1px solid var(--border)',
+        cursor: 'pointer'
       }
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
       style: {
