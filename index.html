@@ -20170,7 +20170,6 @@ function OpsTechReady(_ref149) {
   var techDone = orders.filter(function (o) {
     return o.status === 'tech_done' && !(SALES_AO.includes(o.sales_name) && o.delivery_method === 'Di Pickup Sendiri');
   });
-  var siPendingKurir = (serviceIntakes || []).filter(function (si) {
   var siNeedCourier = (serviceIntakes || []).filter(function (si) {
     return si.status === 'done' && !si.assigned_courier && si.return_status !== 'returned' && si.return_method !== 'self';
   });
