@@ -12495,7 +12495,14 @@ function SupervisorTech(_ref92) {
       'at_service_center': 'Di Service Center',
       'done': 'Selesai',
       'returned': 'Dikembalikan'
-    }[si.status] || si.status))), /*#__PURE__*/React.createElement(TechNoteEditBox, {
+    }[si.status] || si.status), si.status === 'done' && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 6,
+        fontSize: 11,
+        fontWeight: 600,
+        color: si.return_status === 'returned' ? 'var(--green)' : si.assigned_courier ? 'var(--blue)' : 'var(--amber)'
+      }
+    }, si.return_status === 'returned' ? '\u2705 Sudah Dikembalikan' : si.assigned_courier ? '\uD83D\uDE9A Kurir: ' + si.assigned_courier : '\uD83D\uDCE6 Perlu Kirim'))), /*#__PURE__*/React.createElement(TechNoteEditBox, {
       note: si.tech_note,
       edits: si.tech_note_edits || [],
       editorName: supervisorName,
