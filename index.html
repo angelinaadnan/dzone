@@ -24578,7 +24578,7 @@ function AdminOnlineTechRequest(_ref167) {
               return_status: 'returned',
               returned_at: now,
               return_method: 'self',
-              return_photo: extra.photoUrl || null,
+              return_photo: extra.photoUrl || null
             });
           case 16:
             setReturnMode(function (m) {
@@ -25200,7 +25200,7 @@ function AdminOnlineTechRequest(_ref167) {
       onChange: function onChange(e) {
         return setEksp(si.id, 'resi', e.target.value);
       }
-    })), /*#__PURE__*/React.createElement("div", {
+    }))), /*#__PURE__*/React.createElement("div", {
       style: { marginBottom: 10, marginTop: 8 }
     }, /*#__PURE__*/React.createElement("label", {
       style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 }
@@ -25211,7 +25211,7 @@ function AdminOnlineTechRequest(_ref167) {
       src: returnPhoto[si.id],
       style: { width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6, marginTop: 4 },
       alt: "bukti resi"
-    }))), /*#__PURE__*/React.createElement("div", {
+    })), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         gap: 8
@@ -25224,8 +25224,14 @@ function AdminOnlineTechRequest(_ref167) {
       onClick: function onClick() {
         var _d$name2, _d$resi;
         var d = ekspForm[si.id] || {};
-        if (!((_d$name2 = d.name) !== null && _d$name2 !== void 0 && _d$name2.trim())) { alert('Isi nama ekspedisi dulu'); return; }
-        if (!((_d$resi = d.resi) !== null && _d$resi !== void 0 && _d$resi.trim())) { alert('Isi nomor resi dulu'); return; }
+        if (!((_d$name2 = d.name) !== null && _d$name2 !== void 0 && _d$name2.trim())) {
+          alert('Isi nama ekspedisi dulu');
+          return;
+        }
+        if (!((_d$resi = d.resi) !== null && _d$resi !== void 0 && _d$resi.trim())) {
+          alert('Isi nomor resi dulu');
+          return;
+        }
         if (!window.confirm("Konfirmasi sudah dikirim via ".concat(d.name, " \u2014 Resi: ").concat(d.resi, "?"))) return;
         var _siId = si.id, _d = d;
         var _p = returnPhoto[_siId] ? uploadPhoto(returnPhoto[_siId], 'si_return') : Promise.resolve(null);
