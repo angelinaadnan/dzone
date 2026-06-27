@@ -44236,7 +44236,7 @@ function OpsServiceMonitor(_ref277) {
   var intakes = _ref277.intakes,
     onUpdate = _ref277.onUpdate,
     orders = _ref277.orders;
-  intakes = (intakes || []).filter(function(si) { return si.source_type === 'customer' || si.source_type === 'branch'; });
+  intakes = (intakes || []).filter(function(si) { return (si.source_type === 'customer' || si.source_type === 'branch') && si.created_by_role !== 'admin_online'; });
   var _React$useState495 = React.useState(null),
     _React$useState496 = _slicedToArray(_React$useState495, 2),
     selected = _React$useState496[0],
