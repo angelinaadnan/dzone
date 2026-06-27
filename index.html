@@ -32499,7 +32499,7 @@ function CourierJobTasks(_ref207) {
     return s.sc_pickup_courier === courierName && s.status === 'sc_pickup_assigned';
   });
   var myReturns = si.filter(function (s) {
-    return s.assigned_courier === courierName && s.return_status === 'assigned';
+    return s.assigned_courier === courierName && (s.return_status === 'assigned' || s.return_status === 'in_delivery');
   });
 
   // ── Helper: last known GPS position for this courier ──
@@ -41484,7 +41484,7 @@ function CourierService(_ref265) {
     return si.courier_name === courierName && si.source_type === 'branch' && si.status === 'received' && !si.courier_picked_up;
   });
   var myReturns = intakes.filter(function (si) {
-    return si.assigned_courier === courierName && si.return_status === 'assigned';
+    return si.assigned_courier === courierName && (si.return_status === 'assigned' || si.return_status === 'in_delivery');
   });
   var scDelivery = intakes.filter(function (si) {
     return si.sc_delivery_courier === courierName && si.status === 'to_service_center';
