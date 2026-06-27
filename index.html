@@ -24511,16 +24511,6 @@ function AdminOnlineTechRequest(_ref167) {
     _React$useState256 = _slicedToArray(_React$useState255, 2),
     ekspForm = _React$useState256[0],
     setEkspForm = _React$useState256[1]; // {siId: {name:'', resi:''}}
-  var _React$useState_rp = React.useState({}),
-    _React$useState_rp2 = _slicedToArray(_React$useState_rp, 2),
-    returnPhoto = _React$useState_rp2[0],
-    setReturnPhoto = _React$useState_rp2[1];
-  var handleReturnPhoto = function handleReturnPhoto(siId, e) {
-    var file = e.target.files[0]; if (!file) return;
-    var reader = new FileReader();
-    reader.onloadend = function() { setReturnPhoto(function(p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, siId, reader.result)); }); };
-    reader.readAsDataURL(file);
-  };
   var setEksp = function setEksp(id, k, v) {
     return setEkspForm(function (f) {
       return _objectSpread(_objectSpread({}, f), {}, _defineProperty({}, id, _objectSpread(_objectSpread({}, f[id] || {}), {}, _defineProperty({}, k, v))));
@@ -24561,8 +24551,7 @@ function AdminOnlineTechRequest(_ref167) {
               assigned_courier: label,
               return_status: 'returned',
               returned_at: now,
-              return_method: 'ekspedisi',
-              return_photo: extra.photoUrl || null
+              return_method: 'ekspedisi'
             });
           case 11:
             _context73.next = 16;
@@ -24577,8 +24566,7 @@ function AdminOnlineTechRequest(_ref167) {
               assigned_courier: 'Ambil Sendiri',
               return_status: 'returned',
               returned_at: now,
-              return_method: 'self',
-              return_photo: extra.photoUrl || null
+              return_method: 'self'
             });
           case 16:
             setReturnMode(function (m) {
@@ -25201,17 +25189,6 @@ function AdminOnlineTechRequest(_ref167) {
         return setEksp(si.id, 'resi', e.target.value);
       }
     }))), /*#__PURE__*/React.createElement("div", {
-      style: { marginBottom: 10, marginTop: 8 }
-    }, /*#__PURE__*/React.createElement("label", {
-      style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 }
-    }, "\uD83D\uDCF8 Foto Bukti Resi (opsional)"), /*#__PURE__*/React.createElement("input", {
-      type: "file", accept: "image/*", capture: "environment",
-      onChange: function onChange(e) { return handleReturnPhoto(si.id, e); }
-    }), returnPhoto[si.id] && /*#__PURE__*/React.createElement("img", {
-      src: returnPhoto[si.id],
-      style: { width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6, marginTop: 4 },
-      alt: "bukti resi"
-    })), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         gap: 8
@@ -25233,9 +25210,7 @@ function AdminOnlineTechRequest(_ref167) {
           return;
         }
         if (!window.confirm("Konfirmasi sudah dikirim via ".concat(d.name, " \u2014 Resi: ").concat(d.resi, "?"))) return;
-        var _siId = si.id, _d = d;
-        var _p = returnPhoto[_siId] ? uploadPhoto(returnPhoto[_siId], 'si_return') : Promise.resolve(null);
-        _p.then(function(url) { doReturn(_siId, 'ekspedisi', _objectSpread(_objectSpread({}, _d), {}, { photoUrl: url })); });
+        doReturn(si.id, 'ekspedisi', d);
       }
     }, "\u2705 Konfirmasi Sudah Dikirim"), /*#__PURE__*/React.createElement("button", {
       className: "btn-secondary btn-sm",
@@ -25265,17 +25240,6 @@ function AdminOnlineTechRequest(_ref167) {
         marginBottom: 10
       }
     }, "Konfirmasi barang sudah diambil langsung oleh customer?"), /*#__PURE__*/React.createElement("div", {
-      style: { marginBottom: 10 }
-    }, /*#__PURE__*/React.createElement("label", {
-      style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 }
-    }, "\uD83D\uDCF8 Foto Bukti Pengambilan (opsional)"), /*#__PURE__*/React.createElement("input", {
-      type: "file", accept: "image/*", capture: "environment",
-      onChange: function onChange(e) { return handleReturnPhoto(si.id, e); }
-    }), returnPhoto[si.id] && /*#__PURE__*/React.createElement("img", {
-      src: returnPhoto[si.id],
-      style: { width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: 6, marginTop: 4 },
-      alt: "bukti"
-    })), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         gap: 8
@@ -25284,9 +25248,7 @@ function AdminOnlineTechRequest(_ref167) {
       className: "btn-green btn-sm",
       onClick: function onClick() {
         if (!window.confirm('Konfirmasi customer sudah ambil barang?')) return;
-        var _siId2 = si.id;
-        var _p2 = returnPhoto[_siId2] ? uploadPhoto(returnPhoto[_siId2], 'si_return') : Promise.resolve(null);
-        _p2.then(function(url) { doReturn(_siId2, 'self', { photoUrl: url }); });
+        doReturn(si.id, 'self');
       }
     }, "\u2705 Ya, Sudah Diambil"), /*#__PURE__*/React.createElement("button", {
       className: "btn-secondary btn-sm",
@@ -44236,7 +44198,6 @@ function OpsServiceMonitor(_ref277) {
   var intakes = _ref277.intakes,
     onUpdate = _ref277.onUpdate,
     orders = _ref277.orders;
-  intakes = (intakes || []).filter(function(si) { return si.source_type === 'customer' || si.source_type === 'branch'; });
   var _React$useState495 = React.useState(null),
     _React$useState496 = _slicedToArray(_React$useState495, 2),
     selected = _React$useState496[0],
