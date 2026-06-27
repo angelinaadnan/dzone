@@ -123,18 +123,6 @@
     .no-print { display: none !important; }
   }
 </style>
-<script>
-window.__errors = [];
-window.onerror = function(msg, src, line, col, err) {
-  window.__errors.push({msg: msg, src: src, line: line, col: col});
-  var d = document.getElementById('__errdiv');
-  if (!d) { d = document.createElement('div'); d.id='__errdiv'; d.style.cssText='position:fixed;top:0;left:0;right:0;background:#ff0000;color:#fff;padding:12px;font-size:13px;z-index:999999;white-space:pre-wrap;max-height:60vh;overflow:auto;'; document.body.appendChild(d); }
-  d.innerText += 'LINE ' + line + ':' + col + ' — ' + msg + '\n[' + src + ']\n\n';
-};
-window.addEventListener('unhandledrejection', function(e) {
-  window.onerror('Unhandled Promise: ' + (e.reason && e.reason.message || e.reason), 'promise', 0, 0, e.reason);
-});
-</script>
 </head>
 <body>
 <div id="root"></div>
@@ -3898,7 +3886,7 @@ function App() {
     onUpdateTask: updateCourierTask,
     onUpdateBranch: updateBranchRequest,
     userRole: "admin",
-    userName: userName
+    userName: userName,
     onNavigate: setPage
   }), role === 'admin' && page === 'orders' && /*#__PURE__*/React.createElement(AdminOrders, {
     orders: orders,
@@ -3922,7 +3910,7 @@ function App() {
     onUpdateTask: updateCourierTask,
     onUpdateBranch: updateBranchRequest,
     userRole: "ops",
-    userName: userName
+    userName: userName,
     onNavigate: setPage
   }), role === 'ops' && page === 'queue' && /*#__PURE__*/React.createElement(OpsQueue, {
     orders: orders,
@@ -4073,7 +4061,7 @@ function App() {
     checkins: courierCheckins,
     onUpdateOrder: updateOrder,
     userRole: "supervisor",
-    userName: userName
+    userName: userName,
     onNavigate: setPage
   }), role === 'supervisor' && page === 'sup_new_order' && /*#__PURE__*/React.createElement(NewOrderForm, {
     onSave: saveOrder,
