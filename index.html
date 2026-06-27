@@ -12033,10 +12033,10 @@ function SupervisorTech(_ref92) {
     _React$useState160 = _slicedToArray(_React$useState159, 2),
     filterTech = _React$useState160[0],
     setFilterTech = _React$useState160[1];
-  var _React$useState161 = React.useState('orders'),
+  var _React$useState161 = React.useState('all'),
     _React$useState162 = _slicedToArray(_React$useState161, 2),
     tab = _React$useState162[0],
-    setTab = _React$useState162[1]; // 'orders' | 'service' | 'komponen'
+    setTab = _React$useState162[1]; // 'all' | 'orders' | 'service' | 'komponen'
 
   // Always show all known technicians, plus anyone who has historical jobs
   var allTechs = _toConsumableArray(new Set([].concat(TEKNISI_LIST, _toConsumableArray(techOrders.map(function (o) {
@@ -12263,6 +12263,20 @@ function SupervisorTech(_ref92) {
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: function onClick() {
+      return setTab('all');
+    },
+    style: {
+      flex: 1,
+      padding: '8px',
+      borderRadius: 7,
+      border: 'none',
+      cursor: 'pointer',
+      background: tab === 'all' ? 'var(--bg2)' : 'transparent',
+      color: tab === 'all' ? 'var(--text)' : 'var(--text2)',
+      fontWeight: tab === 'all' ? 700 : 400
+    }
+  }, "\uD83D\uDCCB Semua (", filtOrders.length + filtSI.length, ")"), /*#__PURE__*/React.createElement("button", {
+    onClick: function onClick() {
       return setTab('orders');
     },
     style: {
@@ -12316,7 +12330,151 @@ function SupervisorTech(_ref92) {
       fontWeight: 700,
       padding: '1px 5px'
     }
-  }, kompPending))), tab === 'orders' && /*#__PURE__*/React.createElement(React.Fragment, null, filtOrders.length === 0 && /*#__PURE__*/React.createElement("div", {
+  }, kompPending))), tab === 'all' && /*#__PURE__*/React.createElement(React.Fragment, null, (filtOrders.length + filtSI.length) === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "icon"
+  }, "\uD83D\uDD27"), /*#__PURE__*/React.createElement("div", null, "Tidak ada pekerjaan teknisi")), [].concat(_toConsumableArray(filtOrders.map(function (o) {
+    return {
+      item: o,
+      type: 'order'
+    };
+  })), _toConsumableArray(filtSI.map(function (si) {
+    return {
+      item: si,
+      type: 'si'
+    };
+  }))).sort(function (a, b) {
+    return new Date(b.item.created_at) - new Date(a.item.created_at);
+  }).map(function (row) {
+    var _item$status_history;
+    var item = row.item, type = row.type;
+    var isOrder = type === 'order';
+    var techEntry = isOrder ? ((_item$status_history = item.status_history) === null || _item$status_history === void 0 ? void 0 : _item$status_history.find(function (h) {
+      return h.status === 'tech';
+    })) : null;
+    var techDoneEntry = isOrder ? (item.status_history || []).find(function (h) {
+      return h.status === 'tech_done';
+    }) : null;
+    var techAssignTime = isOrder ? techEntry && techEntry.time : item.tech_assigned_at;
+    var techDoneTime = isOrder ? techDoneEntry && techDoneEntry.time : item.done_at;
+    var statusBadge = isOrder ? STATUS_LABELS[item.status] || item.status : {
+      'received': 'Diterima',
+      'to_technician': 'Di Teknisi',
+      'post_sc_checking': 'Cek Pasca SC',
+      'to_service_center': 'Ke SC',
+      'at_service_center': 'Di SC',
+      'done': 'Selesai',
+      'returned': 'Dikembalikan'
+    }[item.status] || item.status;
+    var statusCls = isOrder ? STATUS_COLORS[item.status] || 'badge-new' : item.status === 'done' ? 'badge-delivered' : item.status === 'to_technician' ? 'badge-tech' : 'badge-prep';
+    var deliveryInfo = null;
+    if (isOrder) {
+      if (item.status === 'on_delivery') deliveryInfo = '\uD83D\uDE9A Sedang dikirim' + (item.courier_name ? ' \xB7 ' + item.courier_name : '');else if (item.status === 'delivered') deliveryInfo = '\u2705 Terkirim';else if (item.status === 'tech_done') deliveryInfo = '\uD83D\uDCE6 Selesai teknisi, siap kirim';
+    } else {
+      if (item.return_status === 'returned') deliveryInfo = '\u2705 Sudah dikembalikan ke customer';else if (item.return_status === 'in_delivery') deliveryInfo = '\uD83D\uDE9A Sedang diantar balik' + (item.assigned_courier ? ' \xB7 ' + item.assigned_courier : '');else if (item.return_status === 'assigned') deliveryInfo = '\uD83D\uDCE6 Kurir siap antar: ' + (item.assigned_courier || '\u2014');else if (item.status === 'done') deliveryInfo = '\u23F3 Menunggu antar balik ke customer';
+    }
+    var masukLabel = isOrder ? 'Sales: ' + (item.sales_name || '\u2014') : 'Kurir jemput: ' + (item.courier_name || item.created_by || '\u2014');
+    var techName = isOrder ? item.tech_name : item.tech_assigned;
+    return /*#__PURE__*/React.createElement("div", {
+      key: item.id + type,
+      className: "card",
+      style: {
+        marginBottom: 10,
+        borderLeft: '3px solid ' + (isOrder ? 'var(--accent2)' : 'var(--amber)')
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        flexWrap: 'wrap',
+        marginBottom: 3
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: '2px 7px',
+        borderRadius: 10,
+        fontWeight: 700,
+        background: isOrder ? 'rgba(99,102,241,0.12)' : 'rgba(245,158,11,0.12)',
+        color: isOrder ? 'var(--accent2)' : 'var(--amber)'
+      }
+    }, isOrder ? '\uD83D\uDCBB Instalasi' : '\uD83D\uDEE0 Servis Unit'), item.has_component_change && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: '2px 7px',
+        borderRadius: 10,
+        fontWeight: 700,
+        background: 'rgba(245,158,11,0.15)',
+        color: 'var(--amber)'
+      }
+    }, '\uD83D\uDD29 Swap/Upgrade'), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: 14
+      }
+    }, item.customer_name)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: 'var(--text2)'
+      }
+    }, isOrder ? (item.goods || []).map(function (g) {
+      return g.name;
+    }).join(', ') || '\u2014' : item.unit_type + (item.unit_model ? ' \xB7 ' + item.unit_model : '') + (item.serial_number ? ' \xB7 SN: ' + item.serial_number : ''))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: 'right',
+        minWidth: 110
+      }
+    }, techName && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: 'var(--amber)',
+        fontWeight: 600,
+        marginBottom: 3
+      }
+    }, '\uD83D\uDD27 ', techName), /*#__PURE__*/React.createElement("span", {
+      className: 'badge ' + statusCls,
+      style: {
+        display: 'inline-block'
+      }
+    }, statusBadge))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTop: '1px solid var(--border2)',
+        fontSize: 11,
+        color: 'var(--text3)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2
+      }
+    }, /*#__PURE__*/React.createElement("span", null, '\uD83D\uDCC5 Masuk: ', fmtDateTime(item.created_at), ' \xB7 ', masukLabel), techAssignTime && /*#__PURE__*/React.createElement("span", null, '\uD83D\uDD27 Ke teknisi: ', fmtDateTime(techAssignTime), techName ? ' \xB7 ' + techName : ''), techDoneTime ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--green)'
+      }
+    }, '\u2705 Selesai: ', fmtDateTime(techDoneTime)) : techAssignTime && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'var(--amber)'
+      }
+    }, '\u23F3 Sedang dikerjakan...'), deliveryInfo && /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: deliveryInfo.startsWith('\u2705') ? 'var(--green)' : deliveryInfo.startsWith('\uD83D\uDE9A') ? 'var(--blue)' : 'var(--text3)',
+        fontWeight: 600
+      }
+    }, deliveryInfo)));
+  })), tab === 'orders' && /*#__PURE__*/React.createElement(React.Fragment, null, filtOrders.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("div", {
     className: "icon"
