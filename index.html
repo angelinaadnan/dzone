@@ -3366,7 +3366,7 @@ function App() {
           case 3:
             // Coba select semua kolom
             since30d = new Date();
-            since30d.setDate(since30d.getDate() - 30);
+            since30d.setDate(since30d.getDate() - 90);
             needAllAttendance = ['admin', 'ops', 'supervisor', 'absensi_only'].includes(role);
             attendQ = db.from('attendance').select('*').gte('check_in', since30d.toISOString()).order('check_in', {
               ascending: false
@@ -4821,6 +4821,10 @@ function AbsensiPage(_ref46) {
     _React$useState22 = _slicedToArray(_React$useState21, 2),
     exportTo = _React$useState22[0],
     setExportTo = _React$useState22[1];
+  var _React$useState_em = React.useState(todayStr.slice(0, 7)),
+    _React$useState_em2 = _slicedToArray(_React$useState_em, 2),
+    exportMonth = _React$useState_em2[0],
+    setExportMonth = _React$useState_em2[1];
   var _React$useState23 = React.useState(''),
     _React$useState24 = _slicedToArray(_React$useState23, 2),
     notes = _React$useState24[0],
@@ -4858,6 +4862,16 @@ function AbsensiPage(_ref46) {
   };
   var getSchedule = function getSchedule(name) {
     return USER_SCHEDULES[name] || DEFAULT_SCHEDULE;
+  };
+  var handleMonthChange = function handleMonthChange(m) {
+    setExportMonth(m);
+    if (!m) return;
+    var firstDay = m + '-01';
+    var d = new Date(firstDay);
+    d.setMonth(d.getMonth() + 1); d.setDate(0);
+    var lastDay = d.toISOString().slice(0, 10);
+    setExportFrom(firstDay);
+    setExportTo(lastDay);
   };
 
   // Hitung berapa menit telat (0 = tepat waktu / lebih awal)
@@ -5405,6 +5419,24 @@ function AbsensiPage(_ref46) {
         return exportExcel('day');
       }
     }, "\u2B07 Export Hari Ini")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: { fontSize: 13, color: 'var(--text2)', margin: 0 }
+    }, "\uD83D\uDCC5 Export Bulan:"), /*#__PURE__*/React.createElement("input", {
+      type: "month",
+      value: exportMonth,
+      onChange: function onChange(e) { return handleMonthChange(e.target.value); },
+      style: { padding: '7px 12px', fontSize: 13, borderRadius: 8, width: 'auto' }
+    }), /*#__PURE__*/React.createElement("button", {
+      className: "btn-primary btn-sm",
+      onClick: function onClick() { return exportExcel('range'); }
+    }, "\u2B07 Export Excel Bulan")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         gap: 10,
