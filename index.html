@@ -17471,6 +17471,59 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
       });
       XLSX.utils.book_append_sheet(wb, ws2, 'GPS Rute');
     }
+
+    // Sheet: Rute Harian (format ringkas, untuk cross-check manual)
+    var BASE_NAME = 'DUSIT';
+    var routeRows = [];
+    courierData.forEach(function(c) {
+      var acts = [];
+      (c.myOrders || []).forEach(function(o) {
+        var dest = (o.customer_name || '').toUpperCase().replace(/\s+/g, ' ').trim();
+        var km = o.distance_km && parseFloat(o.distance_km) > 0 ? parseFloat(parseFloat(o.distance_km).toFixed(1)) : null;
+        acts.push({ time: o.delivered_at || o.updated_at || o.created_at, dest: dest, km: km, tipe: 'Pengiriman' });
+      });
+      (c.myTasks || []).forEach(function(t) {
+        var dest = (t.destination || t.task_type || '').toUpperCase().replace(/\s+/g, ' ').trim();
+        var km = t.distance_km && parseFloat(t.distance_km) > 0 ? parseFloat(parseFloat(t.distance_km).toFixed(1)) : null;
+        acts.push({ time: t.completed_at || t.assigned_at || t.created_at, dest: dest, km: km, tipe: 'Tugas Kurir' });
+      });
+      (c.myPickups || []).forEach(function(p) {
+        var dest = (p.supplier || '').toUpperCase().replace(/\s+/g, ' ').trim();
+        var km = p.km && parseFloat(p.km) > 0 ? parseFloat(parseFloat(p.km).toFixed(1)) : null;
+        acts.push({ time: p.time, dest: dest, km: km, tipe: 'Ambil PO' });
+      });
+      (c.myTrips || []).forEach(function(t) {
+        var dest = (t.branch || '').toUpperCase().replace(/\s+/g, ' ').trim();
+        var km = t.km && parseFloat(t.km) > 0 ? parseFloat(parseFloat(t.km).toFixed(1)) : null;
+        acts.push({ time: t.time, dest: dest, km: km, tipe: 'Kirim Cabang' });
+      });
+      (c.mySI || []).forEach(function(s) {
+        var dest = (s.role || s.customer || '').toUpperCase().replace(/\s+/g, ' ').trim();
+        acts.push({ time: s.time, dest: dest, km: null, tipe: 'Servis' });
+      });
+      if (acts.length === 0) return;
+      acts.sort(function(a, b) { return new Date(a.time || 0) - new Date(b.time || 0); });
+      var prevDate = null;
+      acts.forEach(function(a) {
+        var tgl = a.time ? new Date(a.time).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() : '';
+        var rute = a.dest ? (BASE_NAME + '-' + a.dest + '-' + BASE_NAME) : '';
+        routeRows.push({
+          'Tgl': tgl !== prevDate ? tgl : '',
+          'Kurir': c.name,
+          'Rute': rute,
+          'KM Google Maps': a.km !== null ? a.km : '',
+          'Tipe': a.tipe,
+          'Jam': a.time ? new Date(a.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''
+        });
+        prevDate = tgl;
+      });
+    });
+    if (routeRows.length > 0) {
+      var wsRoute = XLSX.utils.json_to_sheet(routeRows);
+      wsRoute['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 45 }, { wch: 14 }, { wch: 14 }, { wch: 8 }];
+      XLSX.utils.book_append_sheet(wb, wsRoute, 'Rute Harian');
+    }
+
     XLSX.writeFile(wb, "DZ_Monitor_Kurir_".concat(dateStr, ".xlsx"));
   } catch (e) {
     alert('Export gagal: ' + e.message);
