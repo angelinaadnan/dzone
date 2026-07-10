@@ -17493,30 +17493,32 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         : 'https://maps.google.com?q=-6.1374698,106.8254577';
       var dusitFmt = BASE_NAME + ' (' + dusitLink + ')';
       var acts = [];
+      var mkSearch = function(name) { return name ? 'https://maps.google.com/maps?q=' + encodeURIComponent(name) : ''; };
       (c.myOrders || []).forEach(function(o) {
         var dest = (o.customer_name || '').toUpperCase().replace(/\s+/g, ' ').trim();
         var km = o.distance_km && parseFloat(o.distance_km) > 0 ? parseFloat(parseFloat(o.distance_km).toFixed(1)) : null;
-        acts.push({ time: o.delivered_at || o.updated_at || o.created_at, dest: dest, km: km, tipe: 'Pengiriman', loc: o.end_location || null });
+        var fallback = o.customer_address ? mkSearch(o.customer_address) : mkSearch(dest);
+        acts.push({ time: o.delivered_at || o.updated_at || o.created_at, dest: dest, km: km, tipe: 'Pengiriman', loc: o.end_location || null, fallback: fallback });
       });
       (c.myTasks || []).forEach(function(t) {
         var dest = (t.destination || t.task_type || '').toUpperCase().replace(/\s+/g, ' ').trim();
         var km = t.distance_km && parseFloat(t.distance_km) > 0 ? parseFloat(parseFloat(t.distance_km).toFixed(1)) : null;
         var loc = t.end_location || t.arrived_location || null;
-        acts.push({ time: t.completed_at || t.assigned_at || t.created_at, dest: dest, km: km, tipe: 'Tugas Kurir', loc: loc });
+        acts.push({ time: t.completed_at || t.assigned_at || t.created_at, dest: dest, km: km, tipe: 'Tugas Kurir', loc: loc, fallback: mkSearch(dest) });
       });
       (c.myPickups || []).forEach(function(p) {
         var dest = (p.supplier || '').toUpperCase().replace(/\s+/g, ' ').trim();
         var km = p.km && parseFloat(p.km) > 0 ? parseFloat(parseFloat(p.km).toFixed(1)) : null;
-        acts.push({ time: p.time, dest: dest, km: km, tipe: 'Ambil PO', loc: p.endLoc || null });
+        acts.push({ time: p.time, dest: dest, km: km, tipe: 'Ambil PO', loc: p.endLoc || null, fallback: mkSearch(p.address || dest) });
       });
       (c.myTrips || []).forEach(function(t) {
         var dest = (t.branch || '').toUpperCase().replace(/\s+/g, ' ').trim();
         var km = t.km && parseFloat(t.km) > 0 ? parseFloat(parseFloat(t.km).toFixed(1)) : null;
-        acts.push({ time: t.time, dest: dest, km: km, tipe: 'Kirim Cabang', loc: t.endLoc || null });
+        acts.push({ time: t.time, dest: dest, km: km, tipe: 'Kirim Cabang', loc: t.endLoc || null, fallback: mkSearch(dest) });
       });
       (c.mySI || []).forEach(function(s) {
         var dest = (s.role || s.customer || '').toUpperCase().replace(/\s+/g, ' ').trim();
-        acts.push({ time: s.time, dest: dest, km: null, tipe: 'Servis', loc: null });
+        acts.push({ time: s.time, dest: dest, km: null, tipe: 'Servis', loc: null, fallback: mkSearch(dest) });
       });
       if (acts.length === 0) return;
       acts.sort(function(a, b) { return new Date(a.time || 0) - new Date(b.time || 0); });
@@ -17526,7 +17528,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         var destName = a.dest || '?';
         var destLink = a.loc && (a.loc.lat || a.loc.latitude)
           ? 'https://maps.google.com?q=' + (a.loc.lat || a.loc.latitude) + ',' + (a.loc.lng || a.loc.longitude || a.loc.lon)
-          : '';
+          : (a.fallback || '');
         var km = a.km !== null ? a.km : '';
         var jam = a.time ? new Date(a.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
         // Pergi: DUSIT → TUJUAN
