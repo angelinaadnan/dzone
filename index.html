@@ -7,7 +7,7 @@
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/xlsx@0.16.9/dist/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet"/>
 <style>
   :root {
@@ -17503,10 +17503,15 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
     if (routeRows.length > 0) {
       var wsRoute = XLSX.utils.json_to_sheet(routeRows);
       wsRoute['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 55 }, { wch: 55 }, { wch: 14 }, { wch: 14 }, { wch: 8 }];
+      var _rng = XLSX.utils.decode_range(wsRoute['!ref']);
+      for (var _hc = _rng.s.c; _hc <= _rng.e.c; _hc++) {
+        var _ha = XLSX.utils.encode_cell({ r: 0, c: _hc });
+        if (wsRoute[_ha]) wsRoute[_ha].s = { font: { bold: true } };
+      }
       XLSX.utils.book_append_sheet(wb, wsRoute, 'Rute Harian');
     }
 
-    XLSX.writeFile(wb, "DZ_Monitor_Kurir_".concat(dateStr, ".xlsx"));
+    XLSX.writeFile(wb, "DZ_Monitor_Kurir_".concat(dateStr, ".xlsx"), { cellStyles: true });
   } catch (e) {
     alert('Export gagal: ' + e.message);
     console.error('exportCourierDailyMonitorToExcel error:', e);
