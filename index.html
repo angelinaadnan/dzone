@@ -17427,7 +17427,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'Kurir': c.name,
           'Leg': i + 1,
           'Dari': safeTxt(leg.from.note),
-          'KM Google Maps': extractKmNote(leg.from.note),
+          'KM Google Maps': extractKmNote(leg.to.note),
           'Jam Dari': leg.from.created_at ? new Date(leg.from.created_at).toLocaleString('id-ID') : '',
           'Lat Dari': leg.from.lat || '',
           'Lng Dari': leg.from.lng || '',
