@@ -17293,7 +17293,7 @@ function exportCourierTasksToExcel(tasks) {
       'Catatan Selesai': t.completion_note || '',
       'Tgl Selesai': t.completed_at ? new Date(t.completed_at).toLocaleString('id-ID') : '',
       'Diselesaikan Oleh': t.completed_by || '',
-      'Jarak (km)': fmtKmExcel(t.distance_km),
+      'KM Garis Lurus': fmtKmExcel(t.distance_km),
       'Titik Mulai (GPS)': fmtLoc(t.start_location),
       'Maps Mulai': fmtMaps(t.start_location),
       'Titik Tiba (GPS)': fmtLoc(t.end_location || t.arrived_location),
@@ -17427,7 +17427,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'Kurir': c.name,
           'Leg': i + 1,
           'Dari': safeTxt(leg.from.note),
-          'Jarak Tempuh (km)': extractKmNote(leg.from.note),
+          'KM Google Maps': extractKmNote(leg.from.note),
           'Jam Dari': leg.from.created_at ? new Date(leg.from.created_at).toLocaleString('id-ID') : '',
           'Lat Dari': leg.from.lat || '',
           'Lng Dari': leg.from.lng || '',
@@ -17437,8 +17437,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'Lat Ke': leg.to.lat || '',
           'Lng Ke': leg.to.lng || '',
           'Maps Ke': fmtMaps(leg.to),
-          'Jarak (km)': fmtKmEx(leg.km),
-          'Jarak (terbaca)': fmtKmRead(leg.km),
+          'KM Garis Lurus': fmtKmEx(leg.km),
           'Est. BBM (Rp)': leg.km > 0 ? Math.round(leg.km * 600) : ''
         });
       });
@@ -17448,7 +17447,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'Kurir': c.name,
           'Leg': 1,
           'Dari': safeTxt(pt.note),
-          'Jarak Tempuh (km)': extractKmNote(pt.note),
+          'KM Google Maps': extractKmNote(pt.note),
           'Jam Dari': pt.created_at ? new Date(pt.created_at).toLocaleString('id-ID') : '',
           'Lat Dari': pt.lat || '',
           'Lng Dari': pt.lng || '',
@@ -17458,8 +17457,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'Lat Ke': '',
           'Lng Ke': '',
           'Maps Ke': '',
-          'Jarak (km)': '',
-          'Jarak (terbaca)': '',
+          'KM Garis Lurus': '',
           'Est. BBM (Rp)': ''
         });
       }
