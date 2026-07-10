@@ -17483,7 +17483,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
       return name;
     };
     var routeRows = [];
-    courierData.forEach(function(c) {
+    courierData.filter(function(c) { return KURIR_LIST.indexOf(c.name) !== -1; }).forEach(function(c) {
       // Ambil koordinat DUSIT dari check-in kurir yang ada catatan "dusit"
       var dusitCheckin = (c.myCheckins || []).find(function(ck) {
         return ck.note && ck.note.toLowerCase().includes('dusit');
