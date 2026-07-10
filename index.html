@@ -17506,14 +17506,28 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
       var prevDate = null;
       acts.forEach(function(a) {
         var tgl = a.time ? new Date(a.time).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() : '';
-        var rute = a.dest ? (BASE_NAME + '-' + a.dest + '-' + BASE_NAME) : '';
+        var dest = a.dest || '?';
+        var km = a.km !== null ? a.km : '';
+        var jam = a.time ? new Date(a.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
+        // Pergi: DUSIT → TUJUAN
         routeRows.push({
           'Tgl': tgl !== prevDate ? tgl : '',
           'Kurir': c.name,
-          'Rute': rute,
-          'KM Google Maps': a.km !== null ? a.km : '',
+          'Dari': BASE_NAME,
+          'Ke': dest,
+          'KM Google Maps': km,
           'Tipe': a.tipe,
-          'Jam': a.time ? new Date(a.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''
+          'Jam': jam
+        });
+        // Pulang: TUJUAN → DUSIT
+        routeRows.push({
+          'Tgl': '',
+          'Kurir': c.name,
+          'Dari': dest,
+          'Ke': BASE_NAME,
+          'KM Google Maps': km,
+          'Tipe': a.tipe,
+          'Jam': ''
         });
         prevDate = tgl;
       });
