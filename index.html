@@ -17528,7 +17528,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         var destName = a.dest || '?';
         var destLink = a.loc && (a.loc.lat || a.loc.latitude)
           ? 'https://maps.google.com?q=' + (a.loc.lat || a.loc.latitude) + ',' + (a.loc.lng || a.loc.longitude || a.loc.lon)
-          : (a.fallback || '');
+          : '';
         var km = a.km !== null ? a.km : '';
         var jam = a.time ? new Date(a.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
         // Pergi: DUSIT → TUJUAN
