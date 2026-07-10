@@ -17523,16 +17523,21 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
       var prevDate = null;
       acts.forEach(function(a) {
         var tgl = a.time ? new Date(a.time).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() : '';
-        var destFmt = fmtPoint(a.dest || '?', a.loc);
+        var destName = a.dest || '?';
+        var destLink = a.loc && (a.loc.lat || a.loc.latitude)
+          ? 'https://maps.google.com?q=' + (a.loc.lat || a.loc.latitude) + ',' + (a.loc.lng || a.loc.longitude || a.loc.lon)
+          : '';
         var km = a.km !== null ? a.km : '';
         var jam = a.time ? new Date(a.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
         // Pergi: DUSIT → TUJUAN
         routeRows.push({
           'Tgl': tgl !== prevDate ? tgl : '',
           'Kurir': c.name,
-          'Dari': dusitFmt,
-          'Ke': destFmt,
-          'KM Google Maps': km,
+          'Dari': BASE_NAME,
+          'Link Dari': dusitLink,
+          'Ke': destName,
+          'Link Tujuan': destLink,
+          'KM Google Maps (Motor)': km,
           'Tipe': a.tipe,
           'Jam': jam
         });
@@ -17540,9 +17545,11 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         routeRows.push({
           'Tgl': '',
           'Kurir': c.name,
-          'Dari': destFmt,
-          'Ke': dusitFmt,
-          'KM Google Maps': km,
+          'Dari': destName,
+          'Link Dari': destLink,
+          'Ke': BASE_NAME,
+          'Link Tujuan': dusitLink,
+          'KM Google Maps (Motor)': km,
           'Tipe': a.tipe,
           'Jam': ''
         });
