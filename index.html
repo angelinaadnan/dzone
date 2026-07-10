@@ -17539,7 +17539,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'Link Tujuan': destLink,
           'KM Google Maps (Motor)': km,
           'Tipe': a.tipe,
-          'Jam': jam
+          'Jam Tiba di Tujuan': jam
         });
         // Pulang: TUJUAN → DUSIT
         routeRows.push({
@@ -17551,7 +17551,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'Link Tujuan': dusitLink,
           'KM Google Maps (Motor)': km,
           'Tipe': a.tipe,
-          'Jam': ''
+          'Jam Tiba di Tujuan': ''
         });
         prevDate = tgl;
       });
