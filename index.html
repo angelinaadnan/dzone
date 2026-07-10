@@ -17474,9 +17474,6 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
 
     // Sheet: Rute Harian (format ringkas, untuk cross-check manual)
     var BASE_NAME = 'DUSIT';
-    var DUSIT_LAT = -6.1374698;
-    var DUSIT_LNG = 106.8254577;
-    var dusitLink = 'https://maps.google.com?q=' + DUSIT_LAT + ',' + DUSIT_LNG;
     var fmtPoint = function(name, loc) {
       if (loc && (loc.lat || loc.latitude)) {
         var lat = loc.lat || loc.latitude;
@@ -17485,9 +17482,16 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
       }
       return name;
     };
-    var dusitFmt = BASE_NAME + ' (' + dusitLink + ')';
     var routeRows = [];
     courierData.forEach(function(c) {
+      // Ambil koordinat DUSIT dari check-in kurir yang ada catatan "dusit"
+      var dusitCheckin = (c.myCheckins || []).find(function(ck) {
+        return ck.note && ck.note.toLowerCase().includes('dusit');
+      }) || (c.myCheckins && c.myCheckins[0]) || null;
+      var dusitLink = dusitCheckin && dusitCheckin.lat
+        ? 'https://maps.google.com?q=' + dusitCheckin.lat + ',' + dusitCheckin.lng
+        : 'https://maps.google.com?q=-6.1374698,106.8254577';
+      var dusitFmt = BASE_NAME + ' (' + dusitLink + ')';
       var acts = [];
       (c.myOrders || []).forEach(function(o) {
         var dest = (o.customer_name || '').toUpperCase().replace(/\s+/g, ' ').trim();
