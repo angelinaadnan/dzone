@@ -17414,64 +17414,6 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
       return s.slice(0, MAX_CELL) + '…';
     };
 
-    // ── GPS Rute (leg-by-leg) ──
-    var extractKmNote = function extractKmNote(note) {
-      if (!note) return '';
-      var m = String(note).match(/[·•]\s*([\d.]+)\s*km/i);
-      return m ? parseFloat(m[1]) : '';
-    };
-    var gpsRows = [];
-    courierData.forEach(function (c) {
-      c.legs.forEach(function (leg, i) {
-        gpsRows.push({
-          'Kurir': c.name,
-          'Leg': i + 1,
-          'Dari': safeTxt(leg.from.note),
-          'KM Google Maps': extractKmNote(leg.to.note),
-          'Jam Dari': leg.from.created_at ? new Date(leg.from.created_at).toLocaleString('id-ID') : '',
-          'Lat Dari': leg.from.lat || '',
-          'Lng Dari': leg.from.lng || '',
-          'Maps Dari': fmtMaps(leg.from),
-          'Ke': safeTxt(leg.to.note),
-          'Jam Ke': leg.to.created_at ? new Date(leg.to.created_at).toLocaleString('id-ID') : '',
-          'Lat Ke': leg.to.lat || '',
-          'Lng Ke': leg.to.lng || '',
-          'Maps Ke': fmtMaps(leg.to),
-          'KM Garis Lurus': fmtKmEx(leg.km),
-          'Est. BBM (Rp)': leg.km > 0 ? Math.round(leg.km * 600) : ''
-        });
-      });
-      if (c.myCheckins.length === 1) {
-        var pt = c.myCheckins[0];
-        gpsRows.push({
-          'Kurir': c.name,
-          'Leg': 1,
-          'Dari': safeTxt(pt.note),
-          'KM Google Maps': extractKmNote(pt.note),
-          'Jam Dari': pt.created_at ? new Date(pt.created_at).toLocaleString('id-ID') : '',
-          'Lat Dari': pt.lat || '',
-          'Lng Dari': pt.lng || '',
-          'Maps Dari': fmtMaps(pt),
-          'Ke': '—',
-          'Jam Ke': '',
-          'Lat Ke': '',
-          'Lng Ke': '',
-          'Maps Ke': '',
-          'KM Garis Lurus': '',
-          'Est. BBM (Rp)': ''
-        });
-      }
-    });
-    if (gpsRows.length > 0) {
-      var ws2 = XLSX.utils.json_to_sheet(gpsRows);
-      ws2['!cols'] = Object.keys(gpsRows[0]).map(function (k) {
-        return {
-          wch: Math.max(k.length, 14)
-        };
-      });
-      XLSX.utils.book_append_sheet(wb, ws2, 'GPS Rute');
-    }
-
     // Sheet: Rute Harian (format ringkas, untuk cross-check manual)
     var BASE_NAME = 'DUSIT';
     var fmtPoint = function(name, loc) {
