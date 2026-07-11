@@ -4958,7 +4958,10 @@ function FaceEnrollment(_ref_fe) {
       .then(function(det) {
         if (!det) { setStatus('error'); setErrMsg('Wajah tidak terdeteksi. Pastikan wajah terlihat jelas dan pencahayaan cukup.'); return; }
         var descriptor = Array.from(det.descriptor);
-        return db.from('face_descriptors').upsert([{ user_name: userName, descriptor: descriptor }], { onConflict: 'user_name' })
+        var thumbC = document.createElement('canvas'); thumbC.width = 120; thumbC.height = 90;
+        thumbC.getContext('2d').drawImage(canvas, 0, 0, 120, 90);
+        var photoB64 = thumbC.toDataURL('image/jpeg', 0.7);
+        return db.from('face_descriptors').upsert([{ user_name: userName, descriptor: descriptor, photo_b64: photoB64 }], { onConflict: 'user_name' })
           .then(function() { setStatus('done'); setTimeout(function() { onDone(new Float32Array(descriptor)); }, 1500); });
       })
       .catch(function(e) { setStatus('error'); setErrMsg('Gagal proses: ' + ((e && e.message) ? e.message : 'coba lagi')); });
@@ -4981,7 +4984,10 @@ function FaceEnrollment(_ref_fe) {
         .then(function(det) {
           if (!det) { setStatus('error'); setErrMsg('Wajah tidak terdeteksi di foto. Pastikan wajah terlihat jelas dan tidak terhalang.'); return; }
           var descriptor = Array.from(det.descriptor);
-          return db.from('face_descriptors').upsert([{ user_name: userName, descriptor: descriptor }], { onConflict: 'user_name' })
+          var thumbC2 = document.createElement('canvas'); thumbC2.width = 120; thumbC2.height = 90;
+          thumbC2.getContext('2d').drawImage(canvas, 0, 0, 120, 90);
+          var photoB64 = thumbC2.toDataURL('image/jpeg', 0.7);
+          return db.from('face_descriptors').upsert([{ user_name: userName, descriptor: descriptor, photo_b64: photoB64 }], { onConflict: 'user_name' })
             .then(function() { setStatus('done'); setTimeout(function() { onDone(new Float32Array(descriptor)); }, 1500); });
         })
         .catch(function(err) { setStatus('error'); setErrMsg('Gagal proses: ' + ((err && err.message) ? err.message : 'coba lagi')); });
@@ -5938,6 +5944,7 @@ function AbsensiPage(_ref46) {
         style: { padding: '6px 11px', whiteSpace: 'nowrap' }
       }, enrolledMap[u.name]
         ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            photoMap[u.name] && /*#__PURE__*/React.createElement("img", { src: photoMap[u.name], onClick: function() { window.open(photoMap[u.name]); }, style: { width: 38, height: 28, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', marginRight: 4, verticalAlign: 'middle', border: '1px solid var(--border)' } }),
             /*#__PURE__*/React.createElement("span", { style: { color: 'var(--green)', fontSize: 13 } }, "\u2705"),
             /*#__PURE__*/React.createElement("button", {
               onClick: function() { handleResetFace(u.name); },
@@ -6125,6 +6132,7 @@ function AbsensiPage(_ref46) {
         style: { padding: '6px 11px', whiteSpace: 'nowrap' }
       }, enrolledMap[u.name]
         ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            photoMap[u.name] && /*#__PURE__*/React.createElement("img", { src: photoMap[u.name], onClick: function() { window.open(photoMap[u.name]); }, style: { width: 38, height: 28, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', marginRight: 4, verticalAlign: 'middle', border: '1px solid var(--border)' } }),
             /*#__PURE__*/React.createElement("span", { style: { color: 'var(--green)', fontSize: 13 } }, "\u2705"),
             /*#__PURE__*/React.createElement("button", {
               onClick: function() { handleResetFace(u.name); },
