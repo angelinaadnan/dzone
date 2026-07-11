@@ -19502,6 +19502,8 @@ function AdminOnlineOrders(_ref144) {
     _React$useState230 = _slicedToArray(_React$useState229, 2),
     saving = _React$useState230[0],
     setSaving = _React$useState230[1];
+  var _psf1 = React.useState({}); var pickupSerahFile = _psf1[0]; var setPickupSerahFile = _psf1[1];
+  var _pss1 = React.useState({}); var pickupSerahSaving = _pss1[0]; var setPickupSerahSaving = _pss1[1];
   var setField = function setField(id, k, v) {
     return setEkspedisiForm(function (p) {
       return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, id, _objectSpread(_objectSpread({}, p[id] || {}), {}, _defineProperty({}, k, v))));
@@ -19883,19 +19885,43 @@ function AdminOnlineOrders(_ref144) {
       onClick: function onClick(e) {
         return e.stopPropagation();
       }
-    }, o.status === 'ao_serah' && (o.delivery_method || '').toLowerCase().includes('pickup') ? /*#__PURE__*/React.createElement("button", {
-      className: "btn-primary btn-sm",
-      style: { fontSize: 12 },
-      onClick: function onClick() {
-        if (!window.confirm('Konfirmasi barang sudah diserahkan ke ' + (o.customer_name || 'cabang') + '?')) return;
-        onUpdate(o.id, {
-          status: 'delivered',
-          delivered_at: new Date().toISOString(),
-          assigned_to: 'self_pickup',
-          status_note: 'Diserahkan langsung (pickup sendiri)'
-        });
-      }
-    }, "\u2705 Serah Terima ke Cabang") : !pengirimanOpen[o.id] ? /*#__PURE__*/React.createElement("button", {
+    }, o.status === 'ao_serah' && (o.delivery_method || '').toLowerCase().includes('pickup') ? /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexDirection: 'column', gap: 6 }
+    },
+      /*#__PURE__*/React.createElement("label", {
+        style: { fontSize: 11, color: 'var(--text3)', fontWeight: 600 }
+      }, "\uD83D\uDCF8 Foto bukti serah terima (wajib):"),
+      /*#__PURE__*/React.createElement("input", {
+        type: 'file', accept: 'image/*', capture: 'environment',
+        style: { fontSize: 11 },
+        onChange: function(e) {
+          var f = e.target.files && e.target.files[0];
+          if (f) setPickupSerahFile(function(p) { return Object.assign({}, p, _defineProperty({}, o.id, f)); });
+        }
+      }),
+      /*#__PURE__*/React.createElement("button", {
+        className: "btn-primary btn-sm",
+        disabled: !pickupSerahFile[o.id] || pickupSerahSaving[o.id],
+        style: { fontSize: 12, opacity: pickupSerahFile[o.id] ? 1 : 0.5 },
+        onClick: function onClick() {
+          if (!pickupSerahFile[o.id]) { alert('Upload foto bukti dulu'); return; }
+          if (!window.confirm('Konfirmasi barang sudah diserahkan ke ' + (o.customer_name || 'cabang') + '?')) return;
+          setPickupSerahSaving(function(p) { return Object.assign({}, p, _defineProperty({}, o.id, true)); });
+          uploadPhoto(pickupSerahFile[o.id], 'delivery')
+            .then(function(url) {
+              return onUpdate(o.id, {
+                status: 'delivered',
+                delivered_at: new Date().toISOString(),
+                assigned_to: 'self_pickup',
+                delivery_photo: url || null,
+                status_note: 'Diserahkan langsung (pickup sendiri)'
+              });
+            })
+            .then(function() { setPickupSerahSaving(function(p) { return Object.assign({}, p, _defineProperty({}, o.id, false)); }); })
+            .catch(function() { setPickupSerahSaving(function(p) { return Object.assign({}, p, _defineProperty({}, o.id, false)); }); });
+        }
+      }, pickupSerahSaving[o.id] ? 'Menyimpan...' : '\u2705 Konfirmasi Serah Terima')
+    ) : !pengirimanOpen[o.id] ? /*#__PURE__*/React.createElement("button", {
       className: "btn-secondary btn-sm",
       style: {
         fontSize: 12,
