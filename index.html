@@ -4908,8 +4908,15 @@ function FaceEnrollment(_ref_fe) {
   var _st2 = React.useState(null); var errMsg = _st2[0]; var setErrMsg = _st2[1];
   var _mr1 = React.useState(false); var modelsReady = _mr1[0]; var setModelsReady = _mr1[1];
   React.useEffect(function() {
+    var start = Date.now();
     var check = function() {
-      if (window.faceapi && window.faceapi.nets && window.faceapi.nets.faceRecognitionNet.isLoaded) setModelsReady(true);
+      if (window.faceapi && window.faceapi.nets && window.faceapi.nets.faceRecognitionNet.isLoaded) {
+        setModelsReady(true); return;
+      }
+      if (Date.now() - start > 90000) {
+        setStatus('error'); setErrMsg('Gagal memuat AI model. Periksa koneksi internet lalu refresh halaman.'); return;
+      }
+      if (window._faceModelsState === 'idle') loadFaceModels();
     };
     check();
     var tid = setInterval(check, 800);
