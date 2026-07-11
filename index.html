@@ -4183,10 +4183,23 @@ function getDeviceInfo() {
   var browser = /CriOS/.test(ua) ? 'Chrome' : /FxiOS/.test(ua) ? 'Firefox' : /EdgiOS/.test(ua) ? 'Edge' : /OPiOS/.test(ua) ? 'Opera' : /Safari/.test(ua) && /Apple/.test(ua) ? 'Safari' : /Chrome/.test(ua) ? 'Chrome' : /Firefox/.test(ua) ? 'Firefox' : /Edge/.test(ua) ? 'Edge' : 'Browser';
   return device + ' \xB7 ' + browser;
 }
+var _faceModelsState = 'idle';
+function loadFaceModels() {
+  if (_faceModelsState !== 'idle' || !window.faceapi) return;
+  _faceModelsState = 'loading';
+  var base = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+  Promise.all([
+    window.faceapi.nets.tinyFaceDetector.loadFromUri(base),
+    window.faceapi.nets.faceLandmark68TinyNet.loadFromUri(base),
+    window.faceapi.nets.faceRecognitionNet.loadFromUri(base)
+  ]).then(function() { _faceModelsState = 'loaded'; })
+    .catch(function() { _faceModelsState = 'idle'; });
+}
 function CameraCapture(_ref42) {
   var type = _ref42.type,
     onCapture = _ref42.onCapture,
-    onClose = _ref42.onClose;
+    onClose = _ref42.onClose,
+    faceDescriptor = _ref42.faceDescriptor;
   var videoRef = React.useRef(null);
   var canvasRef = React.useRef(null);
   var gpsRef = React.useRef(null); // selalu current, bisa dibaca di async
@@ -4313,11 +4326,7 @@ function CameraCapture(_ref42) {
     };
     doFetch(false);
   }, []);
-  React.useEffect(function () {
-    if (window.faceapi && window.faceapi.nets && !window.faceapi.nets.tinyFaceDetector.isLoaded) {
-      window.faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights').catch(function () {});
-    }
-  }, []);
+  React.useEffect(function () { loadFaceModels(); }, []);
   var startCam = /*#__PURE__*/function () {
     var _ref44 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee35() {
       var front,
@@ -4408,18 +4417,32 @@ function CameraCapture(_ref42) {
     ctx.drawImage(video, 0, 0);
     setFaceError(null);
     setFaceChecking(true);
-    var detectPromise = (window.faceapi && window.faceapi.nets && window.faceapi.nets.tinyFaceDetector.isLoaded)
-      ? window.faceapi.detectSingleFace(canvas, new window.faceapi.TinyFaceDetectorOptions())
-      : Promise.resolve(true);
-    detectPromise.then(function (det) {
+    var tinyReady = window.faceapi && window.faceapi.nets && window.faceapi.nets.tinyFaceDetector.isLoaded;
+    var recogReady = tinyReady && window.faceapi.nets.faceRecognitionNet.isLoaded;
+    var detectPromise;
+    if (recogReady && faceDescriptor) {
+      detectPromise = window.faceapi.detectSingleFace(canvas, new window.faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks(true).withFaceDescriptor()
+        .then(function(det) {
+          if (!det) return { ok: false, msg: 'Wajah tidak terdeteksi. Pastikan wajah terlihat jelas.' };
+          var dist = window.faceapi.euclideanDistance(faceDescriptor, det.descriptor);
+          if (dist > 0.7) return { ok: false, msg: 'Wajah tidak cocok (' + Math.round(dist * 100) + '% berbeda). Pastikan pencahayaan cukup.' };
+          return { ok: true };
+        });
+    } else if (tinyReady) {
+      detectPromise = window.faceapi.detectSingleFace(canvas, new window.faceapi.TinyFaceDetectorOptions())
+        .then(function(det) {
+          return det ? { ok: true } : { ok: false, msg: 'Wajah tidak terdeteksi. Pastikan wajah terlihat jelas.' };
+        });
+    } else {
+      detectPromise = Promise.resolve({ ok: true });
+    }
+    detectPromise.then(function(res) {
       setFaceChecking(false);
-      if (!det) {
-        setFaceError('Wajah tidak terdeteksi. Pastikan wajah terlihat jelas lalu coba foto lagi.');
-        return;
-      }
+      if (!res.ok) { setFaceError(res.msg); return; }
       setPreview(canvas.toDataURL('image/jpeg', 0.88));
       stopAll();
-    }).catch(function () {
+    }).catch(function() {
       setFaceChecking(false);
       setPreview(canvas.toDataURL('image/jpeg', 0.88));
       stopAll();
@@ -4864,6 +4887,88 @@ function CameraCapture(_ref42) {
 }
 
 // ─── ABSENSI ───────────────────────────────────────────────────────
+function FaceEnrollment(_ref_fe) {
+  var userName = _ref_fe.userName, onDone = _ref_fe.onDone;
+  var videoRef = React.useRef(null);
+  var canvasRef = React.useRef(null);
+  var streamRef = React.useRef(null);
+  var _st1 = React.useState('starting'); var status = _st1[0]; var setStatus = _st1[1];
+  var _st2 = React.useState(null); var errMsg = _st2[0]; var setErrMsg = _st2[1];
+  var startCamera = function() {
+    setStatus('starting');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width:{ideal:640}, height:{ideal:480} }, audio: false })
+      .then(function(s) {
+        streamRef.current = s;
+        if (videoRef.current) { videoRef.current.srcObject = s; videoRef.current.play(); }
+        setStatus('camera');
+      })
+      .catch(function() { setStatus('error'); setErrMsg('Kamera tidak bisa dibuka. Aktifkan izin kamera di browser.'); });
+  };
+  React.useEffect(function() {
+    loadFaceModels();
+    startCamera();
+    return function() { if (streamRef.current) streamRef.current.getTracks().forEach(function(t) { t.stop(); }); };
+  }, []);
+  var capture = function() {
+    var video = videoRef.current, canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    var ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    if (streamRef.current) streamRef.current.getTracks().forEach(function(t) { t.stop(); });
+    if (!window.faceapi || !window.faceapi.nets || !window.faceapi.nets.faceRecognitionNet.isLoaded) {
+      setStatus('error'); setErrMsg('Model AI belum siap. Tunggu beberapa detik lalu coba lagi.');
+      return;
+    }
+    setStatus('processing');
+    window.faceapi.detectSingleFace(canvas, new window.faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks(true).withFaceDescriptor()
+      .then(function(det) {
+        if (!det) { setStatus('error'); setErrMsg('Wajah tidak terdeteksi. Pastikan wajah terlihat jelas dan pencahayaan cukup.'); return; }
+        var descriptor = Array.from(det.descriptor);
+        return db.from('face_descriptors').upsert([{ user_name: userName, descriptor: descriptor }], { onConflict: 'user_name' })
+          .then(function() { setStatus('done'); setTimeout(function() { onDone(new Float32Array(descriptor)); }, 1500); });
+      })
+      .catch(function(e) { setStatus('error'); setErrMsg('Gagal proses: ' + ((e && e.message) ? e.message : 'coba lagi')); });
+  };
+  return /*#__PURE__*/React.createElement('div', {
+    style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 2000,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }
+  },
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: 20, fontWeight: 700, color: '#fff', textAlign: 'center' } }, '\uD83D\uDCF8 Daftarkan Wajah Kamu'),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', maxWidth: 300, lineHeight: 1.6 } },
+      'Foto wajah kamu sekali untuk verifikasi absensi. Pastikan pencahayaan cukup dan wajah terlihat jelas.'
+    ),
+    /*#__PURE__*/React.createElement('div', { style: { position: 'relative', width: 280, height: 210, borderRadius: 14, overflow: 'hidden', background: '#000', border: '2px solid var(--accent)' } },
+      /*#__PURE__*/React.createElement('video', { ref: videoRef, autoPlay: true, playsInline: true, muted: true,
+        style: { width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)',
+          display: (status === 'camera' || status === 'starting') ? 'block' : 'none' } }),
+      (status === 'processing' || status === 'done') && /*#__PURE__*/React.createElement('div', {
+        style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(0,0,0,0.85)' }
+      },
+        /*#__PURE__*/React.createElement('div', { style: { fontSize: 36 } }, status === 'done' ? '\u2705' : '\u23F3'),
+        /*#__PURE__*/React.createElement('div', { style: { color: '#fff', fontSize: 14, fontWeight: 600 } }, status === 'done' ? 'Wajah berhasil didaftarkan!' : 'Memproses wajah...')
+      )
+    ),
+    /*#__PURE__*/React.createElement('canvas', { ref: canvasRef, style: { display: 'none' } }),
+    status === 'error' && /*#__PURE__*/React.createElement('div', {
+      style: { background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 10, padding: '12px 16px', maxWidth: 300, textAlign: 'center' }
+    },
+      /*#__PURE__*/React.createElement('div', { style: { color: '#fca5a5', fontSize: 12, marginBottom: 10 } }, errMsg),
+      /*#__PURE__*/React.createElement('button', { onClick: function() { setErrMsg(null); startCamera(); },
+        style: { padding: '7px 18px', borderRadius: 8, background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12 } },
+        '\uD83D\uDD04 Coba Lagi'
+      )
+    ),
+    status === 'camera' && /*#__PURE__*/React.createElement('button', { onClick: capture,
+      style: { width: 68, height: 68, borderRadius: '50%', background: '#fff', border: '5px solid var(--accent)', cursor: 'pointer', fontSize: 26,
+        display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+      '\uD83D\uDCF7'
+    ),
+    status === 'starting' && /*#__PURE__*/React.createElement('div', { style: { color: 'rgba(255,255,255,0.5)', fontSize: 13 } }, 'Membuka kamera...')
+  );
+}
 function AbsensiPage(_ref46) {
   var attendance = _ref46.attendance,
     onSave = _ref46.onSave,
@@ -4902,6 +5007,10 @@ function AbsensiPage(_ref46) {
     _React$useState28 = _slicedToArray(_React$useState27, 2),
     photoStep = _React$useState28[0],
     setPhotoStep = _React$useState28[1]; // 'in'|'out'|null
+  var _fd1 = React.useState('loading'); var myFaceDescriptor = _fd1[0]; var setMyFaceDescriptor = _fd1[1];
+  var _en1 = React.useState(false); var enrolling = _en1[0]; var setEnrolling = _en1[1];
+  var _em1 = React.useState({}); var enrolledMap = _em1[0]; var setEnrolledMap = _em1[1];
+  var _rf1 = React.useState(null); var resetingFace = _rf1[0]; var setResetingFace = _rf1[1];
   // Jadwal per user: {h: jam masuk, m: menit masuk}
   var USER_SCHEDULES = {
     'PS TITI': {
@@ -5269,6 +5378,32 @@ function AbsensiPage(_ref46) {
     }, "\uD83D\uDCCD ", address ? address.slice(0, 30) + '…' : "".concat(lat.toFixed(4), ",").concat(lng.toFixed(4)));
   };
 
+  React.useEffect(function() {
+    if (!db) return;
+    loadFaceModels();
+    db.from('face_descriptors').select('user_name' + (isSuper ? '' : ',descriptor'))
+      .then(function(res) {
+        var data = res.data || [];
+        var map = {}; data.forEach(function(d) { map[d.user_name] = true; }); setEnrolledMap(map);
+        if (!isSuper) {
+          var mine = data.find(function(d) { return d.user_name === userName; });
+          setMyFaceDescriptor(mine && mine.descriptor ? new Float32Array(mine.descriptor) : null);
+        } else {
+          setMyFaceDescriptor(null);
+        }
+      })
+      .catch(function() { setMyFaceDescriptor(null); });
+  }, []);
+  var handleResetFace = function(name) {
+    if (!window.confirm('Reset wajah ' + name + '? Mereka harus daftar ulang sebelum bisa absen.')) return;
+    setResetingFace(name);
+    db.from('face_descriptors')['delete']().eq('user_name', name)
+      .then(function() {
+        setEnrolledMap(function(prev) { var n = Object.assign({}, prev); delete n[name]; return n; });
+        setResetingFace(null);
+      })
+      .catch(function() { setResetingFace(null); });
+  };
   // ── Supervisor view ───────────────────────────────────────────────
   if (canViewAll) {
     // Sort: belum absen → masih kerja → sudah pulang
@@ -5557,7 +5692,7 @@ function AbsensiPage(_ref46) {
         background: 'var(--bg3)',
         borderBottom: '1px solid var(--border)'
       }
-    }, ['#', 'Nama', 'Role', 'Masuk', 'Lokasi Masuk', 'Foto', 'Pulang', 'Lokasi Pulang', 'Foto', 'Durasi', 'Status', 'Device'].map(function (h) {
+    }, ['#', 'Nama', 'Role', 'Masuk', 'Lokasi Masuk', 'Foto', 'Pulang', 'Lokasi Pulang', 'Foto', 'Durasi', 'Status', 'Device', 'Wajah'].map(function (h) {
       return /*#__PURE__*/React.createElement("th", {
         key: h,
         style: {
@@ -5734,9 +5869,20 @@ function AbsensiPage(_ref46) {
           color: 'var(--text2)',
           whiteSpace: 'nowrap'
         }
-      }, rec && rec.check_in_device ? rec.check_in_device : (rec && rec.check_out_device ? rec.check_out_device : '\u2014')));
+      }, rec && rec.check_in_device ? rec.check_in_device : (rec && rec.check_out_device ? rec.check_out_device : '\u2014'))), /*#__PURE__*/React.createElement("td", {
+        style: { padding: '6px 11px', whiteSpace: 'nowrap' }
+      }, enrolledMap[u.name]
+        ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("span", { style: { color: 'var(--green)', fontSize: 13 } }, "\u2705"),
+            /*#__PURE__*/React.createElement("button", {
+              onClick: function() { handleResetFace(u.name); },
+              disabled: resetingFace === u.name,
+              style: { marginLeft: 6, padding: '2px 8px', borderRadius: 5, background: 'rgba(239,68,68,0.2)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)', cursor: 'pointer', fontSize: 10 }
+            }, resetingFace === u.name ? '...' : 'Reset')
+          )
+        : /*#__PURE__*/React.createElement("span", { style: { color: 'var(--red)', fontSize: 13 } }, "\u274C")));
     }), lainnyaUsers.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-      colSpan: 12,
+      colSpan: 13,
       style: {
         padding: '10px 11px',
         background: 'rgba(108,99,255,0.07)',
@@ -5910,7 +6056,18 @@ function AbsensiPage(_ref46) {
           color: 'var(--text2)',
           whiteSpace: 'nowrap'
         }
-      }, rec && rec.check_in_device ? rec.check_in_device : (rec && rec.check_out_device ? rec.check_out_device : '\u2014')));
+      }, rec && rec.check_in_device ? rec.check_in_device : (rec && rec.check_out_device ? rec.check_out_device : '\u2014'))), /*#__PURE__*/React.createElement("td", {
+        style: { padding: '6px 11px', whiteSpace: 'nowrap' }
+      }, enrolledMap[u.name]
+        ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("span", { style: { color: 'var(--green)', fontSize: 13 } }, "\u2705"),
+            /*#__PURE__*/React.createElement("button", {
+              onClick: function() { handleResetFace(u.name); },
+              disabled: resetingFace === u.name,
+              style: { marginLeft: 6, padding: '2px 8px', borderRadius: 5, background: 'rgba(239,68,68,0.2)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)', cursor: 'pointer', fontSize: 10 }
+            }, resetingFace === u.name ? '...' : 'Reset')
+          )
+        : /*#__PURE__*/React.createElement("span", { style: { color: 'var(--red)', fontSize: 13 } }, "\u274C")));
     }))))), /*#__PURE__*/React.createElement("div", {
       className: "card"
     }, /*#__PURE__*/React.createElement("div", {
@@ -5998,10 +6155,41 @@ function AbsensiPage(_ref46) {
     }, "Telat (menit)"), " \xB7 Durasi \xB7 Status \xB7 GPS Masuk \xB7 Alamat Masuk \xB7 GPS Pulang \xB7 Alamat Pulang \xB7 Catatan \xB7 Foto")), showCamera && /*#__PURE__*/React.createElement(CameraCapture, {
       type: showCamera,
       onCapture: handleCameraCapture,
+      faceDescriptor: null,
       onClose: function onClose() {
         return setShowCamera(null);
       }
     }));
+  }
+
+  // ── Enrollment check (non-supervisor only) ────────────────────────
+  if (!isSuper && enrolling) {
+    return /*#__PURE__*/React.createElement(FaceEnrollment, {
+      userName: userName,
+      onDone: function(desc) {
+        setMyFaceDescriptor(desc);
+        setEnrolledMap(function(prev) { var n = Object.assign({}, prev); n[userName] = true; return n; });
+        setEnrolling(false);
+      }
+    });
+  }
+  if (!isSuper && myFaceDescriptor === 'loading') {
+    return /*#__PURE__*/React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: 40 } },
+      /*#__PURE__*/React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)' } }, '\u23F3 Memuat data wajah...')
+    );
+  }
+  if (!isSuper && myFaceDescriptor === null) {
+    return /*#__PURE__*/React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: '40px 24px' } },
+      /*#__PURE__*/React.createElement('div', { style: { fontSize: 48, marginBottom: 16 } }, '\uD83D\uDCF8'),
+      /*#__PURE__*/React.createElement('div', { style: { fontSize: 16, fontWeight: 700, marginBottom: 8, color: 'var(--text)' } }, 'Daftar Wajah Dulu'),
+      /*#__PURE__*/React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)', marginBottom: 24, lineHeight: 1.7, maxWidth: 300, margin: '0 auto 24px' } },
+        'Untuk keamanan absensi, kamu perlu mendaftarkan wajah sekali. Setelah itu absen seperti biasa.'
+      ),
+      /*#__PURE__*/React.createElement('button', {
+        onClick: function() { setEnrolling(true); },
+        style: { padding: '12px 28px', borderRadius: 10, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700 }
+      }, '\uD83D\uDCF7 Daftar Wajah Sekarang')
+    );
   }
 
   // ── Regular user view ─────────────────────────────────────────────
@@ -6454,6 +6642,7 @@ function AbsensiPage(_ref46) {
   }, "\uD83D\uDDD3"), /*#__PURE__*/React.createElement("div", null, "Belum ada riwayat absensi")), showCamera && /*#__PURE__*/React.createElement(CameraCapture, {
     type: showCamera,
     onCapture: handleCameraCapture,
+    faceDescriptor: myFaceDescriptor instanceof Float32Array ? myFaceDescriptor : null,
     onClose: function onClose() {
       return setShowCamera(null);
     }
