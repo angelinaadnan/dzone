@@ -8,7 +8,6 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/xlsx@0.16.9/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet"/>
 <style>
   :root {
@@ -4185,15 +4184,28 @@ function getDeviceInfo() {
 }
 var _faceModelsState = 'idle';
 function loadFaceModels() {
-  if (_faceModelsState !== 'idle' || !window.faceapi) return;
+  if (_faceModelsState !== 'idle') return;
   _faceModelsState = 'loading';
   var base = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
-  Promise.all([
-    window.faceapi.nets.tinyFaceDetector.loadFromUri(base),
-    window.faceapi.nets.faceLandmark68TinyNet.loadFromUri(base),
-    window.faceapi.nets.faceRecognitionNet.loadFromUri(base)
-  ]).then(function() { _faceModelsState = 'loaded'; })
-    .catch(function() { _faceModelsState = 'idle'; });
+  var doLoad = function() {
+    try {
+      Promise.all([
+        window.faceapi.nets.tinyFaceDetector.loadFromUri(base),
+        window.faceapi.nets.faceLandmark68TinyNet.loadFromUri(base),
+        window.faceapi.nets.faceRecognitionNet.loadFromUri(base)
+      ]).then(function() { _faceModelsState = 'loaded'; })
+        .catch(function() { _faceModelsState = 'idle'; });
+    } catch(e) { _faceModelsState = 'idle'; }
+  };
+  if (window.faceapi) {
+    doLoad();
+  } else {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+    s.onload = doLoad;
+    s.onerror = function() { _faceModelsState = 'idle'; };
+    document.head.appendChild(s);
+  }
 }
 function CameraCapture(_ref42) {
   var type = _ref42.type,
