@@ -5081,6 +5081,7 @@ function AbsensiPage(_ref46) {
   var _fd1 = React.useState('loading'); var myFaceDescriptor = _fd1[0]; var setMyFaceDescriptor = _fd1[1];
   var _en1 = React.useState(false); var enrolling = _en1[0]; var setEnrolling = _en1[1];
   var _em1 = React.useState({}); var enrolledMap = _em1[0]; var setEnrolledMap = _em1[1];
+  var _pm1 = React.useState({}); var photoMap = _pm1[0]; var setPhotoMap = _pm1[1];
   var _rf1 = React.useState(null); var resetingFace = _rf1[0]; var setResetingFace = _rf1[1];
   // Jadwal per user: {h: jam masuk, m: menit masuk}
   var USER_SCHEDULES = {
@@ -5452,10 +5453,10 @@ function AbsensiPage(_ref46) {
   React.useEffect(function() {
     if (!db) return;
     loadFaceModels();
-    db.from('face_descriptors').select('user_name' + (canViewAll ? '' : ',descriptor'))
+    db.from('face_descriptors').select('user_name,photo_b64' + (canViewAll ? '' : ',descriptor'))
       .then(function(res) {
         var data = res.data || [];
-        var map = {}; data.forEach(function(d) { map[d.user_name] = true; }); setEnrolledMap(map);
+        var map = {}; var pmap = {}; data.forEach(function(d) { map[d.user_name] = true; if (d.photo_b64) pmap[d.user_name] = d.photo_b64; }); setEnrolledMap(map); setPhotoMap(pmap);
         if (!canViewAll) {
           var mine = data.find(function(d) { return d.user_name === userName; });
           setMyFaceDescriptor(mine && mine.descriptor ? new Float32Array(mine.descriptor) : null);
