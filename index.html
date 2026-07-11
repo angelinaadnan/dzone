@@ -4432,13 +4432,15 @@ function CameraCapture(_ref42) {
     var tinyReady = window.faceapi && window.faceapi.nets && window.faceapi.nets.tinyFaceDetector.isLoaded;
     var recogReady = tinyReady && window.faceapi.nets.faceRecognitionNet.isLoaded;
     var detectPromise;
-    if (recogReady && faceDescriptor) {
+    if (faceDescriptor && !recogReady) {
+      detectPromise = Promise.resolve({ ok: false, msg: 'Model AI belum siap. Tunggu beberapa detik lalu coba lagi.' });
+    } else if (recogReady && faceDescriptor) {
       detectPromise = window.faceapi.detectSingleFace(canvas, new window.faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks(true).withFaceDescriptor()
         .then(function(det) {
           if (!det) return { ok: false, msg: 'Wajah tidak terdeteksi. Pastikan wajah terlihat jelas.' };
           var dist = window.faceapi.euclideanDistance(faceDescriptor, det.descriptor);
-          if (dist > 0.7) return { ok: false, msg: 'Wajah tidak cocok (' + Math.round(dist * 100) + '% berbeda). Pastikan pencahayaan cukup.' };
+          if (dist > 0.55) return { ok: false, msg: 'Wajah tidak cocok (' + Math.round(dist * 100) + '% berbeda). Pastikan pencahayaan cukup.' };
           return { ok: true };
         });
     } else if (tinyReady) {
