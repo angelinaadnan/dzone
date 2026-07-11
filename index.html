@@ -19883,7 +19883,19 @@ function AdminOnlineOrders(_ref144) {
       onClick: function onClick(e) {
         return e.stopPropagation();
       }
-    }, !pengirimanOpen[o.id] ? /*#__PURE__*/React.createElement("button", {
+    }, o.status === 'ao_serah' && (o.delivery_method || '').toLowerCase().includes('pickup') ? /*#__PURE__*/React.createElement("button", {
+      className: "btn-primary btn-sm",
+      style: { fontSize: 12 },
+      onClick: function onClick() {
+        if (!window.confirm('Konfirmasi barang sudah diserahkan ke ' + (o.customer_name || 'cabang') + '?')) return;
+        onUpdate(o.id, {
+          status: 'delivered',
+          delivered_at: new Date().toISOString(),
+          assigned_to: 'self_pickup',
+          status_note: 'Diserahkan langsung (pickup sendiri)'
+        });
+      }
+    }, "\u2705 Serah Terima ke Cabang") : !pengirimanOpen[o.id] ? /*#__PURE__*/React.createElement("button", {
       className: "btn-secondary btn-sm",
       style: {
         fontSize: 12,
@@ -36856,6 +36868,13 @@ function BranchTitipKirimPage(_ref242) {
         color: 'var(--text3)'
       }
     }, o.status === 'new' && '⏳ Menunggu Admin untuk proses invoice…', o.status === 'invoiced' && '📄 Invoice sudah dibuat, menunggu Ops siapkan barang…', (o.status === 'prep' || o.status === 'tech' || o.status === 'tech_done') && '📦 Ops sedang siapkan / proses barang…', o.status === 'on_delivery' && "\uD83D\uDE9A Sedang dikirim".concat(o.courier_name ? ' oleh ' + o.courier_name : '', "\u2026")));
+  }), selOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
+    order: selOrder,
+    onClose: function() { setSelOrder(null); },
+    onUpdate: onUpdate,
+    onLoadFiles: function() { return Promise.resolve([]); },
+    role: 'cabang',
+    courierName: branchName
   }));
 }
 function BranchRequestForm(_ref243) {
