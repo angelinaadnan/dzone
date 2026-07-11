@@ -8,6 +8,7 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/xlsx@0.16.9/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet"/>
 <style>
   :root {
@@ -4176,6 +4177,12 @@ function App() {
 }
 
 // ─── LIVE CAMERA CAPTURE ───────────────────────────────────────────
+function getDeviceInfo() {
+  var ua = navigator.userAgent || '';
+  var device = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : 'Desktop';
+  var browser = /CriOS/.test(ua) ? 'Chrome' : /FxiOS/.test(ua) ? 'Firefox' : /EdgiOS/.test(ua) ? 'Edge' : /OPiOS/.test(ua) ? 'Opera' : /Safari/.test(ua) && /Apple/.test(ua) ? 'Safari' : /Chrome/.test(ua) ? 'Chrome' : /Firefox/.test(ua) ? 'Firefox' : /Edge/.test(ua) ? 'Edge' : 'Browser';
+  return device + ' \xB7 ' + browser;
+}
 function CameraCapture(_ref42) {
   var type = _ref42.type,
     onCapture = _ref42.onCapture,
@@ -4211,6 +4218,14 @@ function CameraCapture(_ref42) {
     _React$useState16 = _slicedToArray(_React$useState15, 2),
     stamping = _React$useState16[0],
     setStamping = _React$useState16[1];
+  var _React$useState17 = React.useState(false),
+    _React$useState18 = _slicedToArray(_React$useState17, 2),
+    faceChecking = _React$useState18[0],
+    setFaceChecking = _React$useState18[1];
+  var _React$useState19 = React.useState(null),
+    _React$useState20 = _slicedToArray(_React$useState19, 2),
+    faceError = _React$useState20[0],
+    setFaceError = _React$useState20[1];
 
   // Sync gps state → gpsRef agar bisa dibaca di async/setTimeout
   var setGpsSync = function setGpsSync(val) {
@@ -4297,6 +4312,11 @@ function CameraCapture(_ref42) {
       });
     };
     doFetch(false);
+  }, []);
+  React.useEffect(function () {
+    if (window.faceapi && window.faceapi.nets && !window.faceapi.nets.tinyFaceDetector.isLoaded) {
+      window.faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights').catch(function () {});
+    }
   }, []);
   var startCam = /*#__PURE__*/function () {
     var _ref44 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee35() {
@@ -4386,8 +4406,24 @@ function CameraCapture(_ref42) {
       ctx.scale(-1, 1);
     }
     ctx.drawImage(video, 0, 0);
-    setPreview(canvas.toDataURL('image/jpeg', 0.88));
-    stopAll();
+    setFaceError(null);
+    setFaceChecking(true);
+    var detectPromise = (window.faceapi && window.faceapi.nets && window.faceapi.nets.tinyFaceDetector.isLoaded)
+      ? window.faceapi.detectSingleFace(canvas, new window.faceapi.TinyFaceDetectorOptions())
+      : Promise.resolve(true);
+    detectPromise.then(function (det) {
+      setFaceChecking(false);
+      if (!det) {
+        setFaceError('Wajah tidak terdeteksi. Pastikan wajah terlihat jelas lalu coba foto lagi.');
+        return;
+      }
+      setPreview(canvas.toDataURL('image/jpeg', 0.88));
+      stopAll();
+    }).catch(function () {
+      setFaceChecking(false);
+      setPreview(canvas.toDataURL('image/jpeg', 0.88));
+      stopAll();
+    });
   };
   var retake = function retake() {
     setPreview(null);
@@ -4669,7 +4705,22 @@ function CameraCapture(_ref42) {
       fontSize: 12,
       color: 'rgba(255,255,255,0.6)'
     }
-  }, gpsLabel))), /*#__PURE__*/React.createElement("div", {
+  }, gpsLabel))), faceChecking && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      inset: 0,
+      background: 'rgba(0,0,0,0.7)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 28 }
+  }, "\uD83E\uDD16"), /*#__PURE__*/React.createElement("div", {
+    style: { color: '#fff', fontSize: 14, fontWeight: 600 }
+  }, "Mendeteksi wajah...")), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '16px 20px',
       background: 'rgba(0,0,0,0.85)',
@@ -4678,17 +4729,31 @@ function CameraCapture(_ref42) {
   }, !preview && !camErr && !starting && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
-      justifyContent: 'center'
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 10
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, faceError && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '8px 14px',
+      background: 'rgba(239,68,68,0.25)',
+      border: '1px solid rgba(239,68,68,0.5)',
+      borderRadius: 8,
+      color: '#fca5a5',
+      fontSize: 12,
+      textAlign: 'center',
+      maxWidth: 280
+    }
+  }, faceError), /*#__PURE__*/React.createElement("button", {
     onClick: capture,
+    disabled: faceChecking,
     style: {
       width: 76,
       height: 76,
       borderRadius: '50%',
-      background: '#fff',
+      background: faceChecking ? 'rgba(255,255,255,0.3)' : '#fff',
       border: "5px solid ".concat(color),
-      cursor: 'pointer',
+      cursor: faceChecking ? 'not-allowed' : 'pointer',
       fontSize: 30,
       display: 'flex',
       alignItems: 'center',
@@ -5001,6 +5066,7 @@ function AbsensiPage(_ref46) {
               check_in_lng: (gpsData === null || gpsData === void 0 ? void 0 : gpsData.status) === 'ok' ? gpsData.lng : null,
               check_in_acc: (gpsData === null || gpsData === void 0 ? void 0 : gpsData.status) === 'ok' ? gpsData.acc : null,
               check_in_address: (gpsData === null || gpsData === void 0 ? void 0 : gpsData.address) || null,
+              check_in_device: getDeviceInfo(),
               notes: notes || null
             });
           case 9:
@@ -5017,7 +5083,8 @@ function AbsensiPage(_ref46) {
               check_out_lat: (gpsData === null || gpsData === void 0 ? void 0 : gpsData.status) === 'ok' ? gpsData.lat : null,
               check_out_lng: (gpsData === null || gpsData === void 0 ? void 0 : gpsData.status) === 'ok' ? gpsData.lng : null,
               check_out_acc: (gpsData === null || gpsData === void 0 ? void 0 : gpsData.status) === 'ok' ? gpsData.acc : null,
-              check_out_address: (gpsData === null || gpsData === void 0 ? void 0 : gpsData.address) || null
+              check_out_address: (gpsData === null || gpsData === void 0 ? void 0 : gpsData.address) || null,
+              check_out_device: getDeviceInfo()
             });
           case 13:
             setLoading(false);
@@ -5490,7 +5557,7 @@ function AbsensiPage(_ref46) {
         background: 'var(--bg3)',
         borderBottom: '1px solid var(--border)'
       }
-    }, ['#', 'Nama', 'Role', 'Masuk', 'Lokasi Masuk', 'Foto', 'Pulang', 'Lokasi Pulang', 'Foto', 'Durasi', 'Status'].map(function (h) {
+    }, ['#', 'Nama', 'Role', 'Masuk', 'Lokasi Masuk', 'Foto', 'Pulang', 'Lokasi Pulang', 'Foto', 'Durasi', 'Status', 'Device'].map(function (h) {
       return /*#__PURE__*/React.createElement("th", {
         key: h,
         style: {
@@ -5660,9 +5727,16 @@ function AbsensiPage(_ref46) {
           color: st.color,
           fontWeight: 600
         }
-      }, st.label)));
+      }, st.label)), /*#__PURE__*/React.createElement("td", {
+        style: {
+          padding: '8px 11px',
+          fontSize: 11,
+          color: 'var(--text2)',
+          whiteSpace: 'nowrap'
+        }
+      }, rec && rec.check_in_device ? rec.check_in_device : (rec && rec.check_out_device ? rec.check_out_device : '\u2014')));
     }), lainnyaUsers.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-      colSpan: 11,
+      colSpan: 12,
       style: {
         padding: '10px 11px',
         background: 'rgba(108,99,255,0.07)',
@@ -5829,7 +5903,14 @@ function AbsensiPage(_ref46) {
           color: st.color,
           fontWeight: 600
         }
-      }, st.label)));
+      }, st.label)), /*#__PURE__*/React.createElement("td", {
+        style: {
+          padding: '8px 11px',
+          fontSize: 11,
+          color: 'var(--text2)',
+          whiteSpace: 'nowrap'
+        }
+      }, rec && rec.check_in_device ? rec.check_in_device : (rec && rec.check_out_device ? rec.check_out_device : '\u2014')));
     }))))), /*#__PURE__*/React.createElement("div", {
       className: "card"
     }, /*#__PURE__*/React.createElement("div", {
