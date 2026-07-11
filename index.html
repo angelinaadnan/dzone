@@ -29328,6 +29328,30 @@ function OpsDashboard(_ref192) {
       setOpenRow = _React$useState310[1];
     var _psf3 = React.useState({}); var psFile = _psf3[0]; var setPsFile = _psf3[1];
     var _pss3 = React.useState({}); var psSaving = _pss3[0]; var setPsSaving = _pss3[1];
+    var _dlo = React.useState({}); var dlOpen = _dlo[0]; var setDlOpen = _dlo[1];
+    var _dlf = React.useState({}); var dlForm = _dlf[0]; var setDlForm = _dlf[1];
+    var _dls = React.useState({}); var dlSaving = _dls[0]; var setDlSaving = _dls[1];
+    var setDlField = function(id, k, v) { setDlForm(function(p){ return Object.assign({}, p, _defineProperty({}, id, Object.assign({}, p[id]||{}, _defineProperty({}, k, v)))); }); };
+    var submitEkspedisiTitip = function(ord) {
+      var form = dlForm[ord.id] || {};
+      if (!(form.nama||'').trim()) { alert('Nama ekspedisi wajib diisi'); return; }
+      if (!(form.resi||'').trim()) { alert('Nomor resi wajib diisi'); return; }
+      setDlSaving(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, 'eks')); });
+      onUpdateOrder(ord.id, {
+        status: 'delivered', delivered_at: new Date().toISOString(),
+        delivery_method: form.nama.trim(), tracking: form.resi.trim(),
+        courier_name: form.nama.trim(), status_note: 'Dikirim via ' + form.nama.trim() + ', resi: ' + form.resi.trim()
+      }).then(function(){ setDlSaving(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, null)); }); setDlOpen(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, null)); }); })
+        .catch(function(){ setDlSaving(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, null)); }); });
+    };
+    var submitKurirTitip = function(ord) {
+      setDlSaving(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, 'kurir')); });
+      onUpdateOrder(ord.id, {
+        status: 'on_delivery', delivered_at: new Date().toISOString(),
+        courier_name: userName, status_note: 'Dikirim oleh kurir internal'
+      }).then(function(){ setDlSaving(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, null)); }); setDlOpen(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, null)); }); })
+        .catch(function(){ setDlSaving(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, null)); }); });
+    };
     var submitPickupSerah = function(ord) {
       var file = psFile[ord.id];
       if (!file) { alert('Pilih foto terlebih dahulu'); return; }
@@ -29557,22 +29581,80 @@ function OpsDashboard(_ref192) {
           }).join(', ').slice(0, 40)),
           o.status === 'ao_serah' && /*#__PURE__*/React.createElement("div", {
             style: { marginTop: 6, padding: '6px 8px', background: 'rgba(20,184,166,0.08)', borderRadius: 6 }
-          }, /*#__PURE__*/React.createElement("div", {
-            style: { fontSize: 10, color: 'var(--teal)', fontWeight: 600, marginBottom: 4 }
-          }, "📦 Serah Terima ke Cabang"), /*#__PURE__*/React.createElement("label", {
-            style: { fontSize: 10, color: 'var(--text2)', display: 'block', marginBottom: 3 }
-          }, "📷 Foto bukti serah terima (wajib):"), /*#__PURE__*/React.createElement("input", {
-            type: "file", accept: "image/*",
-            style: { fontSize: 10, width: '100%', marginBottom: 4 },
-            onChange: function(e) {
-              var f = e.target.files[0];
-              if (f) setPsFile(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, f)); });
-            }
-          }), psFile[o.id] && /*#__PURE__*/React.createElement("button", {
-            disabled: psSaving[o.id],
-            onClick: function() { submitPickupSerah(o); },
-            style: { padding: '4px 12px', borderRadius: 6, background: 'var(--teal)', color: '#fff', border: 'none', cursor: psSaving[o.id] ? 'not-allowed' : 'pointer', fontSize: 10, fontWeight: 600, opacity: psSaving[o.id] ? 0.6 : 1 }
-          }, psSaving[o.id] ? 'Menyimpan...' : '✅ Konfirmasi Serah Terima')));
+          }, (o.delivery_method || '').toLowerCase().includes('pickup') ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: 'var(--teal)', fontWeight: 600, marginBottom: 4 } }, "📦 Serah Terima Langsung"),
+            /*#__PURE__*/React.createElement("label", { style: { fontSize: 10, color: 'var(--text2)', display: 'block', marginBottom: 3 } }, "📷 Foto bukti serah terima (wajib):"),
+            /*#__PURE__*/React.createElement("input", {
+              type: "file", accept: "image/*",
+              style: { fontSize: 10, width: '100%', marginBottom: 4 },
+              onChange: function(e) {
+                var f = e.target.files[0];
+                if (f) setPsFile(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, f)); });
+              }
+            }),
+            psFile[o.id] && /*#__PURE__*/React.createElement("button", {
+              disabled: psSaving[o.id],
+              onClick: function() { submitPickupSerah(o); },
+              style: { padding: '4px 12px', borderRadius: 6, background: 'var(--teal)', color: '#fff', border: 'none', cursor: psSaving[o.id] ? 'not-allowed' : 'pointer', fontSize: 10, fontWeight: 600, opacity: psSaving[o.id] ? 0.6 : 1 }
+            }, psSaving[o.id] ? 'Menyimpan...' : '✅ Konfirmasi Serah Terima')
+          ) : !dlOpen[o.id] ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: 'var(--teal)', fontWeight: 600, marginBottom: 4, width: '100%' } }, "📦 Siap Kirim — Pilih Metode:"),
+            /*#__PURE__*/React.createElement("button", {
+              onClick: function() { setDlOpen(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, 'eks')); }); },
+              style: { padding: '4px 10px', borderRadius: 6, background: 'var(--blue)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600 }
+            }, "🚚 Ekspedisi"),
+            /*#__PURE__*/React.createElement("button", {
+              onClick: function() { setDlOpen(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, 'kurir')); }); },
+              style: { padding: '4px 10px', borderRadius: 6, background: 'var(--accent2)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600 }
+            }, "🛵 Kurir Internal")
+          ) : dlOpen[o.id] === 'eks' ? /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: 'var(--blue)', fontWeight: 600, marginBottom: 6 } }, "🚚 Input Ekspedisi"),
+            ['JNE','J&T','SiCepat','Anteraja','Ninja','POS','Gojek'].map(function(eks) {
+              var _dlForm = dlForm[o.id] || {};
+              return /*#__PURE__*/React.createElement("button", {
+                key: eks,
+                onClick: function() { setDlField(o.id, 'nama', eks); },
+                style: { padding: '3px 7px', borderRadius: 5, border: '1px solid var(--border)', background: (_dlForm.nama===eks) ? 'var(--blue)' : 'var(--bg3)', color: (_dlForm.nama===eks) ? '#fff' : 'var(--text2)', fontSize: 9, cursor: 'pointer', marginRight: 4, marginBottom: 4 }
+              }, eks);
+            }),
+            /*#__PURE__*/React.createElement("input", {
+              placeholder: "Nama ekspedisi...",
+              value: (dlForm[o.id]||{}).nama || '',
+              onChange: function(e){ setDlField(o.id, 'nama', e.target.value); },
+              style: { width: '100%', padding: '4px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box', marginBottom: 4 }
+            }),
+            /*#__PURE__*/React.createElement("input", {
+              placeholder: "No. resi...",
+              value: (dlForm[o.id]||{}).resi || '',
+              onChange: function(e){ setDlField(o.id, 'resi', e.target.value); },
+              style: { width: '100%', padding: '4px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text)', fontSize: 10, boxSizing: 'border-box', marginBottom: 4 }
+            }),
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 6 } },
+              /*#__PURE__*/React.createElement("button", {
+                disabled: dlSaving[o.id] === 'eks',
+                onClick: function(){ submitEkspedisiTitip(o); },
+                style: { padding: '4px 10px', borderRadius: 6, background: 'var(--blue)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, opacity: dlSaving[o.id]==='eks' ? 0.6 : 1 }
+              }, dlSaving[o.id]==='eks' ? 'Menyimpan...' : '✅ Konfirmasi Kirim'),
+              /*#__PURE__*/React.createElement("button", {
+                onClick: function(){ setDlOpen(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); },
+                style: { padding: '4px 10px', borderRadius: 6, background: 'var(--bg3)', color: 'var(--text2)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: 10 }
+              }, "← Kembali")
+            )
+          ) : /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: 'var(--accent2)', fontWeight: 600, marginBottom: 6 } }, "🛵 Konfirmasi Kurir Internal"),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: 'var(--text2)', marginBottom: 6 } }, "Barang akan dikirim oleh kurir internal (" + userName + ")"),
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 6 } },
+              /*#__PURE__*/React.createElement("button", {
+                disabled: dlSaving[o.id] === 'kurir',
+                onClick: function(){ submitKurirTitip(o); },
+                style: { padding: '4px 10px', borderRadius: 6, background: 'var(--accent2)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 10, fontWeight: 600, opacity: dlSaving[o.id]==='kurir' ? 0.6 : 1 }
+              }, dlSaving[o.id]==='kurir' ? 'Menyimpan...' : '✅ Konfirmasi Kirim'),
+              /*#__PURE__*/React.createElement("button", {
+                onClick: function(){ setDlOpen(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); },
+                style: { padding: '4px 10px', borderRadius: 6, background: 'var(--bg3)', color: 'var(--text2)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: 10 }
+              }, "← Kembali")
+            )
+          )));
         }
         return /*#__PURE__*/React.createElement("div", {
           key: o.id,
