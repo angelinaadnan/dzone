@@ -4906,6 +4906,15 @@ function FaceEnrollment(_ref_fe) {
   var streamRef = React.useRef(null);
   var _st1 = React.useState('starting'); var status = _st1[0]; var setStatus = _st1[1];
   var _st2 = React.useState(null); var errMsg = _st2[0]; var setErrMsg = _st2[1];
+  var _mr1 = React.useState(false); var modelsReady = _mr1[0]; var setModelsReady = _mr1[1];
+  React.useEffect(function() {
+    var check = function() {
+      if (window.faceapi && window.faceapi.nets && window.faceapi.nets.faceRecognitionNet.isLoaded) setModelsReady(true);
+    };
+    check();
+    var tid = setInterval(check, 800);
+    return function() { clearInterval(tid); };
+  }, []);
   var startCamera = function() {
     setStatus('starting');
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width:{ideal:640}, height:{ideal:480} }, audio: false })
@@ -4975,11 +4984,14 @@ function FaceEnrollment(_ref_fe) {
         '\uD83D\uDD04 Coba Lagi'
       )
     ),
-    status === 'camera' && /*#__PURE__*/React.createElement('button', { onClick: capture,
-      style: { width: 68, height: 68, borderRadius: '50%', background: '#fff', border: '5px solid var(--accent)', cursor: 'pointer', fontSize: 26,
-        display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-      '\uD83D\uDCF7'
+    status === 'camera' && /*#__PURE__*/React.createElement('button', {
+      onClick: modelsReady ? capture : undefined,
+      disabled: !modelsReady,
+      style: { width: 68, height: 68, borderRadius: '50%', background: modelsReady ? '#fff' : 'rgba(255,255,255,0.3)', border: '5px solid var(--accent)', cursor: modelsReady ? 'pointer' : 'not-allowed', fontSize: 26,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: modelsReady ? 1 : 0.6 } },
+      modelsReady ? '\uD83D\uDCF7' : '\u23F3'
     ),
+    status === 'camera' && !modelsReady && /*#__PURE__*/React.createElement('div', { style: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center' } }, '\u23F3 Memuat AI model, harap tunggu...'),
     status === 'starting' && /*#__PURE__*/React.createElement('div', { style: { color: 'rgba(255,255,255,0.5)', fontSize: 13 } }, 'Membuka kamera...')
   );
 }
