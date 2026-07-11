@@ -4186,7 +4186,7 @@ var _faceModelsState = 'idle';
 function loadFaceModels() {
   if (_faceModelsState !== 'idle') return;
   _faceModelsState = 'loading';
-  var base = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+  var base = '/weights';
   var doLoad = function() {
     try {
       Promise.all([
