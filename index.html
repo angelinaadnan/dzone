@@ -5393,11 +5393,11 @@ function AbsensiPage(_ref46) {
   React.useEffect(function() {
     if (!db) return;
     loadFaceModels();
-    db.from('face_descriptors').select('user_name' + (isSuper ? '' : ',descriptor'))
+    db.from('face_descriptors').select('user_name' + (canViewAll ? '' : ',descriptor'))
       .then(function(res) {
         var data = res.data || [];
         var map = {}; data.forEach(function(d) { map[d.user_name] = true; }); setEnrolledMap(map);
-        if (!isSuper) {
+        if (!canViewAll) {
           var mine = data.find(function(d) { return d.user_name === userName; });
           setMyFaceDescriptor(mine && mine.descriptor ? new Float32Array(mine.descriptor) : null);
         } else {
@@ -6175,7 +6175,7 @@ function AbsensiPage(_ref46) {
   }
 
   // ── Enrollment check (non-supervisor only) ────────────────────────
-  if (!isSuper && enrolling) {
+  if (!canViewAll && enrolling) {
     return /*#__PURE__*/React.createElement(FaceEnrollment, {
       userName: userName,
       onDone: function(desc) {
@@ -6185,12 +6185,12 @@ function AbsensiPage(_ref46) {
       }
     });
   }
-  if (!isSuper && myFaceDescriptor === 'loading') {
+  if (!canViewAll && myFaceDescriptor === 'loading') {
     return /*#__PURE__*/React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: 40 } },
       /*#__PURE__*/React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)' } }, '\u23F3 Memuat data wajah...')
     );
   }
-  if (!isSuper && myFaceDescriptor === null) {
+  if (!canViewAll && myFaceDescriptor === null) {
     return /*#__PURE__*/React.createElement('div', { className: 'card', style: { textAlign: 'center', padding: '40px 24px' } },
       /*#__PURE__*/React.createElement('div', { style: { fontSize: 48, marginBottom: 16 } }, '\uD83D\uDCF8'),
       /*#__PURE__*/React.createElement('div', { style: { fontSize: 16, fontWeight: 700, marginBottom: 8, color: 'var(--text)' } }, 'Daftar Wajah Dulu'),
