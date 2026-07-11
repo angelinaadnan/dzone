@@ -9913,20 +9913,57 @@ function SupervisorOrders(_ref77) {
   var FILTER_GROUPS = {
     all: null,
     pending: ['new'],
-    processing: ['invoiced', 'prep', 'tech', 'tech_done', 'on_delivery', 'cancel_requested'],
+    processing: ['invoiced', 'prep', 'tech', 'tech_done', 'ao_serah', 'on_delivery', 'cancel_requested'],
     delivered: ['delivered'],
     cancelled: ['cancelled']
   };
-  var statuses = ['all', 'pending', 'processing', 'delivered', 'cancelled'];
+  var statuses = ['all', 'cabang', 'pending', 'processing', 'delivered', 'cancelled'];
   var STATUS_LABEL = {
     pending: 'Aktif/Baru',
     processing: 'Diproses',
     delivered: 'Terkirim',
-    cancelled: 'Dibatalkan'
+    cancelled: 'Dibatalkan',
+    cabang: '🏢 Dari Cabang'
+  };
+  var _dlo2 = React.useState({}); var dlOpen2 = _dlo2[0]; var setDlOpen2 = _dlo2[1];
+  var _dlf2 = React.useState({}); var dlForm2 = _dlf2[0]; var setDlForm2 = _dlf2[1];
+  var _dls2 = React.useState({}); var dlSaving2 = _dls2[0]; var setDlSaving2 = _dls2[1];
+  var _psf4 = React.useState({}); var psFile2 = _psf4[0]; var setPsFile2 = _psf4[1];
+  var _pss4 = React.useState({}); var psSaving2 = _pss4[0]; var setPsSaving2 = _pss4[1];
+  var setDlField2 = function(id, k, v) { setDlForm2(function(p){ return Object.assign({}, p, _defineProperty({}, id, Object.assign({}, p[id]||{}, _defineProperty({}, k, v)))); }); };
+  var submitEkspedisiOps = function(o) {
+    var form = dlForm2[o.id] || {};
+    if (!(form.nama||'').trim()) { alert('Nama ekspedisi wajib diisi'); return; }
+    if (!(form.resi||'').trim()) { alert('Nomor resi wajib diisi'); return; }
+    setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, 'eks')); });
+    onUpdate(o.id, { status: 'delivered', delivered_at: new Date().toISOString(), delivery_method: form.nama.trim(), tracking: form.resi.trim(), courier_name: form.nama.trim(), status_note: 'Dikirim via ' + form.nama.trim() + ', resi: ' + form.resi.trim() })
+      .then(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); setDlOpen2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); })
+      .catch(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); });
+  };
+  var submitKurirOps = function(o) {
+    setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, 'kurir')); });
+    onUpdate(o.id, { status: 'on_delivery', delivered_at: new Date().toISOString(), courier_name: currentUser, status_note: 'Dikirim oleh kurir internal' })
+      .then(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); setDlOpen2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); })
+      .catch(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); });
+  };
+  var submitSerahTerimaOps = function(o) {
+    var file = psFile2[o.id];
+    if (!file) { alert('Pilih foto bukti terlebih dahulu'); return; }
+    if (!window.confirm('Konfirmasi serah terima barang ke ' + (o.customer_name || 'cabang') + '?')) return;
+    setPsSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, true)); });
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      uploadPhoto(ev.target.result, 'delivery')
+        .then(function(url) { return onUpdate(o.id, { status: 'delivered', delivered_at: new Date().toISOString(), delivery_photo: url||null, status_note: 'Serah terima langsung ke cabang (pickup sendiri)' }); })
+        .then(function(){ setPsSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, false)); }); })
+        .catch(function(e){ alert('Gagal: '+(e.message||e)); setPsSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, false)); }); });
+    };
+    reader.readAsDataURL(file);
   };
   var filtered = orders.filter(function (o) {
     return !hideNew || o.status !== 'new';
   }).filter(function (o) {
+    if (filter === 'cabang') return (o.info_tambahan || '').includes('[Titip Kirim dari Cabang:') && !['delivered', 'cancelled'].includes(o.status);
     if (filter === 'all') return true;
     var group = FILTER_GROUPS[filter];
     return group ? group.includes(o.status) : o.status === filter;
@@ -10183,7 +10220,36 @@ function SupervisorOrders(_ref77) {
         background: 'rgba(239,68,68,0.07)',
         borderRadius: 6
       }
-    }, "\uD83D\uDEAB Menunggu approval ops", o.cancel_reason ? " \xB7 \"".concat(o.cancel_reason, "\"") : ''));
+    }, "\uD83D\uDEAB Menunggu approval ops", o.cancel_reason ? " \xB7 \"".concat(o.cancel_reason, "\"") : ''),
+    filter === 'cabang' && o.status === 'ao_serah' && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' },
+      onClick: function(e){ e.stopPropagation(); }
+    }, (o.delivery_method || '').toLowerCase().includes('pickup') ? /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: 'var(--teal)', fontWeight: 600, marginBottom: 4 } }, "\uD83D\uDCE6 Serah Terima Langsung"),
+      /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 3 } }, "\uD83D\uDCF7 Foto bukti serah terima (wajib):"),
+      /*#__PURE__*/React.createElement("input", { type: "file", accept: "image/*", style: { fontSize: 11, width: '100%', marginBottom: 4 }, onChange: function(e){ var f=e.target.files[0]; if(f) setPsFile2(function(p){ return Object.assign({},p,_defineProperty({},o.id,f)); }); } }),
+      psFile2[o.id] && /*#__PURE__*/React.createElement("button", { disabled: psSaving2[o.id], onClick: function(){ submitSerahTerimaOps(o); }, style: { padding: '5px 14px', borderRadius: 6, background: 'var(--teal)', color: '#fff', border: 'none', cursor: psSaving2[o.id]?'not-allowed':'pointer', fontSize: 11, fontWeight: 600 } }, psSaving2[o.id] ? 'Menyimpan...' : '\u2705 Konfirmasi Serah Terima')
+    ) : !dlOpen2[o.id] ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } },
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: 'var(--teal)', fontWeight: 600 } }, "\uD83D\uDCE6 Siap Kirim:"),
+      /*#__PURE__*/React.createElement("button", { onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,'eks')); }); }, style: { padding: '4px 12px', borderRadius: 6, background: 'var(--blue)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600 } }, "\uD83D\uDE9A Ekspedisi"),
+      /*#__PURE__*/React.createElement("button", { onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,'kurir')); }); }, style: { padding: '4px 12px', borderRadius: 6, background: 'var(--accent2)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600 } }, "\uD83D\uDEF5 Kurir Internal")
+    ) : dlOpen2[o.id] === 'eks' ? /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: 'var(--blue)', fontWeight: 600, marginBottom: 6 } }, "\uD83D\uDE9A Input Ekspedisi"),
+      ['JNE','J&T','SiCepat','Anteraja','Ninja','POS','Gojek'].map(function(eks){ var _f=dlForm2[o.id]||{}; return /*#__PURE__*/React.createElement("button", { key: eks, onClick: function(){ setDlField2(o.id,'nama',eks); }, style: { padding: '3px 8px', borderRadius: 5, border: '1px solid var(--border)', background: _f.nama===eks?'var(--blue)':'var(--bg3)', color: _f.nama===eks?'#fff':'var(--text2)', fontSize: 10, cursor: 'pointer', marginRight: 4, marginBottom: 4 } }, eks); }),
+      /*#__PURE__*/React.createElement("input", { placeholder: "Nama ekspedisi...", value: (dlForm2[o.id]||{}).nama||'', onChange: function(e){ setDlField2(o.id,'nama',e.target.value); }, style: { width: '100%', padding: '5px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box', marginBottom: 4 } }),
+      /*#__PURE__*/React.createElement("input", { placeholder: "No. resi...", value: (dlForm2[o.id]||{}).resi||'', onChange: function(e){ setDlField2(o.id,'resi',e.target.value); }, style: { width: '100%', padding: '5px 8px', borderRadius: 5, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box', marginBottom: 6 } }),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 6 } },
+        /*#__PURE__*/React.createElement("button", { disabled: dlSaving2[o.id]==='eks', onClick: function(){ submitEkspedisiOps(o); }, style: { padding: '5px 14px', borderRadius: 6, background: 'var(--blue)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, opacity: dlSaving2[o.id]==='eks'?0.6:1 } }, dlSaving2[o.id]==='eks'?'Menyimpan...':'\u2705 Konfirmasi Kirim'),
+        /*#__PURE__*/React.createElement("button", { onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,null)); }); }, style: { padding: '5px 10px', borderRadius: 6, background: 'var(--bg3)', color: 'var(--text2)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: 11 } }, "\u2190 Kembali")
+      )
+    ) : /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: 'var(--accent2)', fontWeight: 600, marginBottom: 6 } }, "\uD83D\uDEF5 Kurir Internal"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: 'var(--text2)', marginBottom: 6 } }, "Dikirim oleh: " + (currentUser || 'ops')),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 6 } },
+        /*#__PURE__*/React.createElement("button", { disabled: dlSaving2[o.id]==='kurir', onClick: function(){ submitKurirOps(o); }, style: { padding: '5px 14px', borderRadius: 6, background: 'var(--accent2)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, opacity: dlSaving2[o.id]==='kurir'?0.6:1 } }, dlSaving2[o.id]==='kurir'?'Menyimpan...':'\u2705 Konfirmasi Kirim'),
+        /*#__PURE__*/React.createElement("button", { onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,null)); }); }, style: { padding: '5px 10px', borderRadius: 6, background: 'var(--bg3)', color: 'var(--text2)', border: '1px solid var(--border)', cursor: 'pointer', fontSize: 11 } }, "\u2190 Kembali")
+      )
+    )));
   }), allowRevisi && revisingOrder && /*#__PURE__*/React.createElement(RevisiOrderModal, {
     order: revisingOrder,
     onClose: function onClose() {
