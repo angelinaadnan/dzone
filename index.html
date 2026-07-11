@@ -4924,15 +4924,17 @@ function FaceEnrollment(_ref_fe) {
   var capture = function() {
     var video = videoRef.current, canvas = canvasRef.current;
     if (!video || !canvas) return;
+    if (!window.faceapi || !window.faceapi.nets || !window.faceapi.nets.faceRecognitionNet.isLoaded) {
+      setErrMsg('Model AI masih loading... tunggu sebentar lalu coba lagi.');
+      loadFaceModels();
+      return;
+    }
+    setErrMsg(null);
     canvas.width = video.videoWidth; canvas.height = video.videoHeight;
     var ctx = canvas.getContext('2d');
     ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0);
     if (streamRef.current) streamRef.current.getTracks().forEach(function(t) { t.stop(); });
-    if (!window.faceapi || !window.faceapi.nets || !window.faceapi.nets.faceRecognitionNet.isLoaded) {
-      setStatus('error'); setErrMsg('Model AI belum siap. Tunggu beberapa detik lalu coba lagi.');
-      return;
-    }
     setStatus('processing');
     window.faceapi.detectSingleFace(canvas, new window.faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks(true).withFaceDescriptor()
@@ -4964,11 +4966,11 @@ function FaceEnrollment(_ref_fe) {
       )
     ),
     /*#__PURE__*/React.createElement('canvas', { ref: canvasRef, style: { display: 'none' } }),
-    status === 'error' && /*#__PURE__*/React.createElement('div', {
+    (status === 'error' || errMsg) && /*#__PURE__*/React.createElement('div', {
       style: { background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 10, padding: '12px 16px', maxWidth: 300, textAlign: 'center' }
     },
       /*#__PURE__*/React.createElement('div', { style: { color: '#fca5a5', fontSize: 12, marginBottom: 10 } }, errMsg),
-      /*#__PURE__*/React.createElement('button', { onClick: function() { setErrMsg(null); startCamera(); },
+      status === 'error' && /*#__PURE__*/React.createElement('button', { onClick: function() { setErrMsg(null); startCamera(); },
         style: { padding: '7px 18px', borderRadius: 8, background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12 } },
         '\uD83D\uDD04 Coba Lagi'
       )
