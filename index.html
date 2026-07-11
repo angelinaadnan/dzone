@@ -4904,6 +4904,7 @@ function FaceEnrollment(_ref_fe) {
   var videoRef = React.useRef(null);
   var canvasRef = React.useRef(null);
   var streamRef = React.useRef(null);
+  var fileInputRef = React.useRef(null);
   var _st1 = React.useState('starting'); var status = _st1[0]; var setStatus = _st1[1];
   var _st2 = React.useState(null); var errMsg = _st2[0]; var setErrMsg = _st2[1];
   var _mr1 = React.useState(false); var modelsReady = _mr1[0]; var setModelsReady = _mr1[1];
@@ -4962,6 +4963,32 @@ function FaceEnrollment(_ref_fe) {
       })
       .catch(function(e) { setStatus('error'); setErrMsg('Gagal proses: ' + ((e && e.message) ? e.message : 'coba lagi')); });
   };
+  var handleFileChange = function(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!modelsReady) { setErrMsg('Model AI masih loading... tunggu sebentar lalu coba lagi.'); return; }
+    if (streamRef.current) streamRef.current.getTracks().forEach(function(t) { t.stop(); });
+    setStatus('processing');
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    img.onload = function() {
+      var canvas = canvasRef.current;
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      window.faceapi.detectSingleFace(canvas, new window.faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks(true).withFaceDescriptor()
+        .then(function(det) {
+          if (!det) { setStatus('error'); setErrMsg('Wajah tidak terdeteksi di foto. Pastikan wajah terlihat jelas dan tidak terhalang.'); return; }
+          var descriptor = Array.from(det.descriptor);
+          return db.from('face_descriptors').upsert([{ user_name: userName, descriptor: descriptor }], { onConflict: 'user_name' })
+            .then(function() { setStatus('done'); setTimeout(function() { onDone(new Float32Array(descriptor)); }, 1500); });
+        })
+        .catch(function(err) { setStatus('error'); setErrMsg('Gagal proses: ' + ((err && err.message) ? err.message : 'coba lagi')); });
+    };
+    img.onerror = function() { setStatus('error'); setErrMsg('Gagal membaca foto. Coba foto lain.'); };
+    img.src = url;
+  };
   return /*#__PURE__*/React.createElement('div', {
     style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 2000,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }
@@ -4999,6 +5026,11 @@ function FaceEnrollment(_ref_fe) {
       modelsReady ? '\uD83D\uDCF7' : '\u23F3'
     ),
     status === 'camera' && !modelsReady && /*#__PURE__*/React.createElement('div', { style: { color: 'rgba(255,255,255,0.5)', fontSize: 12, textAlign: 'center' } }, '\u23F3 Memuat AI model, harap tunggu...'),
+    status === 'camera' && modelsReady && /*#__PURE__*/React.createElement('button', {
+      onClick: function() { if (fileInputRef.current) fileInputRef.current.click(); },
+      style: { marginTop: 4, padding: '7px 18px', borderRadius: 8, background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', cursor: 'pointer', fontSize: 12 }
+    }, '\uD83D\uDDBC\uFE0F Pilih dari Galeri'),
+    /*#__PURE__*/React.createElement('input', { ref: fileInputRef, type: 'file', accept: 'image/*', style: { display: 'none' }, onChange: handleFileChange }),
     status === 'starting' && /*#__PURE__*/React.createElement('div', { style: { color: 'rgba(255,255,255,0.5)', fontSize: 13 } }, 'Membuka kamera...')
   );
 }
