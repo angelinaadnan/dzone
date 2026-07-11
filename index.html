@@ -29326,6 +29326,29 @@ function OpsDashboard(_ref192) {
       _React$useState310 = _slicedToArray(_React$useState309, 2),
       openRow = _React$useState310[0],
       setOpenRow = _React$useState310[1];
+    var _psf3 = React.useState({}); var psFile = _psf3[0]; var setPsFile = _psf3[1];
+    var _pss3 = React.useState({}); var psSaving = _pss3[0]; var setPsSaving = _pss3[1];
+    var submitPickupSerah = function(ord) {
+      var file = psFile[ord.id];
+      if (!file) { alert('Pilih foto terlebih dahulu'); return; }
+      if (!window.confirm('Konfirmasi serah terima barang ke ' + (ord.customer_name || 'cabang') + '?')) return;
+      setPsSaving(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, true)); });
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        uploadPhoto(ev.target.result, 'delivery')
+          .then(function(url) {
+            return onUpdateOrder(ord.id, {
+              status: 'delivered',
+              delivered_at: new Date().toISOString(),
+              delivery_photo: url || null,
+              status_note: 'Serah terima langsung ke cabang (pickup sendiri)'
+            });
+          })
+          .then(function() { setPsSaving(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, false)); }); })
+          .catch(function(e) { alert('Gagal: ' + (e.message || e)); setPsSaving(function(p){ return Object.assign({}, p, _defineProperty({}, ord.id, false)); }); });
+      };
+      reader.readAsDataURL(file);
+    };
     var toggle = function toggle(key) {
       return setOpenRow(function (p) {
         return p === key ? null : key;
@@ -29531,7 +29554,25 @@ function OpsDashboard(_ref192) {
             }
           }, (o.goods || []).map(function (g) {
             return "".concat(g.qty, "\xD7").concat(g.name);
-          }).join(', ').slice(0, 40)));
+          }).join(', ').slice(0, 40)),
+          o.status === 'ao_serah' && (o.delivery_method || '').toLowerCase().includes('pickup') && /*#__PURE__*/React.createElement("div", {
+            style: { marginTop: 6, padding: '6px 8px', background: 'rgba(20,184,166,0.08)', borderRadius: 6 }
+          }, /*#__PURE__*/React.createElement("div", {
+            style: { fontSize: 10, color: 'var(--teal)', fontWeight: 600, marginBottom: 4 }
+          }, "📦 Pickup Sendiri — Serah Terima ke Cabang"), /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: 10, color: 'var(--text2)', display: 'block', marginBottom: 3 }
+          }, "📷 Foto bukti serah terima (wajib):"), /*#__PURE__*/React.createElement("input", {
+            type: "file", accept: "image/*",
+            style: { fontSize: 10, width: '100%', marginBottom: 4 },
+            onChange: function(e) {
+              var f = e.target.files[0];
+              if (f) setPsFile(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, f)); });
+            }
+          }), psFile[o.id] && /*#__PURE__*/React.createElement("button", {
+            disabled: psSaving[o.id],
+            onClick: function() { submitPickupSerah(o); },
+            style: { padding: '4px 12px', borderRadius: 6, background: 'var(--teal)', color: '#fff', border: 'none', cursor: psSaving[o.id] ? 'not-allowed' : 'pointer', fontSize: 10, fontWeight: 600, opacity: psSaving[o.id] ? 0.6 : 1 }
+          }, psSaving[o.id] ? 'Menyimpan...' : '✅ Konfirmasi Serah Terima')));
         }
         return /*#__PURE__*/React.createElement("div", {
           key: o.id,
