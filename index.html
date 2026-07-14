@@ -42760,67 +42760,52 @@ function ReturnBatalBox(_ref271) {
     _React$useState460 = _slicedToArray(_React$useState459, 2),
     dest = _React$useState460[0],
     setDest = _React$useState460[1];
+  var _showKr = React.useState(false); var showKurir = _showKr[0]; var setShowKurir = _showKr[1];
   var toBranch = si.source_type === 'branch';
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      fontWeight: 600,
-      marginBottom: 8,
-      color: 'var(--text2)'
-    }
-  }, "\uD83D\uDCE6 Kembalikan ke mana?"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 8,
-      marginBottom: 10
-    }
-  }, toBranch && /*#__PURE__*/React.createElement("button", {
-    className: dest === 'branch' ? 'btn-blue btn-sm' : 'btn-secondary btn-sm',
-    onClick: function onClick() {
-      return setDest('branch');
-    }
-  }, "\uD83C\uDFE2 Ke Cabang (", si.branch_name, ")"), /*#__PURE__*/React.createElement("button", {
-    className: dest === 'customer' ? 'btn-blue btn-sm' : 'btn-secondary btn-sm',
-    onClick: function onClick() {
-      return setDest('customer');
-    }
-  }, "\uD83D\uDC64 Ke Customer (", si.customer_name, ")")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      fontWeight: 600,
-      marginBottom: 6,
-      color: 'var(--text2)'
-    }
-  }, "\uD83D\uDE97 Assign Kurir:"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 6,
-      flexWrap: 'wrap'
-    }
-  }, KURIR_LIST.map(function (n) {
-    return /*#__PURE__*/React.createElement("button", {
-      key: n,
-      className: "btn-secondary btn-sm",
-      onClick: function onClick() {
-        return batalReturnKurir(n, dest);
-      }
-    }, n);
-  })), /*#__PURE__*/React.createElement("div", {
-    style: { marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border)', width: '100%' }
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "btn-secondary btn-sm",
-    style: { color: 'var(--green)', border: '1px solid var(--green)', width: '100%' },
-    onClick: function onClick() {
-      if (!window.confirm('Konfirmasi: Customer ambil sendiri barang yang dibatalkan?')) return;
-      onUpdate(si.id, {
-        status: 'batal_dikembalikan',
-        assigned_courier: 'Ambil Sendiri',
-        return_destination: dest,
-        return_status: 'returned',
-        returned_at: new Date().toISOString()
-      });
-    }
-  }, "\uD83D\uDEB6 Ambil Sendiri (Customer pickup langsung)")));
+  return /*#__PURE__*/React.createElement("div", null,
+    toBranch && /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--text2)' } }, "\uD83D\uDCE6 Kembalikan ke mana?"),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, marginBottom: 12 } },
+        /*#__PURE__*/React.createElement("button", {
+          className: dest === 'branch' ? 'btn-blue btn-sm' : 'btn-secondary btn-sm',
+          onClick: function() { setDest('branch'); setShowKurir(false); }
+        }, "\uD83C\uDFE2 Ke Cabang (", si.branch_name, ")"),
+        /*#__PURE__*/React.createElement("button", {
+          className: dest === 'customer' ? 'btn-blue btn-sm' : 'btn-secondary btn-sm',
+          onClick: function() { setDest('customer'); setShowKurir(false); }
+        }, "\uD83D\uDC64 Ke Customer (", si.customer_name, ")")
+      )
+    ),
+    dest === 'customer' && !showKurir && /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 8, fontWeight: 600 } }, !toBranch && ("\uD83D\uDCE6 Kembalikan ke " + (si.customer_name || 'Customer') + ":")),
+      /*#__PURE__*/React.createElement("button", {
+        className: "btn-green btn-sm",
+        style: { width: '100%', marginBottom: 8, padding: '10px 0', fontSize: 13, fontWeight: 700 },
+        onClick: function() {
+          if (!window.confirm('Konfirmasi serah terima langsung ke ' + (si.customer_name || 'customer') + '?')) return;
+          onUpdate(si.id, { status: 'batal_dikembalikan', assigned_courier: 'Ambil Sendiri', return_destination: 'customer', return_status: 'returned', returned_at: new Date().toISOString() });
+        }
+      }, "\u2705 Serah Terima Langsung (Customer Ambil Sendiri)"),
+      /*#__PURE__*/React.createElement("button", {
+        className: "btn-secondary btn-sm",
+        style: { width: '100%', fontSize: 11 },
+        onClick: function() { setShowKurir(true); }
+      }, "\uD83D\uDE97 Kirim via Kurir \u2192")
+    ),
+    (dest === 'branch' || (dest === 'customer' && showKurir)) && /*#__PURE__*/React.createElement("div", null,
+      showKurir && /*#__PURE__*/React.createElement("button", {
+        className: "btn-secondary btn-sm",
+        style: { fontSize: 10, marginBottom: 8 },
+        onClick: function() { setShowKurir(false); }
+      }, "\u2190 Kembali"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text2)' } }, "\uD83D\uDE97 Assign Kurir:"),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+        KURIR_LIST.map(function(n) {
+          return /*#__PURE__*/React.createElement("button", { key: n, className: "btn-secondary btn-sm", onClick: function() { return batalReturnKurir(n, dest); } }, n);
+        })
+      )
+    )
+  );
 }
 function ServiceCardOps(_ref272) {
   var si = _ref272.si,
@@ -44905,9 +44890,9 @@ function OpsServiceMonitor(_ref277) {
     _React$useState500 = _slicedToArray(_React$useState499, 2),
     tab = _React$useState500[0],
     setTab = _React$useState500[1]; // 'list' | 'sn'
-  var filtered = filter === 'all' ? intakes : intakes.filter(function (si) {
-    return si.status === filter;
-  });
+  var _siSrch = React.useState(''); var siQ = _siSrch[0]; var setSiQ = _siSrch[1];
+  var _siBase = filter === 'all' ? intakes : intakes.filter(function (si) { return si.status === filter; });
+  var filtered = siQ.trim() ? _siBase.filter(function(si) { var q = siQ.toLowerCase(); return (si.customer_name||'').toLowerCase().includes(q) || (si.serial_number||'').toLowerCase().includes(q) || (si.unit_type||'').toLowerCase().includes(q); }) : _siBase;
   var installOrders = (orders || []).filter(function (o) {
     return o.tech_name || ['tech', 'tech_done', 'on_delivery', 'delivered'].includes(o.status);
   });
@@ -44961,7 +44946,13 @@ function OpsServiceMonitor(_ref277) {
     }
   }, "\uD83D\uDCCA Excel"))), tab === 'sn' ? /*#__PURE__*/React.createElement(SNSearchPanel, {
     intakes: intakes
-  }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    placeholder: "\uD83D\uDD0D Cari nama customer atau S/N...",
+    value: siQ,
+    onChange: function(e) { setSiQ(e.target.value); },
+    style: { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13, marginBottom: 14, boxSizing: 'border-box' }
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))',
@@ -44970,15 +44961,18 @@ function OpsServiceMonitor(_ref277) {
     }
   }, ['received', 'to_technician', 'back_from_sc', 'post_sc_checking', 'at_service_center', 'sc_ekspedisi_waiting', 'sc_batal', 'done'].map(function (s) {
     var _STATUS_SI$s2;
+    var cnt = intakes.filter(function(si) { return si.status === s; }).length;
+    var isAmber = ['back_from_sc', 'sc_batal', 'sc_ekspedisi_waiting'].includes(s) && cnt > 0;
     return /*#__PURE__*/React.createElement("div", {
       key: s,
       className: "stat-card",
       style: {
         padding: '10px 12px',
-        borderLeft: ['back_from_sc', 'sc_batal', 'sc_ekspedisi_waiting'].includes(s) && intakes.filter(function (si) {
-          return si.status === s;
-        }).length > 0 ? '3px solid var(--amber)' : 'none'
-      }
+        cursor: 'pointer',
+        outline: filter === s ? '2px solid var(--blue)' : 'none',
+        borderLeft: isAmber ? '3px solid var(--amber)' : 'none'
+      },
+      onClick: function() { setFilter(s); setSiQ(''); }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10,
@@ -44989,13 +44983,9 @@ function OpsServiceMonitor(_ref277) {
       className: "stat-num",
       style: {
         fontSize: 20,
-        color: ['back_from_sc', 'sc_batal', 'sc_ekspedisi_waiting'].includes(s) && intakes.filter(function (si) {
-          return si.status === s;
-        }).length > 0 ? 'var(--amber)' : 'inherit'
+        color: isAmber ? 'var(--amber)' : filter === s ? 'var(--blue)' : 'inherit'
       }
-    }, intakes.filter(function (si) {
-      return si.status === s;
-    }).length));
+    }, cnt));
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
