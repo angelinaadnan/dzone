@@ -42771,7 +42771,7 @@ function ReturnBatalBox(_ref271) {
     setSaving(true);
     uploadPhoto(selfPic, 'delivery')
       .then(function(url) {
-        return onUpdate(si.id, { status: 'batal_dikembalikan', assigned_courier: 'Ambil Sendiri', return_destination: dest, return_status: 'returned', delivery_photo: url, returned_at: new Date().toISOString() });
+        return onUpdate(si.id, { status: 'batal_dikembalikan', assigned_courier: 'Ambil Sendiri', return_destination: dest, return_status: 'returned', return_photo: url, returned_at: new Date().toISOString() });
       })
       .then(function() { setSaving(false); })
       .catch(function(e) { alert('Gagal: ' + (e.message||e)); setSaving(false); });
@@ -42783,7 +42783,7 @@ function ReturnBatalBox(_ref271) {
     setSaving(true);
     uploadPhoto(kurirPic, 'delivery')
       .then(function(url) {
-        return onUpdate(si.id, { status: 'batal_dikembalikan', assigned_courier: kurirSel, return_destination: dest, return_status: 'assigned', delivery_photo: url, return_assigned_at: new Date().toISOString() });
+        return onUpdate(si.id, { status: 'batal_dikembalikan', assigned_courier: kurirSel, return_destination: dest, return_status: 'assigned', return_photo: url, return_assigned_at: new Date().toISOString() });
       })
       .then(function() { setSaving(false); })
       .catch(function(e) { alert('Gagal: ' + (e.message||e)); setSaving(false); });
