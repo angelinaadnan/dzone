@@ -42805,7 +42805,22 @@ function ReturnBatalBox(_ref271) {
         return batalReturnKurir(n, dest);
       }
     }, n);
-  })));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border)', width: '100%' }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn-secondary btn-sm",
+    style: { color: 'var(--green)', border: '1px solid var(--green)', width: '100%' },
+    onClick: function onClick() {
+      if (!window.confirm('Konfirmasi: Customer ambil sendiri barang yang dibatalkan?')) return;
+      onUpdate(si.id, {
+        status: 'batal_dikembalikan',
+        assigned_courier: 'Ambil Sendiri',
+        return_destination: dest,
+        return_status: 'returned',
+        returned_at: new Date().toISOString()
+      });
+    }
+  }, "\uD83D\uDEB6 Ambil Sendiri (Customer pickup langsung)")));
 }
 function ServiceCardOps(_ref272) {
   var si = _ref272.si,
