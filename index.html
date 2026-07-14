@@ -42754,56 +42754,124 @@ function BatalBox(_ref270) {
 // Return destination chooser for batal flow
 function ReturnBatalBox(_ref271) {
   var si = _ref271.si,
-    onUpdate = _ref271.onUpdate,
-    batalReturnKurir = _ref271.batalReturnKurir;
+    onUpdate = _ref271.onUpdate;
   var _React$useState459 = React.useState(si.source_type === 'branch' ? 'branch' : 'customer'),
     _React$useState460 = _slicedToArray(_React$useState459, 2),
     dest = _React$useState460[0],
     setDest = _React$useState460[1];
-  var _showKr = React.useState(false); var showKurir = _showKr[0]; var setShowKurir = _showKr[1];
+  var _mode = React.useState(null); var mode = _mode[0]; var setMode = _mode[1]; // null | 'self' | 'kurir'
+  var _sPic = React.useState(null); var selfPic = _sPic[0]; var setSelfPic = _sPic[1];
+  var _kPic = React.useState(null); var kurirPic = _kPic[0]; var setKurirPic = _kPic[1];
+  var _kSel = React.useState(''); var kurirSel = _kSel[0]; var setKurirSel = _kSel[1];
+  var _sav = React.useState(false); var saving = _sav[0]; var setSaving = _sav[1];
   var toBranch = si.source_type === 'branch';
+
+  var handleSelfConfirm = function() {
+    if (!selfPic) { alert('Foto bukti serah terima wajib diupload dulu'); return; }
+    setSaving(true);
+    uploadPhoto(selfPic, 'delivery')
+      .then(function(url) {
+        return onUpdate(si.id, { status: 'batal_dikembalikan', assigned_courier: 'Ambil Sendiri', return_destination: dest, return_status: 'returned', delivery_photo: url, returned_at: new Date().toISOString() });
+      })
+      .then(function() { setSaving(false); })
+      .catch(function(e) { alert('Gagal: ' + (e.message||e)); setSaving(false); });
+  };
+
+  var handleKurirConfirm = function() {
+    if (!kurirSel) { alert('Pilih kurir dulu'); return; }
+    if (!kurirPic) { alert('Foto serah terima ke kurir wajib diupload dulu'); return; }
+    setSaving(true);
+    uploadPhoto(kurirPic, 'delivery')
+      .then(function(url) {
+        return onUpdate(si.id, { status: 'batal_dikembalikan', assigned_courier: kurirSel, return_destination: dest, return_status: 'assigned', delivery_photo: url, return_assigned_at: new Date().toISOString() });
+      })
+      .then(function() { setSaving(false); })
+      .catch(function(e) { alert('Gagal: ' + (e.message||e)); setSaving(false); });
+  };
+
+  var reset = function() { setMode(null); setSelfPic(null); setKurirPic(null); setKurirSel(''); };
+
+  var photoInput = function(label, val, setter) {
+    return /*#__PURE__*/React.createElement("div", { style: { marginBottom: 10 } },
+      /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 } }, "\uD83D\uDCF7 " + label + " (wajib):"),
+      /*#__PURE__*/React.createElement("input", { type: 'file', accept: 'image/*', capture: 'environment', style: { fontSize: 11, width: '100%' },
+        onChange: function(e) {
+          var f = e.target.files[0];
+          if (!f) return;
+          var rd = new FileReader();
+          rd.onloadend = function() { setter(rd.result); };
+          rd.readAsDataURL(f);
+        }
+      }),
+      val && /*#__PURE__*/React.createElement("div", { style: { marginTop: 4, fontSize: 10, color: 'var(--green)' } }, "\u2705 Foto siap")
+    );
+  };
+
   return /*#__PURE__*/React.createElement("div", null,
     toBranch && /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--text2)' } }, "\uD83D\uDCE6 Kembalikan ke mana?"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, marginBottom: 12 } },
         /*#__PURE__*/React.createElement("button", {
           className: dest === 'branch' ? 'btn-blue btn-sm' : 'btn-secondary btn-sm',
-          onClick: function() { setDest('branch'); setShowKurir(false); }
+          onClick: function() { setDest('branch'); reset(); }
         }, "\uD83C\uDFE2 Ke Cabang (", si.branch_name, ")"),
         /*#__PURE__*/React.createElement("button", {
           className: dest === 'customer' ? 'btn-blue btn-sm' : 'btn-secondary btn-sm',
-          onClick: function() { setDest('customer'); setShowKurir(false); }
+          onClick: function() { setDest('customer'); reset(); }
         }, "\uD83D\uDC64 Ke Customer (", si.customer_name, ")")
       )
     ),
-    dest === 'customer' && !showKurir && /*#__PURE__*/React.createElement("div", null,
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 8, fontWeight: 600 } }, !toBranch && ("\uD83D\uDCE6 Kembalikan ke " + (si.customer_name || 'Customer') + ":")),
+    !toBranch && !mode && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 600, marginBottom: 10, color: 'var(--text2)' } },
+      "\uD83D\uDCE6 Kembalikan ke ", si.customer_name || 'customer', ":"
+    ),
+    !mode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
       /*#__PURE__*/React.createElement("button", {
         className: "btn-green btn-sm",
-        style: { width: '100%', marginBottom: 8, padding: '10px 0', fontSize: 13, fontWeight: 700 },
-        onClick: function() {
-          if (!window.confirm('Konfirmasi serah terima langsung ke ' + (si.customer_name || 'customer') + '?')) return;
-          onUpdate(si.id, { status: 'batal_dikembalikan', assigned_courier: 'Ambil Sendiri', return_destination: 'customer', return_status: 'returned', returned_at: new Date().toISOString() });
-        }
-      }, "\u2705 Serah Terima Langsung (Customer Ambil Sendiri)"),
+        style: { padding: '10px 0', fontSize: 13, fontWeight: 700 },
+        onClick: function() { setMode('self'); }
+      }, "\uD83D\uDEB6 Customer Ambil Sendiri"),
       /*#__PURE__*/React.createElement("button", {
         className: "btn-secondary btn-sm",
-        style: { width: '100%', fontSize: 11 },
-        onClick: function() { setShowKurir(true); }
-      }, "\uD83D\uDE97 Kirim via Kurir \u2192")
+        style: { padding: '8px 0' },
+        onClick: function() { setMode('kurir'); }
+      }, "\uD83D\uDE97 Antar via Kurir Internal")
     ),
-    (dest === 'branch' || (dest === 'customer' && showKurir)) && /*#__PURE__*/React.createElement("div", null,
-      showKurir && /*#__PURE__*/React.createElement("button", {
-        className: "btn-secondary btn-sm",
-        style: { fontSize: 10, marginBottom: 8 },
-        onClick: function() { setShowKurir(false); }
-      }, "\u2190 Kembali"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text2)' } }, "\uD83D\uDE97 Assign Kurir:"),
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+    mode === 'self' && /*#__PURE__*/React.createElement("div", { style: { background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 8, padding: 12 } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: 'var(--green)' } }, "\uD83D\uDEB6 Customer Ambil Sendiri"),
+        /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { fontSize: 10 }, onClick: reset }, "\u2190 Ganti")
+      ),
+      photoInput('Foto bukti serah terima ke customer', selfPic, setSelfPic),
+      /*#__PURE__*/React.createElement("button", {
+        className: "btn-green btn-sm",
+        style: { width: '100%', fontWeight: 700 },
+        disabled: saving || !selfPic,
+        onClick: handleSelfConfirm
+      }, saving ? 'Menyimpan...' : '\u2705 Konfirmasi Serah Terima')
+    ),
+    mode === 'kurir' && /*#__PURE__*/React.createElement("div", { style: { background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: 12 } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: 'var(--blue)' } }, "\uD83D\uDE97 Antar via Kurir Internal"),
+        /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { fontSize: 10 }, onClick: reset }, "\u2190 Ganti")
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: 'var(--text2)', marginBottom: 6, fontWeight: 600 } }, "Pilih Kurir:"),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 } },
         KURIR_LIST.map(function(n) {
-          return /*#__PURE__*/React.createElement("button", { key: n, className: "btn-secondary btn-sm", onClick: function() { return batalReturnKurir(n, dest); } }, n);
+          return /*#__PURE__*/React.createElement("button", {
+            key: n,
+            className: "btn-secondary btn-sm",
+            style: { background: kurirSel===n?'var(--blue)':'var(--bg3)', color: kurirSel===n?'#fff':'var(--text)', border: '1px solid var(--border)', fontWeight: kurirSel===n?700:400 },
+            onClick: function() { setKurirSel(n); }
+          }, n);
         })
-      )
+      ),
+      photoInput('Foto serah terima ke kurir', kurirPic, setKurirPic),
+      /*#__PURE__*/React.createElement("button", {
+        className: "btn-primary btn-sm",
+        style: { width: '100%', fontWeight: 700 },
+        disabled: saving || !kurirSel || !kurirPic,
+        onClick: handleKurirConfirm
+      }, saving ? 'Menyimpan...' : '\uD83D\uDE97 Assign Kurir & Konfirmasi')
     )
   );
 }
