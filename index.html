@@ -9908,6 +9908,8 @@ function SupervisorOrders(_ref77) {
     _React$useState106 = _slicedToArray(_React$useState105, 2),
     revisingOrder = _React$useState106[0],
     setRevisingOrder = _React$useState106[1];
+  var _df = React.useState(''); var dateFrom = _df[0]; var setDateFrom = _df[1];
+  var _dt = React.useState(''); var dateTo = _dt[0]; var setDateTo = _dt[1];
 
   // Mapping filter label → actual DB statuses
   var FILTER_GROUPS = {
@@ -9952,7 +9954,14 @@ function SupervisorOrders(_ref77) {
     var group = FILTER_GROUPS[filter];
     return group ? group.includes(o.status) : o.status === filter;
   }).filter(function (o) {
-    return !search || (o.customer_name || '').toLowerCase().includes(search.toLowerCase()) || (o.sales_name || '').toLowerCase().includes(search.toLowerCase());
+    if (!search) return true;
+    var q = search.toLowerCase();
+    return (o.customer_name || '').toLowerCase().includes(q) || (o.sales_name || '').toLowerCase().includes(q) || (o.invoice_number || '').toLowerCase().includes(q);
+  }).filter(function (o) {
+    var d = (o.date || o.created_at || '').slice(0, 10);
+    if (dateFrom && d < dateFrom) return false;
+    if (dateTo && d > dateTo) return false;
+    return true;
   });
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -9984,18 +9993,17 @@ function SupervisorOrders(_ref77) {
       flexWrap: 'wrap',
       marginBottom: 14
     }
-  }, /*#__PURE__*/React.createElement("input", {
-    placeholder: "\uD83D\uDD0D Cari nama customer / sales...",
-    value: search,
-    onChange: function onChange(e) {
-      return setSearch(e.target.value);
-    },
-    style: {
-      flex: 1,
-      minWidth: 180,
-      padding: '8px 12px'
-    }
-  }), statuses.map(function (s) {
+  }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap', width: '100%' } },
+    /*#__PURE__*/React.createElement("input", {
+      placeholder: "\uD83D\uDD0D Cari nama customer / sales / no invoice...",
+      value: search,
+      onChange: function(e) { setSearch(e.target.value); },
+      style: { flex: 2, minWidth: 180, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 }
+    }),
+    /*#__PURE__*/React.createElement("input", { type: "date", value: dateFrom, onChange: function(e){ setDateFrom(e.target.value); }, title: "Dari tanggal", style: { flex: 1, minWidth: 130, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 } }),
+    /*#__PURE__*/React.createElement("input", { type: "date", value: dateTo, onChange: function(e){ setDateTo(e.target.value); }, title: "Sampai tanggal", style: { flex: 1, minWidth: 130, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 } }),
+    (dateFrom || dateTo) && /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", onClick: function(){ setDateFrom(''); setDateTo(''); } }, "\u2715 Reset")
+  ), statuses.map(function (s) {
     return /*#__PURE__*/React.createElement("button", {
       key: s,
       className: filter === s ? 'btn-primary btn-sm' : 'btn-secondary btn-sm',
