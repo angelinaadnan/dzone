@@ -31034,6 +31034,22 @@ function SupervisorDashboard(_ref196) {
     return now - new Date(last).getTime() > 3 * 24 * 60 * 60 * 1000;
   });
 
+  // Earliest data query
+  var _earliestD = React.useState(null); var earliestD = _earliestD[0]; var setEarliestD = _earliestD[1];
+  React.useEffect(function() {
+    if (!db) return;
+    Promise.all([
+      db.from('orders').select('created_at').order('created_at', { ascending: true }).limit(1).single(),
+      db.from('service_intakes').select('created_at').order('created_at', { ascending: true }).limit(1).single()
+    ]).then(function(res) {
+      setEarliestD({ order: res[0].data && res[0].data.created_at, si: res[1].data && res[1].data.created_at });
+    });
+  }, []);
+  var fmtDateOnly = function(iso) {
+    if (!iso) return '-';
+    return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   // Sales perf
   var salesStats = SALES_LIST.map(function (name) {
     var mo = orders.filter(function (o) {
@@ -31259,6 +31275,22 @@ function SupervisorDashboard(_ref196) {
       marginTop: 6
     }
   }, "+", gantung.length - 6, " lainnya")), /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: { marginBottom: 16, background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)' }
+  }, /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, marginBottom: 12, color: 'var(--blue)' } }, "\uD83D\uDCC5 Info Data Tersimpan"),
+  /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 } },
+    [
+      { label: 'Order pertama masuk', val: earliestD ? fmtDateOnly(earliestD.order) : '\u23F3 loading...', icon: '\uD83D\uDCCB' },
+      { label: 'Servis pertama masuk', val: earliestD ? fmtDateOnly(earliestD.si) : '\u23F3 loading...', icon: '\uD83D\uDEE0' },
+      { label: 'Total order (6 bln)', val: orders.length + ' order', icon: '\uD83D\uDCE6' },
+      { label: 'Total servis (6 bln)', val: (serviceIntakes||[]).length + ' servis', icon: '\uD83D\uDD27' }
+    ].map(function(item, i) {
+      return /*#__PURE__*/React.createElement("div", { key: i, style: { background: 'var(--bg2)', borderRadius: 8, padding: '10px 12px' } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: 'var(--text2)', marginBottom: 4 } }, item.icon + " " + item.label),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 700 } }, item.val)
+      );
+    })
+  )), /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: 16
