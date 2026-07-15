@@ -9910,6 +9910,19 @@ function SupervisorOrders(_ref77) {
     setRevisingOrder = _React$useState106[1];
   var _df = React.useState(''); var dateFrom = _df[0]; var setDateFrom = _df[1];
   var _dt = React.useState(''); var dateTo = _dt[0]; var setDateTo = _dt[1];
+  var _dbO = React.useState(null); var dbOrders = _dbO[0]; var setDbOrders = _dbO[1];
+  var _dbL = React.useState(false); var dbLoading = _dbL[0]; var setDbLoading = _dbL[1];
+  var queryByDate = function(from, to) {
+    if (!db || (!from && !to)) { setDbOrders(null); return; }
+    setDbLoading(true);
+    var q = db.from('orders').select('*').order('date', { ascending: false }).limit(1000);
+    if (from) q = q.gte('date', from);
+    if (to) q = q.lte('date', to);
+    q.then(function(res) {
+      setDbOrders(res.data || []);
+      setDbLoading(false);
+    }).catch(function(){ setDbLoading(false); });
+  };
 
   // Mapping filter label → actual DB statuses
   var FILTER_GROUPS = {
@@ -9946,7 +9959,8 @@ function SupervisorOrders(_ref77) {
       .then(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); })
       .catch(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); });
   };
-  var filtered = orders.filter(function (o) {
+  var baseOrders = dbOrders !== null ? dbOrders : orders;
+  var filtered = baseOrders.filter(function (o) {
     return !hideNew || o.status !== 'new';
   }).filter(function (o) {
     if (filter === 'cabang') return (o.info_tambahan || '').includes('[Titip Kirim dari Cabang:') && !['delivered', 'cancelled'].includes(o.status);
@@ -9957,11 +9971,6 @@ function SupervisorOrders(_ref77) {
     if (!search) return true;
     var q = search.toLowerCase();
     return (o.customer_name || '').toLowerCase().includes(q) || (o.sales_name || '').toLowerCase().includes(q) || (o.invoice_number || '').toLowerCase().includes(q);
-  }).filter(function (o) {
-    var d = (o.date || o.created_at || '').slice(0, 10);
-    if (dateFrom && d < dateFrom) return false;
-    if (dateTo && d > dateTo) return false;
-    return true;
   });
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -10000,9 +10009,9 @@ function SupervisorOrders(_ref77) {
       onChange: function(e) { setSearch(e.target.value); },
       style: { flex: 2, minWidth: 180, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 }
     }),
-    /*#__PURE__*/React.createElement("input", { type: "date", value: dateFrom, onChange: function(e){ setDateFrom(e.target.value); }, title: "Dari tanggal", style: { flex: 1, minWidth: 130, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 } }),
-    /*#__PURE__*/React.createElement("input", { type: "date", value: dateTo, onChange: function(e){ setDateTo(e.target.value); }, title: "Sampai tanggal", style: { flex: 1, minWidth: 130, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 } }),
-    (dateFrom || dateTo) && /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", onClick: function(){ setDateFrom(''); setDateTo(''); } }, "\u2715 Reset")
+    /*#__PURE__*/React.createElement("input", { type: "date", value: dateFrom, onChange: function(e){ var v=e.target.value; setDateFrom(v); queryByDate(v, dateTo); }, title: "Dari tanggal", style: { flex: 1, minWidth: 130, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 } }),
+    /*#__PURE__*/React.createElement("input", { type: "date", value: dateTo, onChange: function(e){ var v=e.target.value; setDateTo(v); queryByDate(dateFrom, v); }, title: "Sampai tanggal", style: { flex: 1, minWidth: 130, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 } }),
+    (dateFrom || dateTo) && /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", onClick: function(){ setDateFrom(''); setDateTo(''); setDbOrders(null); } }, dbLoading ? '\u23F3' : '\u2715 Reset')
   ), statuses.map(function (s) {
     return /*#__PURE__*/React.createElement("button", {
       key: s,
