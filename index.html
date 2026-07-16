@@ -14904,11 +14904,16 @@ function QuotationPrintView(_ref108) {
       }
     });
   };
-  var printDate = new Date(q.quotation_date || q.created_at).toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  }).toUpperCase();
+  var printDate = (function() {
+    var d = q.quotation_date || q.created_at;
+    if (!d) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      var mn = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+      var pt = d.split('-');
+      return (pt[2] + ' ' + mn[parseInt(pt[1],10)-1] + ' ' + pt[0]).toUpperCase();
+    }
+    return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
+  })();
   var p = {
     fontFamily: 'Arial, sans-serif',
     fontSize: 12,
