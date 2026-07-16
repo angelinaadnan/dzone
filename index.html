@@ -27163,22 +27163,10 @@ function CancelRequestsPanel(_ref182) {
     setExpanded = _React$useState282[1];
   if (total === 0) return null;
   var approve = function approve(type, item) {
-    if (type === 'order') onUpdateOrder(item.id, {
-      status: 'cancelled',
-      cancel_approved_at: new Date().toISOString()
-    });
-    if (type === 'si') onUpdateSI(item.id, {
-      status: 'cancelled',
-      cancel_approved_at: new Date().toISOString()
-    });
-    if (type === 'task') onUpdateTask(item.id, {
-      status: 'cancelled',
-      cancel_approved_at: new Date().toISOString()
-    });
-    if (type === 'branch') onUpdateBranch(item.id, {
-      status: 'cancelled',
-      cancel_approved_at: new Date().toISOString()
-    });
+    if (type === 'order') onUpdateOrder(item.id, { status: 'cancelled' });
+    if (type === 'si') onUpdateSI(item.id, { status: 'cancelled' });
+    if (type === 'task') onUpdateTask(item.id, { status: 'cancelled' });
+    if (type === 'branch') onUpdateBranch(item.id, { status: 'cancelled' });
   };
   var reject = function reject(type, item) {
     var prev = item.cancel_prev_status || (type === 'order' ? 'new' : type === 'si' ? 'received' : 'pending');
