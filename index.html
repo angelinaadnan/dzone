@@ -14235,7 +14235,8 @@ function QuotationForm(_ref106) {
     allQuotations = _ref106.allQuotations,
     initial = _ref106.initial;
   var editing = !!initial;
-  var _React$useState171 = React.useState(initial || {
+  var todayStr = new Date().toISOString().split('T')[0];
+  var _React$useState171 = React.useState(initial ? Object.assign({ quotation_date: initial.quotation_date || (initial.created_at || '').slice(0, 10) || todayStr }, initial) : {
       customer_name: '',
       customer_phone: '',
       customer_address: '',
@@ -14254,7 +14255,8 @@ function QuotationForm(_ref106) {
       overall_discount: 0,
       biaya_lainlain: 0,
       syarat_pembayaran: 'CBD',
-      po_no: ''
+      po_no: '',
+      quotation_date: todayStr
     }),
     _React$useState172 = _slicedToArray(_React$useState171, 2),
     form = _React$useState172[0],
@@ -14423,6 +14425,12 @@ function QuotationForm(_ref106) {
       return set('validity_days', Number(e.target.value));
     }
   }))), /*#__PURE__*/React.createElement("div", {
+    className: "form-row form-row-2"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "\uD83D\uDCC5 Tanggal Dokumen"),
+    /*#__PURE__*/React.createElement("input", { type: "date", value: form.quotation_date || todayStr, onChange: function(e){ return set('quotation_date', e.target.value); }, style: { width: '100%' } })
+  ), /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', paddingBottom: 4 } },
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: 'var(--text2)' } }, "Ubah jika penawaran/proforma diterbitkan di hari lain (misal: besok)")
+  )), /*#__PURE__*/React.createElement("div", {
     className: "form-row"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Alamat"), /*#__PURE__*/React.createElement("textarea", {
     rows: 2,
@@ -14895,7 +14903,7 @@ function QuotationPrintView(_ref108) {
       }
     });
   };
-  var printDate = new Date(q.created_at).toLocaleDateString('id-ID', {
+  var printDate = new Date(q.quotation_date || q.created_at).toLocaleDateString('id-ID', {
     day: '2-digit',
     month: 'long',
     year: 'numeric'
