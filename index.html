@@ -2950,6 +2950,7 @@ function App() {
               sales_name: q.sales_name,
               status: q.status || 'draft',
               quotation_number: q.quotation_number,
+              quotation_date: q.quotation_date || new Date().toISOString().split('T')[0],
               updated_at: q.updated_at
             };
             _context23.next = 8;
@@ -3001,7 +3002,7 @@ function App() {
             }, updates));
           case 4:
             // Strip any unknown keys before update
-            allowed = ['type', 'customer_name', 'customer_phone', 'customer_address', 'customer_email', 'goods', 'notes', 'validity_days', 'ppn_included', 'ppn_percent', 'overall_discount', 'biaya_lainlain', 'syarat_pembayaran', 'po_no', 'sales_name', 'status', 'quotation_number', 'order_id', 'converted_at'];
+            allowed = ['type', 'customer_name', 'customer_phone', 'customer_address', 'customer_email', 'goods', 'notes', 'validity_days', 'ppn_included', 'ppn_percent', 'overall_discount', 'biaya_lainlain', 'syarat_pembayaran', 'po_no', 'sales_name', 'status', 'quotation_number', 'order_id', 'converted_at', 'quotation_date'];
             safe = Object.fromEntries(Object.entries(updates).filter(function (_ref27) {
               var _ref28 = _slicedToArray(_ref27, 1),
                 k = _ref28[0];
