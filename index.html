@@ -4441,7 +4441,7 @@ function CameraCapture(_ref42) {
         .then(function(det) {
           if (!det) return { ok: false, msg: 'Wajah tidak terdeteksi. Pastikan wajah terlihat jelas.' };
           var dist = window.faceapi.euclideanDistance(faceDescriptor, det.descriptor);
-          if (dist > 0.55) return { ok: false, msg: 'Wajah tidak cocok (' + Math.round(dist * 100) + '% berbeda). Pastikan pencahayaan cukup.' };
+          if (dist > 0.45) return { ok: false, msg: 'Wajah tidak cocok (' + Math.round(dist * 100) + '% berbeda). Pastikan pencahayaan cukup.' };
           return { ok: true };
         });
     } else if (tinyReady) {
@@ -5628,10 +5628,12 @@ function AbsensiPage(_ref46) {
     })), !(myToday !== null && myToday !== void 0 && myToday.check_in) && /*#__PURE__*/React.createElement("button", {
       className: "btn-green btn-sm",
       onClick: function onClick() {
+        if (myFaceDescriptor === null) { showToast('⚠ Wajah belum didaftarkan. Hubungi admin untuk reset pendaftaran.', 'error'); return; }
+        if (myFaceDescriptor === 'loading') return;
         return setShowCamera('in');
       },
-      disabled: loading
-    }, loading ? '⏳ Menyimpan...' : '🟢 Check In Sekarang'), (myToday === null || myToday === void 0 ? void 0 : myToday.check_in) && !(myToday !== null && myToday !== void 0 && myToday.check_out) && /*#__PURE__*/React.createElement("button", {
+      disabled: loading || myFaceDescriptor === 'loading'
+    }, loading ? '⏳ Menyimpan...' : myFaceDescriptor === 'loading' ? '⏳ Memuat...' : '🟢 Check In Sekarang'), (myToday === null || myToday === void 0 ? void 0 : myToday.check_in) && !(myToday !== null && myToday !== void 0 && myToday.check_out) && /*#__PURE__*/React.createElement("button", {
       style: {
         fontSize: 13,
         padding: '7px 16px',
@@ -5643,10 +5645,12 @@ function AbsensiPage(_ref46) {
         fontWeight: 600
       },
       onClick: function onClick() {
+        if (myFaceDescriptor === null) { showToast('⚠ Wajah belum didaftarkan. Hubungi admin untuk reset pendaftaran.', 'error'); return; }
+        if (myFaceDescriptor === 'loading') return;
         return setShowCamera('out');
       },
-      disabled: loading
-    }, loading ? '⏳ Menyimpan...' : '🔴 Check Out Sekarang'), (myToday === null || myToday === void 0 ? void 0 : myToday.check_in) && (myToday === null || myToday === void 0 ? void 0 : myToday.check_out) && /*#__PURE__*/React.createElement("div", {
+      disabled: loading || myFaceDescriptor === 'loading'
+    }, loading ? '⏳ Menyimpan...' : myFaceDescriptor === 'loading' ? '⏳ Memuat...' : '🔴 Check Out Sekarang'), (myToday === null || myToday === void 0 ? void 0 : myToday.check_in) && (myToday === null || myToday === void 0 ? void 0 : myToday.check_out) && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 13,
         color: 'var(--green)',
@@ -6506,10 +6510,12 @@ function AbsensiPage(_ref46) {
       fontWeight: 700
     },
     onClick: function onClick() {
+      if (myFaceDescriptor === null) { showToast('⚠ Wajah belum didaftarkan. Hubungi admin untuk reset pendaftaran.', 'error'); return; }
+      if (myFaceDescriptor === 'loading') return;
       return setShowCamera('in');
     },
-    disabled: loading
-  }, loading ? '⏳ Menyimpan...' : '🟢 Check In — Foto Live'), (myToday === null || myToday === void 0 ? void 0 : myToday.check_in) && !(myToday !== null && myToday !== void 0 && myToday.check_out) && /*#__PURE__*/React.createElement("button", {
+    disabled: loading || myFaceDescriptor === 'loading'
+  }, loading ? '⏳ Menyimpan...' : myFaceDescriptor === 'loading' ? '⏳ Memuat...' : '🟢 Check In — Foto Live'), (myToday === null || myToday === void 0 ? void 0 : myToday.check_in) && !(myToday !== null && myToday !== void 0 && myToday.check_out) && /*#__PURE__*/React.createElement("button", {
     style: {
       width: '100%',
       padding: '14px',
@@ -6522,10 +6528,12 @@ function AbsensiPage(_ref46) {
       cursor: 'pointer'
     },
     onClick: function onClick() {
+      if (myFaceDescriptor === null) { showToast('⚠ Wajah belum didaftarkan. Hubungi admin untuk reset pendaftaran.', 'error'); return; }
+      if (myFaceDescriptor === 'loading') return;
       return setShowCamera('out');
     },
-    disabled: loading
-  }, loading ? '⏳ Menyimpan...' : '🔴 Check Out — Foto Live'), (myToday === null || myToday === void 0 ? void 0 : myToday.check_in) && (myToday === null || myToday === void 0 ? void 0 : myToday.check_out) && /*#__PURE__*/React.createElement("div", {
+    disabled: loading || myFaceDescriptor === 'loading'
+  }, loading ? '⏳ Menyimpan...' : myFaceDescriptor === 'loading' ? '⏳ Memuat...' : '🔴 Check Out — Foto Live'), (myToday === null || myToday === void 0 ? void 0 : myToday.check_in) && (myToday === null || myToday === void 0 ? void 0 : myToday.check_out) && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: 'center',
       padding: '12px',
