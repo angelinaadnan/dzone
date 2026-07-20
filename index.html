@@ -17865,6 +17865,8 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         ? 'https://maps.google.com?q=' + dusitCheckin.lat + ',' + dusitCheckin.lng
         : 'https://maps.google.com?q=-6.1374698,106.8254577';
       var dusitFmt = BASE_NAME + ' (' + dusitLink + ')';
+      var dusitLat = dusitCheckin && dusitCheckin.lat ? parseFloat(dusitCheckin.lat) : -6.1374698;
+      var dusitLng = dusitCheckin && dusitCheckin.lng ? parseFloat(dusitCheckin.lng) : 106.8254577;
       var acts = [];
       var mkSearch = function(name) { return name ? 'https://maps.google.com/maps?q=' + encodeURIComponent(name) : ''; };
       (c.myOrders || []).forEach(function(o) {
@@ -17902,7 +17904,9 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         var destLink = a.loc && (a.loc.lat || a.loc.latitude)
           ? 'https://maps.google.com?q=' + (a.loc.lat || a.loc.latitude) + ',' + (a.loc.lng || a.loc.longitude || a.loc.lon)
           : (a.fallback || '');
-        var km = a.km !== null ? a.km : '';
+        var _aLat = a.loc && (a.loc.lat || a.loc.latitude) ? parseFloat(a.loc.lat || a.loc.latitude) : null;
+        var _aLng = a.loc && (a.loc.lng || a.loc.longitude || a.loc.lon) ? parseFloat(a.loc.lng || a.loc.longitude || a.loc.lon) : null;
+        var km = a.km !== null ? a.km : (_aLat && _aLng ? parseFloat((distanceKm(dusitLat, dusitLng, _aLat, _aLng) * 1.2).toFixed(1)) : '');
         var jam = a.time ? new Date(a.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
         // Pergi: DUSIT → TUJUAN
         routeRows.push({
