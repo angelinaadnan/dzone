@@ -17904,9 +17904,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         var destLink = a.loc && (a.loc.lat || a.loc.latitude)
           ? 'https://maps.google.com?q=' + (a.loc.lat || a.loc.latitude) + ',' + (a.loc.lng || a.loc.longitude || a.loc.lon)
           : (a.fallback || '');
-        var _aLat = a.loc && (a.loc.lat || a.loc.latitude) ? parseFloat(a.loc.lat || a.loc.latitude) : null;
-        var _aLng = a.loc && (a.loc.lng || a.loc.longitude || a.loc.lon) ? parseFloat(a.loc.lng || a.loc.longitude || a.loc.lon) : null;
-        var km = a.km !== null ? a.km : (_aLat && _aLng ? parseFloat((distanceKm(dusitLat, dusitLng, _aLat, _aLng) * 1.2).toFixed(1)) : '');
+        var km = a.km !== null ? a.km : '';
         var jam = a.time ? new Date(a.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
         // Pergi: DUSIT → TUJUAN
         routeRows.push({
@@ -22371,6 +22369,7 @@ function CourierDeliveries(_ref155) {
             _context68.prev = 8;
             _context68.t0 = _context68["catch"](2);
           case 10:
+            if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setDelivering(function(d){ var n=Object.assign({},d); n[o.id]=false; return n; }); return _context68.abrupt('return'); }
             startLoc = ((_departed$o$id = departed[o.id]) === null || _departed$o$id === void 0 ? void 0 : _departed$o$id.loc) || null;
             updates = {
               status: 'delivered',
@@ -33296,6 +33295,7 @@ function CourierJobTasks(_ref207) {
             _context85.prev = 12;
             _context85.t0 = _context85["catch"](6);
           case 14:
+            if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setOrderDelivering(function(d){ var n=Object.assign({},d); n[o.id]=false; return n; }); return _context85.abrupt('return'); }
             _context85.next = 16;
             return uploadPhoto(orderPhoto[o.id], 'delivery', 0, setUploadMsg('ord_' + o.id));
           case 16:
@@ -34573,6 +34573,7 @@ function CourierJobTasks(_ref207) {
                 _context89.prev = 14;
                 _context89.t0 = _context89["catch"](8);
               case 16:
+                if (!endLoc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setPoKm(function(prev){ var n=Object.assign({},prev); n[po.id+'_'+p.no]={loading:false}; return n; }); return _context89.abrupt('return'); }
                 setPoKm(function (prev) {
                   return _objectSpread(_objectSpread({}, prev), {}, _defineProperty({}, po.id + '_' + p.no, {
                     loading: false
@@ -34871,9 +34872,8 @@ function CourierJobTasks(_ref207) {
                 _context91.prev = 13;
                 _context91.t0 = _context91["catch"](7);
               case 15:
-                setSiPhotos(function (p) {
-                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, bk + '_gps', false));
-                });
+                setSiPhotos(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, bk + '_gps', false)); });
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setSiPhotos(function(p){ return _objectSpread(_objectSpread({},p),{},_defineProperty({},bk+'_gps',false)); }); return _context91.abrupt('return'); }
                 if (!(startLoc && loc)) {
                   _context91.next = 22;
                   break;
@@ -35160,9 +35160,8 @@ function CourierJobTasks(_ref207) {
                 _context93.prev = 13;
                 _context93.t0 = _context93["catch"](7);
               case 15:
-                setSiPhotos(function (p) {
-                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, k + '_gps', false));
-                });
+                setSiPhotos(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, k + '_gps', false)); });
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setSiPhotos(function(p){ return _objectSpread(_objectSpread({},p),{},_defineProperty({},k+'_gps',false)); }); return _context93.abrupt('return'); }
                 if (!(startLoc && loc)) {
                   _context93.next = 22;
                   break;
@@ -35409,6 +35408,7 @@ function CourierJobTasks(_ref207) {
                 _context95.prev = 13;
                 _context95.t0 = _context95["catch"](7);
               case 15:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return _context95.abrupt('return'); }
                 setSiPhotos(function (p) {
                   return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, _k + '_gps', false));
                 });
@@ -35718,6 +35718,7 @@ function CourierJobTasks(_ref207) {
                 _context97.prev = 13;
                 _context97.t0 = _context97["catch"](7);
               case 15:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return _context97.abrupt('return'); }
                 setSiPhotos(function (p) {
                   return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, _k2 + '_gps', false));
                 });
@@ -35987,6 +35988,7 @@ function CourierJobTasks(_ref207) {
                 _context99.t0 = _context99["catch"](7);
               case 15:
                 setRetGps(false);
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setRetGps(false); return _context99.abrupt('return'); }
                 if (!(startLoc && loc)) {
                   _context99.next = 22;
                   break;
