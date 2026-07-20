@@ -22677,6 +22677,7 @@ function CourierDeliveries(_ref155) {
               _context69.prev = 8;
               _context69.t0 = _context69["catch"](2);
             case 10:
+              if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setDeparted(function(d){ var n=Object.assign({},d); n[o.id]=null; return n; }); return _context69.abrupt('return'); }
               setDeparted(function (d) {
                 return _objectSpread(_objectSpread({}, d), {}, _defineProperty({}, o.id, {
                   loading: false,
@@ -34224,6 +34225,7 @@ function CourierJobTasks(_ref207) {
                 _context87.prev = 8;
                 _context87.t0 = _context87["catch"](2);
               case 10:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setTransitLoading(function(l){ var n=Object.assign({},l); n['ord_'+o.id]=false; return n; }); return _context87.abrupt('return'); }
                 if (onCheckin) onCheckin({
                   courier_name: courierName,
                   lat: ((_loc5 = loc) === null || _loc5 === void 0 ? void 0 : _loc5.lat) || null,
@@ -34458,6 +34460,7 @@ function CourierJobTasks(_ref207) {
                 _context88.prev = 9;
                 _context88.t0 = _context88["catch"](3);
               case 11:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setTransitLoading(function(l){ var n=Object.assign({},l); n['sup_'+po.id+'_'+p.no]=false; return n; }); return _context88.abrupt('return'); }
                 if (onCheckin) onCheckin({
                   courier_name: courierName,
                   lat: ((_loc7 = loc) === null || _loc7 === void 0 ? void 0 : _loc7.lat) || null,
@@ -34765,6 +34768,7 @@ function CourierJobTasks(_ref207) {
                 _context90.prev = 8;
                 _context90.t0 = _context90["catch"](2);
               case 10:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setTransitLoading(function(l){ var n=Object.assign({},l); n['br_'+bk]=false; return n; }); return _context90.abrupt('return'); }
                 if (onCheckin) onCheckin({
                   courier_name: courierName,
                   lat: ((_loc9 = loc) === null || _loc9 === void 0 ? void 0 : _loc9.lat) || null,
@@ -35052,6 +35056,7 @@ function CourierJobTasks(_ref207) {
                 _context92.prev = 8;
                 _context92.t0 = _context92["catch"](2);
               case 10:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setTransitLoading(function(l){ var n=Object.assign({},l); delete n['cb_'+s.id]; return n; }); return _context92.abrupt('return'); }
                 if (onCheckin) onCheckin({
                   courier_name: courierName,
                   lat: ((_loc13 = loc) === null || _loc13 === void 0 ? void 0 : _loc13.lat) || null,
@@ -35306,6 +35311,7 @@ function CourierJobTasks(_ref207) {
                 _context94.prev = 8;
                 _context94.t0 = _context94["catch"](2);
               case 10:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setTransitLoading(function(l){ var n=Object.assign({},l); delete n['sc_'+_s4.id]; return n; }); return _context94.abrupt('return'); }
                 if (onCheckin) onCheckin({
                   courier_name: courierName,
                   lat: ((_loc17 = loc) === null || _loc17 === void 0 ? void 0 : _loc17.lat) || null,
@@ -35616,6 +35622,7 @@ function CourierJobTasks(_ref207) {
                 _context96.prev = 8;
                 _context96.t0 = _context96["catch"](2);
               case 10:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setTransitLoading(function(l){ var n=Object.assign({},l); delete n['scp_'+_s6.id]; return n; }); return _context96.abrupt('return'); }
                 if (onCheckin) onCheckin({
                   courier_name: courierName,
                   lat: ((_loc21 = loc) === null || _loc21 === void 0 ? void 0 : _loc21.lat) || null,
@@ -35879,6 +35886,7 @@ function CourierJobTasks(_ref207) {
                 _context98.prev = 8;
                 _context98.t0 = _context98["catch"](2);
               case 10:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setTransitLoading(function(l){ var n=Object.assign({},l); delete n['ret_'+s.id]; return n; }); return _context98.abrupt('return'); }
                 dest = _s7.source_type === 'branch' ? _s7.branch_name : _s7.customer_name;
                 if (onCheckin) onCheckin({
                   courier_name: courierName,
