@@ -2322,7 +2322,7 @@ function App() {
             }
             return _context14.abrupt("return");
           case 3:
-            poCols = 'id,created_at,created_by,supplier_name,supplier_address,expected_date,notes,items,status,pickup,pickups,lukas_note,lukas_note_read_at,lukas_note_read_by,lukas_note_done_at,lukas_note_done_by';
+            poCols = 'id,created_at,created_by,supplier_name,supplier_address,expected_date,notes,items,status,pickup,pickups,lukas_note,lukas_note_read_at,lukas_note_read_by,lukas_note_done_at,lukas_note_done_by,ppn_type';
             _context14.next = 6;
             return db.from('purchase_orders').select(poCols).order('created_at', {
               ascending: false
@@ -7295,6 +7295,8 @@ function PesanBarangForm(_ref54) {
     _React$useState50 = _slicedToArray(_React$useState49, 2),
     items = _React$useState50[0],
     setItems = _React$useState50[1];
+  var _ppn1 = React.useState((editData === null || editData === void 0 ? void 0 : editData.ppn_type) || '');
+  var ppnType = _ppn1[0]; var setPpnType = _ppn1[1];
   var _React$useState51 = React.useState(false),
     _React$useState52 = _slicedToArray(_React$useState51, 2),
     saving = _React$useState52[0],
@@ -7371,7 +7373,8 @@ function PesanBarangForm(_ref54) {
               supplier_address: supplierAddress.trim() || null,
               expected_date: expectedDate || null,
               notes: notes.trim() || null,
-              items: mergedItems
+              items: mergedItems,
+              ppn_type: ppnType || null
             });
           case 12:
             _context41.next = 16;
@@ -7392,6 +7395,7 @@ function PesanBarangForm(_ref54) {
                   arrived_by: null
                 });
               }),
+              ppn_type: ppnType || null,
               status: 'pending',
               created_by: createdBy
             });
@@ -7456,6 +7460,13 @@ function PesanBarangForm(_ref54) {
       return setSupplierAddress(e.target.value);
     }
   })), /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("label", null, "Harga Termasuk PPN?"), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 8, marginTop: 6 }
+  }, [['incl', '\u2705 Incl. PPN', 'rgba(34,197,94,0.15)', '2px solid var(--green)'], ['excl', '\u274C Excl. PPN', 'rgba(239,68,68,0.15)', '2px solid var(--red)'], ['', '\u2014 Tdk Disebutkan', 'var(--bg3)', '2px solid transparent']].map(function(arr) {
+    var v=arr[0], lbl=arr[1], bg=arr[2], bord=arr[3];
+    return /*#__PURE__*/React.createElement("button", { key: v, type: "button", onClick: function(){ setPpnType(v); }, style: { flex:1, padding:'8px 6px', borderRadius:8, fontSize:12, fontWeight:600, cursor:'pointer', background: ppnType===v ? bg : 'var(--bg3)', border: ppnType===v ? bord : '2px solid var(--border)', color:'var(--text)' } }, lbl);
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 16
     }
@@ -8212,7 +8223,16 @@ function PurchaseOrderCard(_ref60) {
       color: 'var(--text3)',
       marginTop: 2
     }
-  }, "Dibuat: ", po.created_by, " \xB7 ", fmtDateTime(po.created_at), po.expected_date && /*#__PURE__*/React.createElement("span", null, " \xB7 \uD83D\uDCC5 Estimasi tiba: ", fmtDate(po.expected_date))), po.notes && /*#__PURE__*/React.createElement("div", {
+  }, "Dibuat: ", po.created_by, " \xB7 ", fmtDateTime(po.created_at), po.expected_date && /*#__PURE__*/React.createElement("span", null, " \xB7 \uD83D\uDCC5 Estimasi tiba: ", fmtDate(po.expected_date))), po.ppn_type && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 5 }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-block', padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+      background: po.ppn_type === 'incl' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+      color: po.ppn_type === 'incl' ? 'var(--green)' : 'var(--red)',
+      border: po.ppn_type === 'incl' ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(239,68,68,0.4)'
+    }
+  }, po.ppn_type === 'incl' ? '\u2705 Harga Incl. PPN' : '\u274C Harga Excl. PPN')), po.notes && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: 'var(--text2)',
@@ -9219,7 +9239,7 @@ function PesanBarangPage(_ref71) {
   var queryPoByDate = function(from, to) {
     if (!db || (!from && !to)) { setPoDbResult(null); return; }
     setPoDbLoading(true);
-    var q = db.from('purchase_orders').select('id,created_at,created_by,supplier_name,supplier_address,expected_date,notes,items,status,pickup,pickups,lukas_note,lukas_note_read_at,lukas_note_read_by,lukas_note_done_at,lukas_note_done_by').order('created_at', { ascending: false }).limit(1000);
+    var q = db.from('purchase_orders').select('id,created_at,created_by,supplier_name,supplier_address,expected_date,notes,items,status,pickup,pickups,lukas_note,lukas_note_read_at,lukas_note_read_by,lukas_note_done_at,lukas_note_done_by,ppn_type').order('created_at', { ascending: false }).limit(1000);
     if (from) q = q.gte('created_at', from + 'T00:00:00');
     if (to) q = q.lte('created_at', to + 'T23:59:59');
     q.then(function(res) { setPoDbResult(res.data || []); setPoDbLoading(false); });
