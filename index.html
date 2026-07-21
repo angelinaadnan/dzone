@@ -36961,6 +36961,7 @@ function BranchTitipKirimPage(_ref242) {
     _React$useState384 = _slicedToArray(_React$useState383, 2),
     showForm = _React$useState384[0],
     setShowForm = _React$useState384[1];
+  var _so1 = React.useState(null); var selOrder = _so1[0]; var setSelOrder = _so1[1];
   var myOrders = (orders || []).filter(function (o) {
     return members.includes(o.source_branch) || members.includes(o.sales_name) && o.source_type === 'cabang';
   }).sort(function (a, b) {
