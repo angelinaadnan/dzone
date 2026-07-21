@@ -2326,7 +2326,7 @@ function App() {
             _context14.next = 6;
             return db.from('purchase_orders').select(poCols).order('created_at', {
               ascending: false
-            }).limit(200);
+            }).limit(1000);
           case 6:
             _yield$db$from$select4 = _context14.sent;
             data = _yield$db$from$select4.data;
@@ -4156,7 +4156,8 @@ function App() {
     onSave: savePurchaseOrder,
     onUpdate: updatePurchaseOrder,
     createdBy: userName,
-    role: role
+    role: role,
+    db: db
   }), page === 'absensi' && /*#__PURE__*/React.createElement(AbsensiPage, {
     attendance: attendance,
     onSave: saveAttendance,
@@ -9193,7 +9194,8 @@ function PesanBarangPage(_ref71) {
     onSave = _ref71.onSave,
     onUpdate = _ref71.onUpdate,
     createdBy = _ref71.createdBy,
-    role = _ref71.role;
+    role = _ref71.role,
+    db = _ref71.db;
   var _React$useState79 = React.useState(false),
     _React$useState80 = _slicedToArray(_React$useState79, 2),
     showForm = _React$useState80[0],
@@ -9210,8 +9212,21 @@ function PesanBarangPage(_ref71) {
     _React$useState86 = _slicedToArray(_React$useState85, 2),
     search = _React$useState86[0],
     setSearch = _React$useState86[1];
+  var _poDf = React.useState(''); var poDateFrom = _poDf[0]; var setPoDateFrom = _poDf[1];
+  var _poDt = React.useState(''); var poDateTo = _poDt[0]; var setPoDateTo = _poDt[1];
+  var _poDb = React.useState(null); var poDbResult = _poDb[0]; var setPoDbResult = _poDb[1];
+  var _poDl = React.useState(false); var poDbLoading = _poDl[0]; var setPoDbLoading = _poDl[1];
+  var queryPoByDate = function(from, to) {
+    if (!db || (!from && !to)) { setPoDbResult(null); return; }
+    setPoDbLoading(true);
+    var q = db.from('purchase_orders').select('id,created_at,created_by,supplier_name,supplier_address,expected_date,notes,items,status,pickup,pickups,lukas_note,lukas_note_read_at,lukas_note_read_by,lukas_note_done_at,lukas_note_done_by').order('created_at', { ascending: false }).limit(1000);
+    if (from) q = q.gte('created_at', from + 'T00:00:00');
+    if (to) q = q.lte('created_at', to + 'T23:59:59');
+    q.then(function(res) { setPoDbResult(res.data || []); setPoDbLoading(false); });
+  };
+  var baseOrders = poDbResult !== null ? poDbResult : orders;
   var canMark = ['admin', 'ops', 'admin_pembelian', 'admin_online', 'supervisor'].includes(role);
-  var filtered = orders.filter(function (po) {
+  var filtered = baseOrders.filter(function (po) {
     return filter === 'all' || po.status === filter;
   }).filter(function (po) {
     return !search || (po.supplier_name || '').toLowerCase().includes(search.toLowerCase());
@@ -9318,7 +9333,20 @@ function PesanBarangPage(_ref71) {
       minWidth: 160,
       padding: '8px 12px'
     }
-  }), ['all', 'pending', 'partial', 'completed', 'cancelled'].map(function (s) {
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "date", value: poDateFrom,
+    onChange: function(e) { var v=e.target.value; setPoDateFrom(v); setPoDbResult(null); queryPoByDate(v, poDateTo); },
+    style: { padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 }
+  }), /*#__PURE__*/React.createElement("span", { style: { alignSelf: 'center', color: 'var(--text2)', fontSize: 12 } }, "s/d"),
+  /*#__PURE__*/React.createElement("input", {
+    type: "date", value: poDateTo,
+    onChange: function(e) { var v=e.target.value; setPoDateTo(v); setPoDbResult(null); queryPoByDate(poDateFrom, v); },
+    style: { padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 }
+  }), (poDateFrom || poDateTo) && /*#__PURE__*/React.createElement("button", {
+    className: "btn-secondary btn-sm",
+    onClick: function() { setPoDateFrom(''); setPoDateTo(''); setPoDbResult(null); }
+  }, poDbLoading ? '\u23F3' : '\u2715 Reset'),
+  ['all', 'pending', 'partial', 'completed', 'cancelled'].map(function (s) {
     return /*#__PURE__*/React.createElement("button", {
       key: s,
       className: filter === s ? 'btn-primary btn-sm' : 'btn-secondary btn-sm',
