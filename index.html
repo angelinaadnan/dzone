@@ -5046,16 +5046,20 @@ function FaceEnrollment(_ref_fe) {
   );
 }
 function SalesHarianPage() {
-  return /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)' }
-  },
-    /*#__PURE__*/React.createElement("div", { className: "section-title", style: { flexShrink: 0 } }, "📈 Sales Harian"),
-    /*#__PURE__*/React.createElement("iframe", {
-      src: "https://script.google.com/macros/s/AKfycbytzhKrFsyQImSCR5fGYNWlDYsMgR96U0V9mWGEo7ilduC7Lnaz6OscGYhhBK_pYOGA7Q/exec",
-      style: { flex: 1, border: 'none', borderRadius: 10, background: 'var(--bg2)' },
-      title: "Sales Harian",
-      allowFullScreen: true
-    })
+  var url = 'https://script.google.com/macros/s/AKfycbytzhKrFsyQImSCR5fGYNWlDYsMgR96U0V9mWGEo7ilduC7Lnaz6OscGYhhBK_pYOGA7Q/exec';
+  return /*#__PURE__*/React.createElement("div", { style: { maxWidth: 480 } },
+    /*#__PURE__*/React.createElement("div", { className: "section-title" }, "📈 Sales Harian"),
+    /*#__PURE__*/React.createElement("div", { className: "card", style: { textAlign: 'center', padding: '40px 24px' } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 48, marginBottom: 16 } }, "📈"),
+      /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, fontSize: 16, marginBottom: 8 } }, "Sales Harian"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: 'var(--text2)', marginBottom: 24 } }, "Klik tombol di bawah untuk membuka laporan Sales Harian di tab baru."),
+      /*#__PURE__*/React.createElement("a", {
+        href: url,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        style: { display: 'inline-block', padding: '12px 32px', borderRadius: 10, background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }
+      }, "🔗 Buka Sales Harian")
+    )
   );
 }
 function AbsensiPage(_ref46) {
