@@ -3719,6 +3719,7 @@ function App() {
   var BRANCH_REQUEST_ALLOWED = ['TC RIZAL', 'TC LUVI', 'PS DARTIK'];
   var PESAN_BARANG_ALLOWED_SALES = ['Aldi', 'Eliwaty', 'Tio'];
   var canAccessPesanBarang = ['admin', 'ops', 'admin_pembelian', 'admin_online', 'supervisor'].includes(role) || role === 'sales' && PESAN_BARANG_ALLOWED_SALES.includes(userName);
+  var SALES_HARIAN_USERS = ['Angel', 'Liana', 'Santo', 'GITA'];
   var navItems = (role === 'supervisor' && userName === 'Santo' ? [].concat(_toConsumableArray(ROLE_NAV[role]), [{
     id: 'branch_request',
     icon: '📦',
@@ -3727,7 +3728,7 @@ function App() {
     return n.id !== 'branch_request' || BRANCH_REQUEST_ALLOWED.includes(userName);
   }) : ROLE_NAV[role]).filter(function (n) {
     return n.id !== 'pesan_barang' || canAccessPesanBarang;
-  });
+  }).concat(SALES_HARIAN_USERS.includes(userName) ? [{ id: 'sales_harian', icon: '📈', label: 'Sales Harian' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -4165,7 +4166,7 @@ function App() {
     userName: userName,
     role: role,
     demoMode: demoMode
-  })), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
+  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
     order: selectedOrder,
     onClose: function onClose() {
       return setSelectedOrder(null);
@@ -5042,6 +5043,19 @@ function FaceEnrollment(_ref_fe) {
     }, '\uD83D\uDDBC\uFE0F Pilih dari Galeri'),
     /*#__PURE__*/React.createElement('input', { ref: fileInputRef, type: 'file', accept: 'image/*', style: { display: 'none' }, onChange: handleFileChange }),
     status === 'starting' && /*#__PURE__*/React.createElement('div', { style: { color: 'rgba(255,255,255,0.5)', fontSize: 13 } }, 'Membuka kamera...')
+  );
+}
+function SalesHarianPage() {
+  return /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)' }
+  },
+    /*#__PURE__*/React.createElement("div", { className: "section-title", style: { flexShrink: 0 } }, "📈 Sales Harian"),
+    /*#__PURE__*/React.createElement("iframe", {
+      src: "https://script.google.com/macros/s/AKfycbytzhKrFsyQImSCR5fGYNWlDYsMgR96U0V9mWGEo7ilduC7Lnaz6OscGYhhBK_pYOGA7Q/exec",
+      style: { flex: 1, border: 'none', borderRadius: 10, background: 'var(--bg2)' },
+      title: "Sales Harian",
+      allowFullScreen: true
+    })
   );
 }
 function AbsensiPage(_ref46) {
