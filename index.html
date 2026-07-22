@@ -20182,20 +20182,49 @@ function AdminOnlineOrders(_ref144) {
       onClick: function onClick(e) {
         return e.stopPropagation();
       }
-    }, !pengirimanOpen[o.id] ? /*#__PURE__*/React.createElement("button", {
+    }, !pengirimanOpen[o.id] ? /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: 8, flexWrap: 'wrap' }
+    }, /*#__PURE__*/React.createElement("button", {
       className: "btn-secondary btn-sm",
-      style: {
-        fontSize: 12,
-        color: 'var(--blue)',
-        borderColor: 'var(--blue)'
-      },
+      style: { fontSize: 12, color: 'var(--blue)', borderColor: 'var(--blue)' },
       onClick: function onClick() {
         setField(o.id, 'nama', o.delivery_method);
         setPengirimanOpen(function (p) {
           return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, o.id, 'eks'));
         });
       }
-    }, "\uD83D\uDCE6 Input Resi ", o.delivery_method) : /*#__PURE__*/React.createElement("div", {
+    }, "\uD83D\uDCE6 Input Resi ", o.delivery_method), /*#__PURE__*/React.createElement("button", {
+      className: "btn-secondary btn-sm",
+      style: { fontSize: 11, color: 'var(--orange)', borderColor: 'var(--orange)' },
+      onClick: function onClick() {
+        setPengirimanOpen(function (p) {
+          return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, o.id, 'choose'));
+        });
+      }
+    }, "\uD83D\uDD04 Ubah Metode")) : pengirimanOpen[o.id] === 'choose' ? /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: 8, flexWrap: 'wrap' }
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn-secondary btn-sm",
+      style: { fontSize: 12, color: 'var(--green)', borderColor: 'var(--green)' },
+      disabled: saving[o.id],
+      onClick: function onClick() { return submitKurirInternal(o); }
+    }, saving[o.id] === 'kurir' ? 'Menyimpan...' : '\uD83D\uDE9A Kurir Internal'), /*#__PURE__*/React.createElement("button", {
+      className: "btn-secondary btn-sm",
+      style: { fontSize: 12, color: 'var(--teal)', borderColor: 'var(--teal)' },
+      disabled: saving[o.id],
+      onClick: function onClick() { return submitAmbilSendiri(o); }
+    }, saving[o.id] === 'ambil' ? 'Menyimpan...' : '\uD83E\uDD1D Ambil Sendiri'), /*#__PURE__*/React.createElement("button", {
+      className: "btn-secondary btn-sm",
+      style: { fontSize: 12, color: 'var(--blue)', borderColor: 'var(--blue)' },
+      onClick: function onClick() {
+        setField(o.id, 'nama', o.delivery_method);
+        setPengirimanOpen(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, o.id, 'eks')); });
+      }
+    }, '\uD83D\uDCE6 Ekspedisi'), /*#__PURE__*/React.createElement("button", {
+      className: "btn-secondary btn-sm",
+      style: { fontSize: 11 },
+      onClick: function onClick() { setPengirimanOpen(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, o.id, null)); }); }
+    }, '\u2715')) : /*#__PURE__*/React.createElement("div", {
       style: {
         background: 'rgba(59,130,246,0.07)',
         border: '1px solid rgba(59,130,246,0.25)',
