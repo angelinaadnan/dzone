@@ -1772,7 +1772,7 @@ function App() {
             since = new Date();
             since.setMonth(since.getMonth() - monthsBack);
             // npwp_file & po_file di-exclude — di-load on-demand via loadOrderFiles (lazy)
-            orderColsBase = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status';
+            orderColsBase = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status,admin_photo';
             orderColsNew = ',upgrade_items,downgrade_items,has_component_change,extra_couriers';
             buildOrderQ = function buildOrderQ(cols) {
               var useExtraCourier = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
@@ -45955,9 +45955,11 @@ function OrderDetailModal(_ref278) {
       width: '100%',
       borderRadius: 10,
       maxHeight: 260,
-      objectFit: 'cover'
+      objectFit: 'cover',
+      cursor: 'pointer'
     },
-    alt: "bukti admin"
+    alt: "bukti admin",
+    onClick: function() { window.open(order.admin_photo, '_blank'); }
   })), (order.tech_photos && order.tech_photos.length > 0 ? order.tech_photos : [order.tech_photo]).filter(Boolean).length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("hr", {
     className: "divider"
   }), /*#__PURE__*/React.createElement("div", {
