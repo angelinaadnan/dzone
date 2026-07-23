@@ -9987,6 +9987,7 @@ function SupervisorOrders(_ref77) {
   var _dt = React.useState(''); var dateTo = _dt[0]; var setDateTo = _dt[1];
   var _dbO = React.useState(null); var dbOrders = _dbO[0]; var setDbOrders = _dbO[1];
   var _dbL = React.useState(false); var dbLoading = _dbL[0]; var setDbLoading = _dbL[1];
+  var _srchTimer = React.useRef(null);
   var queryByDate = function(from, to) {
     if (!db || (!from && !to)) { setDbOrders(null); return; }
     setDbLoading(true);
@@ -9997,6 +9998,16 @@ function SupervisorOrders(_ref77) {
       setDbOrders(res.data || []);
       setDbLoading(false);
     }).catch(function(){ setDbLoading(false); });
+  };
+  var queryBySearch = function(term) {
+    if (!db || !term || term.trim().length < 2) { setDbOrders(null); return; }
+    setDbLoading(true);
+    var t = term.trim();
+    db.from('orders').select('*')
+      .or('customer_name.ilike.%' + t + '%,sales_name.ilike.%' + t + '%,invoice_number.ilike.%' + t + '%,goods_status.ilike.%' + t + '%')
+      .order('created_at', { ascending: false }).limit(500)
+      .then(function(res){ setDbOrders(res.data || []); setDbLoading(false); })
+      .catch(function(){ setDbLoading(false); });
   };
 
   // Mapping filter label → actual DB statuses
@@ -10081,12 +10092,18 @@ function SupervisorOrders(_ref77) {
     /*#__PURE__*/React.createElement("input", {
       placeholder: "\uD83D\uDD0D Cari nama customer / sales / no invoice...",
       value: search,
-      onChange: function(e) { setSearch(e.target.value); },
+      onChange: function(e) {
+        var v = e.target.value; setSearch(v);
+        if (!dateFrom && !dateTo) {
+          clearTimeout(_srchTimer.current);
+          _srchTimer.current = setTimeout(function(){ queryBySearch(v); }, 400);
+        }
+      },
       style: { flex: 2, minWidth: 180, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 }
     }),
     /*#__PURE__*/React.createElement("input", { type: "date", value: dateFrom, onChange: function(e){ var v=e.target.value; setDateFrom(v); queryByDate(v, dateTo); }, title: "Dari tanggal", style: { flex: 1, minWidth: 130, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 } }),
     /*#__PURE__*/React.createElement("input", { type: "date", value: dateTo, onChange: function(e){ var v=e.target.value; setDateTo(v); queryByDate(dateFrom, v); }, title: "Sampai tanggal", style: { flex: 1, minWidth: 130, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13 } }),
-    (dateFrom || dateTo) && /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", onClick: function(){ setDateFrom(''); setDateTo(''); setDbOrders(null); } }, dbLoading ? '\u23F3' : '\u2715 Reset')
+    (dateFrom || dateTo || dbOrders !== null) && /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", onClick: function(){ setDateFrom(''); setDateTo(''); if (search) queryBySearch(search); else setDbOrders(null); } }, dbLoading ? '⏳' : '✕ Reset')
   ), statuses.map(function (s) {
     return /*#__PURE__*/React.createElement("button", {
       key: s,
