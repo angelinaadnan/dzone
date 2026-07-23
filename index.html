@@ -10045,7 +10045,7 @@ function SupervisorOrders(_ref77) {
   }).filter(function (o) {
     if (!search) return true;
     var q = search.toLowerCase();
-    return (o.customer_name || '').toLowerCase().includes(q) || (o.sales_name || '').toLowerCase().includes(q) || (o.invoice_number || '').toLowerCase().includes(q);
+    return (o.customer_name || '').toLowerCase().includes(q) || (o.sales_name || '').toLowerCase().includes(q) || (o.invoice_number || '').toLowerCase().includes(q) || (o.goods_status || '').toLowerCase().includes(q) || (o.id || '').toLowerCase().includes(q);
   });
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -10140,7 +10140,11 @@ function SupervisorOrders(_ref77) {
       }
     }, o.goods.slice(0, 2).map(function (g) {
       return g.name;
-    }).join(', '), o.goods.length > 2 ? " +".concat(o.goods.length - 2, " lainnya") : '')), /*#__PURE__*/React.createElement("div", {
+    }).join(', '), o.goods.length > 2 ? " +".concat(o.goods.length - 2, " lainnya") : ''),
+    o.goods_status && /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'rgba(251,146,60,0.18)', color: 'var(--orange)', fontWeight: 700, display: 'inline-block', marginTop: 4 }
+    }, "⏳ ", o.goods_status)
+    ), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         flexDirection: 'column',
@@ -18227,8 +18231,13 @@ function AdminOrders(_ref135) {
     _useState46 = _slicedToArray(_useState45, 2),
     filter = _useState46[0],
     setFilter = _useState46[1];
-  var filtered = filter === 'all' ? orders : orders.filter(function (o) {
+  var _admSrch = React.useState(''); var admSearch = _admSrch[0]; var setAdmSearch = _admSrch[1];
+  var filtered = (filter === 'all' ? orders : orders.filter(function (o) {
     return o.status === filter;
+  })).filter(function(o) {
+    if (!admSearch) return true;
+    var q = admSearch.toLowerCase();
+    return (o.customer_name || '').toLowerCase().includes(q) || (o.sales_name || '').toLowerCase().includes(q) || (o.invoice_number || '').toLowerCase().includes(q) || (o.goods_status || '').toLowerCase().includes(q) || (o.id || '').toLowerCase().includes(q);
   });
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -18258,7 +18267,12 @@ function AdminOrders(_ref135) {
       alignItems: 'center',
       gap: 6
     }
-  }, "\u2B07 Export Excel ", filter !== 'all' && "(".concat(STATUS_LABELS[filter], ")"))), /*#__PURE__*/React.createElement("div", {
+  }, "\u2B07 Export Excel ", filter !== 'all' && "(".concat(STATUS_LABELS[filter], ")"))), /*#__PURE__*/React.createElement("input", {
+    placeholder: "\uD83D\uDD0D Cari customer / sales / invoice / status barang...",
+    value: admSearch,
+    onChange: function(e) { setAdmSearch(e.target.value); },
+    style: { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13, marginBottom: 12, boxSizing: 'border-box' }
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -18272,7 +18286,7 @@ function AdminOrders(_ref135) {
         return setFilter(s);
       },
       className: filter === s ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'
-    }, s === 'all' ? 'Semua' : STATUS_LABELS[s]);
+    }, s === 'all' ? 'Semua' : s === 'new' ? 'Belum Diproses' : STATUS_LABELS[s]);
   })), filtered.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("div", {
@@ -18347,7 +18361,9 @@ function AdminOrders(_ref135) {
         color: 'var(--amber)',
         fontWeight: 700
       }
-    }, "\u270F\uFE0F Revisi")), /*#__PURE__*/React.createElement("div", {
+    }, "\u270F\uFE0F Revisi"), o.goods_status && /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 10, padding: '1px 6px', borderRadius: 10, background: 'rgba(251,146,60,0.18)', color: 'var(--orange)', fontWeight: 700 }
+    }, "\u23F3 ", o.goods_status)), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: 'var(--text2)',
