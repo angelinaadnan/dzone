@@ -10045,6 +10045,18 @@ function SupervisorOrders(_ref77) {
       .then(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); })
       .catch(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); });
   };
+  var _pg = React.useState(1); var currentPage = _pg[0]; var setCurrentPage = _pg[1];
+  var PAGE_SIZE = 30;
+  var queryByFilter = function(f) {
+    if (!db) return;
+    if (f === 'all' || f === 'cabang') { if (!search && !dateFrom && !dateTo) setDbOrders(null); return; }
+    var sts = FILTER_GROUPS[f];
+    if (!sts) return;
+    setDbLoading(true);
+    db.from('orders').select('*').in('status', sts).order('created_at', { ascending: false }).limit(2000)
+      .then(function(res){ setDbOrders(res.data || []); setDbLoading(false); })
+      .catch(function(){ setDbLoading(false); });
+  };
   var baseOrders = dbOrders !== null ? dbOrders : orders;
   var filtered = baseOrders.filter(function (o) {
     return !hideNew || o.status !== 'new';
@@ -10058,6 +10070,8 @@ function SupervisorOrders(_ref77) {
     var q = search.toLowerCase();
     return (o.customer_name || '').toLowerCase().includes(q) || (o.sales_name || '').toLowerCase().includes(q) || (o.invoice_number || '').toLowerCase().includes(q) || (o.goods_status || '').toLowerCase().includes(q) || (o.id || '').toLowerCase().includes(q);
   });
+  var totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  var paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       maxWidth: 900
@@ -10093,7 +10107,7 @@ function SupervisorOrders(_ref77) {
       placeholder: "\uD83D\uDD0D Cari nama customer / sales / no invoice...",
       value: search,
       onChange: function(e) {
-        var v = e.target.value; setSearch(v);
+        var v = e.target.value; setSearch(v); setCurrentPage(1);
         if (!dateFrom && !dateTo) {
           clearTimeout(_srchTimer.current);
           _srchTimer.current = setTimeout(function(){ queryBySearch(v); }, 400);
@@ -10109,14 +10123,14 @@ function SupervisorOrders(_ref77) {
       key: s,
       className: filter === s ? 'btn-primary btn-sm' : 'btn-secondary btn-sm',
       onClick: function onClick() {
-        return setFilter(s);
+        setFilter(s); setCurrentPage(1); queryByFilter(s);
       }
     }, s === 'all' ? 'Semua' : STATUS_LABEL[s] || s);
   })), filtered.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("div", {
     className: "icon"
-  }, "\uD83D\uDCE6"), /*#__PURE__*/React.createElement("div", null, "Tidak ada order")), filtered.map(function (o) {
+  }, "\uD83D\uDCE6"), /*#__PURE__*/React.createElement("div", null, "Tidak ada order")), paginated.map(function (o) {
     return /*#__PURE__*/React.createElement("div", {
       key: o.id,
       className: "card",
@@ -10342,7 +10356,20 @@ function SupervisorOrders(_ref77) {
       /*#__PURE__*/React.createElement("input", { type: "file", accept: "image/*", capture: "environment", style: { fontSize: 11, width: '100%', marginBottom: 6 }, onChange: function(e){ var f=e.target.files[0]; if(f){ var rd=new FileReader(); rd.onloadend=function(){ setSelfPic2(function(p){ return Object.assign({},p,_defineProperty({},o.id,rd.result)); }); }; rd.readAsDataURL(f); } } }),
       /*#__PURE__*/React.createElement("button", { className: "btn-green btn-sm", style: { width: '100%' }, disabled: !selfPic2[o.id]||dlSaving2[o.id]==='self', onClick: function(){ confirmSelfOps(o); } }, dlSaving2[o.id]==='self'?'Menyimpan...':'\u2705 Konfirmasi Pengambilan')
     )));
-  }), allowRevisi && revisingOrder && /*#__PURE__*/React.createElement(RevisiOrderModal, {
+  }), filtered.length > PAGE_SIZE && /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', marginTop: 16, flexWrap: 'wrap', paddingBottom: 8 }
+  }, currentPage > 1 && /*#__PURE__*/React.createElement("button", {
+    className: "btn-secondary btn-sm",
+    onClick: function(){ setCurrentPage(function(p){ return p - 1; }); window.scrollTo(0, 0); }
+  }, "← Prev"),
+  /*#__PURE__*/React.createElement("span", {
+    style: { padding: '6px 14px', fontSize: 12, color: 'var(--text2)', background: 'var(--bg2)', borderRadius: 8, border: '1px solid var(--border)' }
+  }, "Hal " + currentPage + " / " + totalPages + " · " + filtered.length + " order"),
+  currentPage < totalPages && /*#__PURE__*/React.createElement("button", {
+    className: "btn-secondary btn-sm",
+    onClick: function(){ setCurrentPage(function(p){ return p + 1; }); window.scrollTo(0, 0); }
+  }, "Next →")),
+  allowRevisi && revisingOrder && /*#__PURE__*/React.createElement(RevisiOrderModal, {
     order: revisingOrder,
     onClose: function onClose() {
       return setRevisingOrder(null);
