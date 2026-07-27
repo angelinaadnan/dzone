@@ -1772,7 +1772,7 @@ function App() {
             since = new Date();
             since.setMonth(since.getMonth() - monthsBack);
             // npwp_file & po_file di-exclude — di-load on-demand via loadOrderFiles (lazy)
-            orderColsBase = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status,admin_photo';
+            orderColsBase = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,start_location,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status,admin_photo';
             orderColsNew = ',upgrade_items,downgrade_items,has_component_change,extra_couriers';
             buildOrderQ = function buildOrderQ(cols) {
               var useExtraCourier = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
@@ -17987,7 +17987,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         var dest = (o.customer_name || '').toUpperCase().replace(/\s+/g, ' ').trim();
         var km = o.distance_km && parseFloat(o.distance_km) > 0 ? parseFloat(parseFloat(o.distance_km).toFixed(1)) : null;
         var fallback = o.customer_address ? mkSearch(o.customer_address) : mkSearch(dest);
-        acts.push({ time: o.delivered_at || o.updated_at || o.created_at, dest: dest, km: km, tipe: 'Pengiriman', loc: o.end_location || null, fallback: fallback });
+        acts.push({ time: o.delivered_at || o.updated_at || o.created_at, dest: dest, km: km, tipe: 'Pengiriman', loc: o.end_location || null, startLoc: o.start_location || null, fallback: fallback });
       });
       (c.myTasks || []).forEach(function(t) {
         var dest = (t.destination || t.task_type || '').toUpperCase().replace(/\s+/g, ' ').trim();
@@ -18020,12 +18020,15 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           : (a.fallback || '');
         var km = a.km !== null ? a.km : '';
         var jam = a.time ? new Date(a.time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
-        // Pergi: DUSIT → TUJUAN
+        var fromLink = a.startLoc && (a.startLoc.lat || a.startLoc.latitude)
+          ? 'https://maps.google.com?q=' + (a.startLoc.lat || a.startLoc.latitude) + ',' + (a.startLoc.lng || a.startLoc.longitude || a.startLoc.lon)
+          : dusitLink;
+        // Pergi: BERANGKAT → TUJUAN
         routeRows.push({
           'Tgl': tgl !== prevDate ? tgl : '',
           'Kurir': c.name,
           'Dari': BASE_NAME,
-          'Link Dari': dusitLink,
+          'Link Dari': fromLink,
           'Ke': destName,
           'Link Tujuan': destLink,
           'KM Via Jalan (OSRM)': km,
@@ -22533,6 +22536,7 @@ function CourierDeliveries(_ref155) {
               delivered_at: new Date().toISOString()
             };
             if (loc) updates.end_location = loc;
+            if (startLoc) updates.start_location = startLoc;
             if (!(startLoc && loc)) {
               _context68.next = 17;
               break;
