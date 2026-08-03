@@ -20649,23 +20649,23 @@ function OpsKurirHistory(_ref_okh) {
       });
       var siItems = [];
       (results[4].data || []).forEach(function(s) {
-        var addSI = function(role, ts) {
+        var addSI = function(role, ts, km, endLoc) {
           if (!matchDate(ts || s.created_at)) return;
           siItems.push({
             _type: 'servis',
             customer_name: role,
             customer_address: (s.customer_name || '') + (s.unit_type ? ' · ' + s.unit_type : ''),
-            delivered_at: ts || s.updated_at || s.created_at,
+            delivered_at: ts || s.created_at,
             invoice_number: 'Servis',
-            distance_km: null,
+            distance_km: km || null,
             start_location: null,
-            end_location: null
+            end_location: endLoc || null
           });
         };
-        if (s.courier_name === courier) addSI('Jemput dari ' + (s.branch_name || 'Cabang'), s.delivered_at || s.created_at);
-        if (s.sc_delivery_courier === courier) addSI('Antar ke ' + (s.service_center_name || 'SC'), s.sc_delivered_at || s.created_at);
-        if (s.sc_pickup_courier === courier) addSI('Ambil dari ' + (s.service_center_name || 'SC'), s.sc_picked_up_at || s.created_at);
-        if (s.assigned_courier === courier) addSI('Antar balik ke ' + (s.customer_name || ''), s.returned_at || s.created_at);
+        if (s.courier_name === courier) addSI('Jemput dari ' + (s.branch_name || 'Cabang'), s.delivered_at || s.created_at, s.pickup_distance_km || null, null);
+        if (s.sc_delivery_courier === courier) addSI('Antar ke ' + (s.service_center_name || 'SC'), s.sc_delivered_at || s.created_at, s.sc_distance_km || null, s.sc_arrived_location || null);
+        if (s.sc_pickup_courier === courier) addSI('Ambil dari ' + (s.service_center_name || 'SC'), s.sc_picked_up_at || s.created_at, s.scp_distance_km || null, s.sc_pickup_location || s.sc_arrived_location || null);
+        if (s.assigned_courier === courier) addSI('Antar balik ke ' + (s.customer_name || ''), s.returned_at || s.created_at, s.return_distance_km || null, s.return_arrived_location || null);
       });
       var combined = orders.concat(tasks).concat(pickups).concat(trips).concat(siItems).sort(function(a, b){
         return new Date(a.delivered_at || 0) - new Date(b.delivered_at || 0);
