@@ -20589,14 +20589,13 @@ function OpsKurirHistory(_ref_okh) {
       .eq('assigned_courier', courier)
       .gte('created_at', since60.toISOString())
       .order('created_at', { ascending: true });
-    var p3 = db.from('purchase_orders').select('id,supplier_name,supplier_address,pickups,updated_at,created_at')
-      .gte('updated_at', since60.toISOString());
-    var p4 = db.from('branch_requests').select('id,branch_name,trips,updated_at,created_at')
-      .gte('updated_at', since60.toISOString());
+    var p3 = db.from('purchase_orders').select('id,supplier_name,supplier_address,pickups,created_at')
+      .gte('created_at', since60.toISOString()).limit(300);
+    var p4 = db.from('branch_requests').select('id,branch_name,trips,created_at')
+      .gte('created_at', since60.toISOString()).limit(300);
     var since180 = new Date(); since180.setDate(since180.getDate() - 180);
-    var p5 = db.from('service_intakes').select('id,customer_name,unit_type,branch_name,service_center_name,courier_name,sc_delivery_courier,sc_pickup_courier,assigned_courier,return_status,updated_at,created_at,delivered_at,sc_delivered_at,sc_picked_up_at,returned_at')
-      .gte('updated_at', since180.toISOString())
-      .limit(500);
+    var p5 = db.from('service_intakes').select('id,customer_name,unit_type,branch_name,service_center_name,courier_name,sc_delivery_courier,sc_pickup_courier,assigned_courier,return_status,created_at,delivered_at,sc_delivered_at,sc_picked_up_at,returned_at')
+      .gte('created_at', since180.toISOString()).limit(500);
     Promise.all([p1, p2, p3, p4, p5]).then(function(results) {
       var orders = (results[0].data || []).map(function(o){ return Object.assign({}, o, { _type: 'order' }); });
       var tasks = (results[1].data || []).filter(function(t){
@@ -20615,7 +20614,7 @@ function OpsKurirHistory(_ref_okh) {
       var pickups = [];
       (results[2].data || []).forEach(function(po) {
         (po.pickups || []).forEach(function(p) {
-          var pDate = p.done_at || po.updated_at || po.created_at;
+          var pDate = p.done_at || po.created_at;
           if (p.courier === courier && matchDate(pDate)) {
             pickups.push({
               _type: 'pickup',
@@ -20651,7 +20650,7 @@ function OpsKurirHistory(_ref_okh) {
       var siItems = [];
       (results[4].data || []).forEach(function(s) {
         var addSI = function(role, ts) {
-          if (!matchDate(ts || s.updated_at || s.created_at)) return;
+          if (!matchDate(ts || s.created_at)) return;
           siItems.push({
             _type: 'servis',
             customer_name: role,
@@ -20664,9 +20663,9 @@ function OpsKurirHistory(_ref_okh) {
           });
         };
         if (s.courier_name === courier) addSI('Jemput dari ' + (s.branch_name || 'Cabang'), s.delivered_at || s.created_at);
-        if (s.sc_delivery_courier === courier) addSI('Antar ke ' + (s.service_center_name || 'SC'), s.sc_delivered_at || s.updated_at);
-        if (s.sc_pickup_courier === courier) addSI('Ambil dari ' + (s.service_center_name || 'SC'), s.sc_picked_up_at || s.updated_at);
-        if (s.assigned_courier === courier) addSI('Antar balik ke ' + (s.customer_name || ''), s.returned_at || s.updated_at);
+        if (s.sc_delivery_courier === courier) addSI('Antar ke ' + (s.service_center_name || 'SC'), s.sc_delivered_at || s.created_at);
+        if (s.sc_pickup_courier === courier) addSI('Ambil dari ' + (s.service_center_name || 'SC'), s.sc_picked_up_at || s.created_at);
+        if (s.assigned_courier === courier) addSI('Antar balik ke ' + (s.customer_name || ''), s.returned_at || s.created_at);
       });
       var combined = orders.concat(tasks).concat(pickups).concat(trips).concat(siItems).sort(function(a, b){
         return new Date(a.delivered_at || 0) - new Date(b.delivered_at || 0);
