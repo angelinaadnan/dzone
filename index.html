@@ -20587,10 +20587,10 @@ function OpsKurirHistory(_ref_okh) {
       .eq('assigned_courier', courier)
       .gte('created_at', since60.toISOString())
       .order('created_at', { ascending: true });
-    var p3 = db.from('purchase_orders').select('id,supplier_name,supplier_address,pickups')
-      .gte('created_at', since60.toISOString());
-    var p4 = db.from('branch_requests').select('id,branch,trips')
-      .gte('created_at', since60.toISOString());
+    var p3 = db.from('purchase_orders').select('id,supplier_name,supplier_address,pickups,updated_at,created_at')
+      .gte('updated_at', since60.toISOString());
+    var p4 = db.from('branch_requests').select('id,branch_name,trips,updated_at,created_at')
+      .gte('updated_at', since60.toISOString());
     var since180 = new Date(); since180.setDate(since180.getDate() - 180);
     var p5 = db.from('service_intakes').select('id,customer_name,unit_type,branch_name,service_center_name,courier_name,sc_delivery_courier,sc_pickup_courier,assigned_courier,return_status,updated_at,created_at,delivered_at,sc_delivered_at,sc_picked_up_at,returned_at')
       .gte('updated_at', since60.toISOString());
@@ -20611,12 +20611,13 @@ function OpsKurirHistory(_ref_okh) {
       var pickups = [];
       (results[2].data || []).forEach(function(po) {
         (po.pickups || []).forEach(function(p) {
-          if (p.courier === courier && matchDate(p.done_at)) {
+          var pDate = p.done_at || po.updated_at || po.created_at;
+          if (p.courier === courier && matchDate(pDate)) {
             pickups.push({
               _type: 'pickup',
               customer_name: (po.supplier_name || '').toUpperCase(),
               customer_address: p.address || po.supplier_address || '',
-              delivered_at: p.done_at,
+              delivered_at: pDate,
               invoice_number: 'Ambil PO',
               distance_km: p.distance_km || null,
               start_location: p.start_location || null,
@@ -20628,12 +20629,13 @@ function OpsKurirHistory(_ref_okh) {
       var trips = [];
       (results[3].data || []).forEach(function(r) {
         (r.trips || []).forEach(function(t) {
-          if (t.courier === courier && matchDate(t.delivered_at)) {
+          var tDate = t.delivered_at || r.updated_at || r.created_at;
+          if (t.courier === courier && matchDate(tDate)) {
             trips.push({
               _type: 'trip',
-              customer_name: (r.branch || t.branch || '').toUpperCase(),
+              customer_name: (r.branch_name || r.branch || t.branch || '').toUpperCase(),
               customer_address: '',
-              delivered_at: t.delivered_at,
+              delivered_at: tDate,
               invoice_number: 'Kirim Cabang',
               distance_km: t.distance_km || null,
               start_location: t.start_location || null,
