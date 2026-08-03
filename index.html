@@ -20583,23 +20583,27 @@ function OpsKurirHistory(_ref_okh) {
       .eq('courier_name', courier).eq('status', 'delivered')
       .gte('delivered_at', dateFrom).lte('delivered_at', dateTo)
       .order('delivered_at', { ascending: true });
-    var p2 = db.from('courier_tasks').select('id,task_type,destination,description,completed_at,distance_km,end_location,start_location,arrived_location,contact_name')
-      .eq('assigned_courier', courier).eq('status', 'completed')
-      .gte('completed_at', dateFrom).lte('completed_at', dateTo)
-      .order('completed_at', { ascending: true });
+    var p2 = db.from('courier_tasks').select('id,task_type,destination,description,completed_at,assigned_at,created_at,status,distance_km,end_location,start_location,arrived_location,contact_name')
+      .eq('assigned_courier', courier)
+      .gte('created_at', since60.toISOString())
+      .order('created_at', { ascending: true });
     var p3 = db.from('purchase_orders').select('id,supplier_name,supplier_address,pickups')
       .gte('created_at', since60.toISOString());
     var p4 = db.from('branch_requests').select('id,branch,trips')
       .gte('created_at', since60.toISOString());
     Promise.all([p1, p2, p3, p4]).then(function(results) {
       var orders = (results[0].data || []).map(function(o){ return Object.assign({}, o, { _type: 'order' }); });
-      var tasks = (results[1].data || []).map(function(t){ return Object.assign({}, t, {
+      var tasks = (results[1].data || []).filter(function(t){
+        var ts = t.completed_at || t.assigned_at || t.created_at;
+        return matchDate(ts);
+      }).map(function(t){ return Object.assign({}, t, {
         _type: 'task',
         customer_name: t.destination || t.description || t.task_type,
         customer_address: t.contact_name || '',
-        delivered_at: t.completed_at,
+        delivered_at: t.completed_at || t.assigned_at || t.created_at,
         invoice_number: t.task_type,
-        end_location: t.end_location || t.arrived_location || null
+        end_location: t.end_location || t.arrived_location || null,
+        _status: t.status
       }); });
       var pickups = [];
       (results[2].data || []).forEach(function(po) {
@@ -20736,8 +20740,8 @@ function OpsKurirHistory(_ref_okh) {
           o.customer_address ? React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, o.customer_address) : null,
           React.createElement("div", { style: { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' } },
             o._type === 'task' ? React.createElement("span", {
-              style: { fontSize: 11, fontWeight: 700, color: 'var(--orange)', background: 'rgba(251,146,60,0.15)', padding: '2px 8px', borderRadius: 6 }
-            }, "🔧 ", o.invoice_number) :
+              style: { fontSize: 11, fontWeight: 700, color: o._status === 'completed' ? 'var(--green)' : 'var(--orange)', background: o._status === 'completed' ? 'rgba(34,197,94,0.12)' : 'rgba(251,146,60,0.15)', padding: '2px 8px', borderRadius: 6 }
+            }, o._status === 'completed' ? "✅ " : "⏳ ", o.invoice_number) :
             o._type === 'pickup' ? React.createElement("span", {
               style: { fontSize: 11, fontWeight: 700, color: 'var(--amber)', background: 'rgba(245,158,11,0.15)', padding: '2px 8px', borderRadius: 6 }
             }, "🛒 Ambil PO") :
