@@ -20564,10 +20564,13 @@ function OpsKurirHistory(_ref_okh) {
   var load = function(courier, date) {
     if (!db || !courier || !date) return;
     setLoading(true);
+    var dateFrom = date + 'T00:00:00+07:00';
+    var dateTo = date + 'T23:59:59+07:00';
     db.from('orders').select('id,customer_name,customer_address,delivered_at,distance_km,end_location,invoice_number,date,start_location')
       .eq('courier_name', courier)
-      .eq('date', date)
       .eq('status', 'delivered')
+      .gte('delivered_at', dateFrom)
+      .lte('delivered_at', dateTo)
       .order('delivered_at', { ascending: true })
       .then(function(res) {
         setHistory(res.data || []);
