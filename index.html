@@ -20595,7 +20595,8 @@ function OpsKurirHistory(_ref_okh) {
       .gte('updated_at', since60.toISOString());
     var since180 = new Date(); since180.setDate(since180.getDate() - 180);
     var p5 = db.from('service_intakes').select('id,customer_name,unit_type,branch_name,service_center_name,courier_name,sc_delivery_courier,sc_pickup_courier,assigned_courier,return_status,updated_at,created_at,delivered_at,sc_delivered_at,sc_picked_up_at,returned_at')
-      .gte('updated_at', since60.toISOString());
+      .or('courier_name.eq.' + courier + ',sc_delivery_courier.eq.' + courier + ',sc_pickup_courier.eq.' + courier + ',assigned_courier.eq.' + courier)
+      .gte('updated_at', since180.toISOString());
     Promise.all([p1, p2, p3, p4, p5]).then(function(results) {
       var orders = (results[0].data || []).map(function(o){ return Object.assign({}, o, { _type: 'order' }); });
       var tasks = (results[1].data || []).filter(function(t){
