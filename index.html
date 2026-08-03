@@ -20575,9 +20575,11 @@ function OpsKurirHistory(_ref_okh) {
     var since60 = new Date(); since60.setDate(since60.getDate() - 60);
     var matchDate = function(ts) {
       if (!ts) return false;
-      var d = new Date(ts).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
-      var sel = new Date(date + 'T00:00:00+07:00').toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
-      return d === sel;
+      // Convert to Jakarta UTC+7 and compare YYYY-MM-DD
+      var utcMs = new Date(ts).getTime();
+      var jakartaMs = utcMs + 7 * 60 * 60 * 1000;
+      var d = new Date(jakartaMs).toISOString().slice(0, 10);
+      return d === date;
     };
     var p1 = db.from('orders').select('id,customer_name,customer_address,delivered_at,distance_km,end_location,invoice_number,date,start_location')
       .eq('courier_name', courier).eq('status', 'delivered')
