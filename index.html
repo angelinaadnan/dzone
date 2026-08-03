@@ -814,6 +814,10 @@ var ROLE_NAV = {
     icon: '🛒',
     label: 'Pesan Barang'
   }, {
+    id: 'op_kurir_history',
+    icon: '🚚',
+    label: 'History Kurir'
+  }, {
     id: 'absensi',
     icon: '🗓',
     label: 'Absensi'
@@ -3978,6 +3982,8 @@ function App() {
     orders: orders,
     branchName: userName,
     branchMembers: getBranchMembers(userName)
+  }), role === 'ops' && page === 'op_kurir_history' && /*#__PURE__*/React.createElement(OpsKurirHistory, {
+    db: db
   }), role === 'ops' && page === 'assign' && /*#__PURE__*/React.createElement(OpsAssign, {
     orders: orders,
     onUpdate: updateOrder
@@ -20545,6 +20551,123 @@ function AdminOnlineOrders(_ref144) {
 }
 
 // ─── OPS QUEUE ─────────────────────────────────────────────────────
+
+function OpsKurirHistory(_ref_okh) {
+  var db = _ref_okh.db;
+  var couriers = USERS.filter(function(u){ return u.role === 'courier'; }).map(function(u){ return u.name; });
+  var today = new Date().toISOString().slice(0,10);
+  var _sc = React.useState(couriers[0] || ''); var selCourier = _sc[0]; var setSelCourier = _sc[1];
+  var _sd = React.useState(today); var selDate = _sd[0]; var setSelDate = _sd[1];
+  var _sh = React.useState([]); var history = _sh[0]; var setHistory = _sh[1];
+  var _sl = React.useState(false); var loading = _sl[0]; var setLoading = _sl[1];
+
+  var load = function(courier, date) {
+    if (!db || !courier || !date) return;
+    setLoading(true);
+    db.from('orders').select('id,customer_name,customer_address,delivered_at,distance_km,end_location,invoice_number,date,start_location')
+      .eq('courier_name', courier)
+      .eq('date', date)
+      .eq('status', 'delivered')
+      .order('delivered_at', { ascending: true })
+      .then(function(res) {
+        setHistory(res.data || []);
+        setLoading(false);
+      }).catch(function(){ setLoading(false); });
+  };
+
+  React.useEffect(function(){ load(selCourier, selDate); }, [selCourier, selDate]);
+
+  var exportExcel = function() {
+    if (!history.length) return;
+    var rows = history.map(function(o, i) {
+      var jam = o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+      var fromLink = o.start_location && (o.start_location.lat || o.start_location.latitude)
+        ? 'https://maps.google.com?q=' + (o.start_location.lat || o.start_location.latitude) + ',' + (o.start_location.lng || o.start_location.longitude)
+        : '';
+      var toLink = o.end_location && (o.end_location.lat || o.end_location.latitude)
+        ? 'https://maps.google.com?q=' + (o.end_location.lat || o.end_location.latitude) + ',' + (o.end_location.lng || o.end_location.longitude)
+        : '';
+      return {
+        'No': i + 1,
+        'Invoice': o.invoice_number || o.id,
+        'Customer': o.customer_name || '',
+        'Alamat': o.customer_address || '',
+        'Jam Tiba': jam,
+        'KM (OSRM)': o.distance_km != null ? o.distance_km : '',
+        'Link Berangkat': fromLink,
+        'Link Tiba': toLink
+      };
+    });
+    var totalKm = history.reduce(function(s, o){ return s + (o.distance_km || 0); }, 0);
+    rows.push({ 'No': '', 'Invoice': '', 'Customer': 'TOTAL', 'Alamat': '', 'Jam Tiba': '', 'KM (OSRM)': Math.round(totalKm * 10) / 10, 'Link Berangkat': '', 'Link Tiba': '' });
+    var ws = XLSX.utils.json_to_sheet(rows);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'History');
+    XLSX.writeFile(wb, 'history_kurir_' + selCourier.replace(/ /g,'_') + '_' + selDate + '.xlsx');
+  };
+
+  var totalKm = history.reduce(function(s, o){ return s + (o.distance_km || 0); }, 0);
+
+  return React.createElement("div", { style: { padding: '0 0 40px' } },
+    React.createElement("div", { className: "section-title" }, "🚚 History Kurir"),
+    React.createElement("div", { style: { display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 } },
+      React.createElement("select", {
+        value: selCourier,
+        onChange: function(e){ setSelCourier(e.target.value); },
+        style: { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 14, flex: 1, minWidth: 140 }
+      }, couriers.map(function(c){ return React.createElement("option", { key: c, value: c }, c); })),
+      React.createElement("input", {
+        type: "date", value: selDate,
+        onChange: function(e){ setSelDate(e.target.value); },
+        style: { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 14 }
+      }),
+      React.createElement("button", {
+        onClick: exportExcel,
+        disabled: !history.length,
+        style: { padding: '8px 16px', borderRadius: 8, background: 'var(--green)', color: '#fff', fontWeight: 700, fontSize: 13, border: 'none', cursor: history.length ? 'pointer' : 'not-allowed', opacity: history.length ? 1 : 0.5 }
+      }, "📅 Export Excel")
+    ),
+    loading ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text2)' } }, "Memuat...") :
+    !history.length ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text3)' } }, "Tidak ada pengiriman untuk kurir ini pada tanggal tersebut.") :
+    React.createElement(React.Fragment, null,
+      React.createElement("div", { style: { marginBottom: 10, fontSize: 13, color: 'var(--text2)' } },
+        history.length, " pengiriman · Total ",
+        React.createElement("b", { style: { color: 'var(--accent2)' } }, Math.round(totalKm * 10) / 10, " km")
+      ),
+      history.map(function(o, i) {
+        var jam = o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+        var toLink = o.end_location && (o.end_location.lat || o.end_location.latitude)
+          ? 'https://maps.google.com?q=' + (o.end_location.lat || o.end_location.latitude) + ',' + (o.end_location.lng || o.end_location.longitude)
+          : null;
+        var fromLink = o.start_location && (o.start_location.lat || o.start_location.latitude)
+          ? 'https://maps.google.com?q=' + (o.start_location.lat || o.start_location.latitude) + ',' + (o.start_location.lng || o.start_location.longitude)
+          : null;
+        return React.createElement("div", {
+          key: o.id,
+          style: { background: 'var(--card)', borderRadius: 12, padding: '12px 16px', marginBottom: 10, border: '1px solid var(--border)' }
+        },
+          React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 } },
+            React.createElement("div", null,
+              React.createElement("span", { style: { fontWeight: 700, marginRight: 8 } }, i + 1 + "."),
+              React.createElement("span", { style: { fontWeight: 600 } }, o.customer_name || '-')
+            ),
+            React.createElement("span", { style: { fontSize: 12, color: 'var(--text2)', whiteSpace: 'nowrap', marginLeft: 8 } }, "⏰ ", jam)
+          ),
+          o.customer_address ? React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, o.customer_address) : null,
+          React.createElement("div", { style: { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' } },
+            o.distance_km != null ? React.createElement("span", {
+              style: { fontSize: 12, fontWeight: 700, color: 'var(--accent2)', background: 'rgba(99,102,241,0.1)', padding: '2px 8px', borderRadius: 6 }
+            }, "🛣 ", o.distance_km, " km") : null,
+            o.invoice_number ? React.createElement("span", { style: { fontSize: 11, color: 'var(--text3)' } }, o.invoice_number) : null,
+            fromLink ? React.createElement("a", { href: fromLink, target: '_blank', style: { fontSize: 11, color: 'var(--accent)' } }, "📍 Berangkat") : null,
+            toLink ? React.createElement("a", { href: toLink, target: '_blank', style: { fontSize: 11, color: 'var(--green)' } }, "📍 Tiba") : null
+          )
+        );
+      })
+    )
+  );
+}
+
 function OpsQueue(_ref148) {
   var orders = _ref148.orders,
     onUpdate = _ref148.onUpdate,
