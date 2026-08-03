@@ -949,6 +949,10 @@ var ROLE_NAV = {
     icon: '🚚',
     label: 'Kurir'
   }, {
+    id: 'sup_kurir_history',
+    icon: '📍',
+    label: 'History Kurir'
+  }, {
     id: 'pesan_barang',
     icon: '🛒',
     label: 'Pesan Barang'
@@ -4119,6 +4123,8 @@ function App() {
     onUpdateSI: updateServiceIntake,
     supervisorName: userName,
     canVerify: false
+  }), role === 'supervisor' && page === 'sup_kurir_history' && /*#__PURE__*/React.createElement(OpsKurirHistory, {
+    db: db
   }), role === 'supervisor' && page === 'sup_kurir' && /*#__PURE__*/React.createElement(CourierDailyMonitor, {
     orders: orders,
     courierTasks: courierTasks,
@@ -20628,7 +20634,18 @@ function OpsKurirHistory(_ref_okh) {
         onClick: exportExcel,
         disabled: !history.length,
         style: { padding: '8px 16px', borderRadius: 8, background: 'var(--green)', color: '#fff', fontWeight: 700, fontSize: 13, border: 'none', cursor: history.length ? 'pointer' : 'not-allowed', opacity: history.length ? 1 : 0.5 }
-      }, "📅 Export Excel")
+      }, "📅 Export Excel"),
+      React.createElement("button", {
+        onClick: function() {
+          var stops = history.filter(function(o){ return o.end_location && (o.end_location.lat || o.end_location.latitude); });
+          if (!stops.length) return;
+          var coords = stops.map(function(o){ return (o.end_location.lat || o.end_location.latitude) + ',' + (o.end_location.lng || o.end_location.longitude); });
+          var url = 'https://www.google.com/maps/dir/' + coords.join('/');
+          window.open(url, '_blank');
+        },
+        disabled: !history.length,
+        style: { padding: '8px 16px', borderRadius: 8, background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, border: 'none', cursor: history.length ? 'pointer' : 'not-allowed', opacity: history.length ? 1 : 0.5 }
+      }, "🗺 Lihat Rute di Maps")
     ),
     loading ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text2)' } }, "Memuat...") :
     !history.length ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text3)' } }, "Tidak ada pengiriman untuk kurir ini pada tanggal tersebut.") :
