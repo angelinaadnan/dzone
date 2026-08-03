@@ -20572,16 +20572,29 @@ function OpsKurirHistory(_ref_okh) {
     setLoading(true);
     var dateFrom = date + 'T00:00:00+07:00';
     var dateTo = date + 'T23:59:59+07:00';
-    db.from('orders').select('id,customer_name,customer_address,delivered_at,distance_km,end_location,invoice_number,date,start_location')
-      .eq('courier_name', courier)
-      .eq('status', 'delivered')
-      .gte('delivered_at', dateFrom)
-      .lte('delivered_at', dateTo)
-      .order('delivered_at', { ascending: true })
-      .then(function(res) {
-        setHistory(res.data || []);
-        setLoading(false);
-      }).catch(function(){ setLoading(false); });
+    var p1 = db.from('orders').select('id,customer_name,customer_address,delivered_at,distance_km,end_location,invoice_number,date,start_location')
+      .eq('courier_name', courier).eq('status', 'delivered')
+      .gte('delivered_at', dateFrom).lte('delivered_at', dateTo)
+      .order('delivered_at', { ascending: true });
+    var p2 = db.from('courier_tasks').select('id,task_type,destination,description,completed_at,distance_km,end_location,start_location,contact_name')
+      .eq('assigned_courier', courier).eq('status', 'completed')
+      .gte('completed_at', dateFrom).lte('completed_at', dateTo)
+      .order('completed_at', { ascending: true });
+    Promise.all([p1, p2]).then(function(results) {
+      var orders = (results[0].data || []).map(function(o){ return Object.assign({}, o, { _type: 'order' }); });
+      var tasks = (results[1].data || []).map(function(t){ return Object.assign({}, t, {
+        _type: 'task',
+        customer_name: t.destination || t.description || t.task_type,
+        customer_address: t.contact_name || '',
+        delivered_at: t.completed_at,
+        invoice_number: t.task_type
+      }); });
+      var combined = orders.concat(tasks).sort(function(a, b){
+        return new Date(a.delivered_at) - new Date(b.delivered_at);
+      });
+      setHistory(combined);
+      setLoading(false);
+    }).catch(function(){ setLoading(false); });
   };
 
   React.useEffect(function(){ load(selCourier, selDate); }, [selCourier, selDate]);
@@ -20598,10 +20611,11 @@ function OpsKurirHistory(_ref_okh) {
         : '';
       return {
         'No': i + 1,
-        'Invoice': o.invoice_number || o.id,
-        'Customer': o.customer_name || '',
-        'Alamat': o.customer_address || '',
-        'Jam Tiba': jam,
+        'Tipe': o._type === 'task' ? '🔧 ' + (o.invoice_number || 'Tugas') : '📦 Order',
+        'Invoice / Tugas': o._type === 'order' ? (o.invoice_number || o.id) : (o.invoice_number || '-'),
+        'Customer / Tujuan': o.customer_name || '',
+        'Alamat / Kontak': o.customer_address || '',
+        'Jam Selesai': jam,
         'KM (OSRM)': o.distance_km != null ? o.distance_km : '',
         'Link Berangkat': fromLink,
         'Link Tiba': toLink
@@ -20675,10 +20689,15 @@ function OpsKurirHistory(_ref_okh) {
           ),
           o.customer_address ? React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, o.customer_address) : null,
           React.createElement("div", { style: { display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' } },
+            o._type === 'task' ? React.createElement("span", {
+              style: { fontSize: 11, fontWeight: 700, color: 'var(--orange)', background: 'rgba(251,146,60,0.15)', padding: '2px 8px', borderRadius: 6 }
+            }, "🔧 ", o.invoice_number) : React.createElement("span", {
+              style: { fontSize: 11, fontWeight: 700, color: 'var(--accent)', background: 'rgba(99,102,241,0.1)', padding: '2px 8px', borderRadius: 6 }
+            }, "📦 Order"),
             o.distance_km != null ? React.createElement("span", {
               style: { fontSize: 12, fontWeight: 700, color: 'var(--accent2)', background: 'rgba(99,102,241,0.1)', padding: '2px 8px', borderRadius: 6 }
             }, "🛣 ", o.distance_km, " km") : null,
-            o.invoice_number ? React.createElement("span", { style: { fontSize: 11, color: 'var(--text3)' } }, o.invoice_number) : null,
+            o._type === 'order' && o.invoice_number ? React.createElement("span", { style: { fontSize: 11, color: 'var(--text3)' } }, o.invoice_number) : null,
             fromLink ? React.createElement("a", { href: fromLink, target: '_blank', style: { fontSize: 11, color: 'var(--accent)' } }, "📍 Berangkat") : null,
             toLink ? React.createElement("a", { href: toLink, target: '_blank', style: { fontSize: 11, color: 'var(--green)' } }, "📍 Tiba") : null
           )
