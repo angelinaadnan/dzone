@@ -20591,7 +20591,9 @@ function OpsKurirHistory(_ref_okh) {
       .gte('created_at', since60.toISOString());
     var p4 = db.from('branch_requests').select('id,branch,trips')
       .gte('created_at', since60.toISOString());
-    Promise.all([p1, p2, p3, p4]).then(function(results) {
+    var p5 = db.from('service_intakes').select('id,customer_name,unit_type,branch_name,service_center_name,courier_name,sc_delivery_courier,sc_pickup_courier,assigned_courier,return_status,updated_at,created_at,delivered_at,sc_delivered_at,sc_picked_up_at,returned_at')
+      .gte('created_at', since60.toISOString());
+    Promise.all([p1, p2, p3, p4, p5]).then(function(results) {
       var orders = (results[0].data || []).map(function(o){ return Object.assign({}, o, { _type: 'order' }); });
       var tasks = (results[1].data || []).filter(function(t){
         var ts = t.completed_at || t.assigned_at || t.created_at;
@@ -20639,7 +20641,27 @@ function OpsKurirHistory(_ref_okh) {
           }
         });
       });
-      var combined = orders.concat(tasks).concat(pickups).concat(trips).sort(function(a, b){
+      var siItems = [];
+      (results[4].data || []).forEach(function(s) {
+        var addSI = function(role, ts) {
+          if (!matchDate(ts || s.updated_at || s.created_at)) return;
+          siItems.push({
+            _type: 'servis',
+            customer_name: role,
+            customer_address: (s.customer_name || '') + (s.unit_type ? ' · ' + s.unit_type : ''),
+            delivered_at: ts || s.updated_at || s.created_at,
+            invoice_number: 'Servis',
+            distance_km: null,
+            start_location: null,
+            end_location: null
+          });
+        };
+        if (s.courier_name === courier) addSI('Jemput dari ' + (s.branch_name || 'Cabang'), s.delivered_at || s.created_at);
+        if (s.sc_delivery_courier === courier) addSI('Antar ke ' + (s.service_center_name || 'SC'), s.sc_delivered_at || s.updated_at);
+        if (s.sc_pickup_courier === courier) addSI('Ambil dari ' + (s.service_center_name || 'SC'), s.sc_picked_up_at || s.updated_at);
+        if (s.assigned_courier === courier && s.return_status) addSI('Antar balik ke ' + (s.customer_name || ''), s.returned_at || s.updated_at);
+      });
+      var combined = orders.concat(tasks).concat(pickups).concat(trips).concat(siItems).sort(function(a, b){
         return new Date(a.delivered_at || 0) - new Date(b.delivered_at || 0);
       });
       setHistory(combined);
@@ -20748,6 +20770,9 @@ function OpsKurirHistory(_ref_okh) {
             o._type === 'trip' ? React.createElement("span", {
               style: { fontSize: 11, fontWeight: 700, color: 'var(--teal,#14b8a6)', background: 'rgba(20,184,166,0.12)', padding: '2px 8px', borderRadius: 6 }
             }, "🏢 Kirim Cabang") :
+            o._type === 'servis' ? React.createElement("span", {
+              style: { fontSize: 11, fontWeight: 700, color: '#a855f7', background: 'rgba(168,85,247,0.12)', padding: '2px 8px', borderRadius: 6 }
+            }, "🛠 Servis") :
             React.createElement("span", {
               style: { fontSize: 11, fontWeight: 700, color: 'var(--accent)', background: 'rgba(99,102,241,0.1)', padding: '2px 8px', borderRadius: 6 }
             }, "📦 Order"),
