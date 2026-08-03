@@ -20649,6 +20649,7 @@ function OpsKurirHistory(_ref_okh) {
         });
       });
       var siItems = [];
+      console.log('[HistoryKurir] SI raw count:', (results[4].data || []).length, 'courier:', courier, 'date:', date);
       (results[4].data || []).forEach(function(s) {
         var addSI = function(role, ts) {
           if (!matchDate(ts || s.updated_at || s.created_at)) return;
