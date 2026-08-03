@@ -20566,10 +20566,14 @@ function OpsKurirHistory(_ref_okh) {
   var _sd = React.useState(today); var selDate = _sd[0]; var setSelDate = _sd[1];
   var _sh = React.useState([]); var history = _sh[0]; var setHistory = _sh[1];
   var _sl = React.useState(false); var loading = _sl[0]; var setLoading = _sl[1];
+  var _sch = React.useState([]); var checkins = _sch[0]; var setCheckins = _sch[1];
+  var _sgk = React.useState({}); var gpsSegKm = _sgk[0]; var setGpsSegKm = _sgk[1];
 
   var load = function(courier, date) {
     if (!db || !courier || !date) return;
     setLoading(true);
+    setCheckins([]);
+    setGpsSegKm({});
     var dateFrom = date + 'T00:00:00+07:00';
     var dateTo = date + 'T23:59:59+07:00';
     var since60 = new Date(); since60.setDate(since60.getDate() - 60);
@@ -20596,7 +20600,11 @@ function OpsKurirHistory(_ref_okh) {
     var since180 = new Date(); since180.setDate(since180.getDate() - 180);
     var p5 = db.from('service_intakes').select('*')
       .gte('created_at', since180.toISOString()).limit(500);
-    Promise.all([p1, p2, p3, p4, p5]).then(function(results) {
+    var p6 = db.from('courier_checkins').select('id,created_at,lat,lng,note')
+      .eq('courier_name', courier)
+      .gte('created_at', dateFrom).lte('created_at', dateTo)
+      .order('created_at', { ascending: true });
+    Promise.all([p1, p2, p3, p4, p5, p6]).then(function(results) {
       var orders = (results[0].data || []).map(function(o){ return Object.assign({}, o, { _type: 'order' }); });
       var tasks = (results[1].data || []).filter(function(t){
         // Pakai assigned_at/created_at = kapan kurir berangkat kerja (bukan completed_at)
@@ -20670,12 +20678,29 @@ function OpsKurirHistory(_ref_okh) {
       var combined = orders.concat(tasks).concat(pickups).concat(trips).concat(siItems).sort(function(a, b){
         return new Date(a.delivered_at || 0) - new Date(b.delivered_at || 0);
       });
+      var rawCheckins = (results[5].data || []);
+      var keyCheckins = rawCheckins.filter(function(c){ return !(c.note || '').startsWith('▶'); });
+      setCheckins(keyCheckins);
       setHistory(combined);
       setLoading(false);
     }).catch(function(){ setLoading(false); });
   };
 
   React.useEffect(function(){ load(selCourier, selDate); }, [selCourier, selDate]);
+
+  // Hitung GPS km antar checkin (OSRM road distance)
+  React.useEffect(function() {
+    if (!checkins.length) return;
+    checkins.forEach(function(c, i) {
+      if (i === 0 || !checkins[i-1].lat || !c.lat) return;
+      var k = _gsk(checkins[i-1], c);
+      if (gpsSegKm[k] !== undefined) return;
+      getRoadDistanceKm(parseFloat(checkins[i-1].lat), parseFloat(checkins[i-1].lng), parseFloat(c.lat), parseFloat(c.lng))
+        .then(function(km) {
+          setGpsSegKm(function(d) { var obj = Object.assign({}, d); obj[k] = km; return obj; });
+        });
+    });
+  }, [checkins.length]);
 
   var exportExcel = function() {
     if (!history.length) return;
@@ -20699,7 +20724,15 @@ function OpsKurirHistory(_ref_okh) {
         'Link Tiba': toLink
       };
     });
-    var totalKm = history.reduce(function(s, o){ return s + (o.distance_km || 0); }, 0);
+    var actKm = history.reduce(function(s, o){ return s + (o.distance_km || 0); }, 0);
+  var gpsKm = 0;
+  for (var _gi = 1; _gi < checkins.length; _gi++) {
+    var _ga = checkins[_gi-1], _gb = checkins[_gi];
+    if (!_ga.lat || !_gb.lat) continue;
+    var _gk = _gsk(_ga, _gb);
+    gpsKm += gpsSegKm[_gk] !== undefined ? gpsSegKm[_gk] : distanceKm(parseFloat(_ga.lat), parseFloat(_ga.lng), parseFloat(_gb.lat), parseFloat(_gb.lng));
+  }
+  var totalKm = parseFloat(Math.max(gpsKm, actKm).toFixed(1));
     rows.push({ 'No': '', 'Invoice': '', 'Customer': 'TOTAL', 'Alamat': '', 'Jam Tiba': '', 'KM (OSRM)': Math.round(totalKm * 10) / 10, 'Link Berangkat': '', 'Link Tiba': '' });
     var ws = XLSX.utils.json_to_sheet(rows);
     var wb = XLSX.utils.book_new();
@@ -20743,8 +20776,9 @@ function OpsKurirHistory(_ref_okh) {
     !history.length ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text3)' } }, "Tidak ada pengiriman untuk kurir ini pada tanggal tersebut.") :
     React.createElement(React.Fragment, null,
       React.createElement("div", { style: { marginBottom: 10, fontSize: 13, color: 'var(--text2)' } },
-        history.length, " pengiriman · Total ",
-        React.createElement("b", { style: { color: 'var(--accent2)' } }, Math.round(totalKm * 10) / 10, " km")
+        history.length, " aktivitas · Total GPS ",
+        React.createElement("b", { style: { color: 'var(--accent2)' } }, totalKm, " km"),
+        checkins.length > 0 ? React.createElement("span", { style: { color: 'var(--text3)', marginLeft: 8 } }, "(", checkins.length, " titik GPS)") : null
       ),
       history.map(function(o, i) {
         var jam = o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
