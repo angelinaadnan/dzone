@@ -20599,13 +20599,14 @@ function OpsKurirHistory(_ref_okh) {
     Promise.all([p1, p2, p3, p4, p5]).then(function(results) {
       var orders = (results[0].data || []).map(function(o){ return Object.assign({}, o, { _type: 'order' }); });
       var tasks = (results[1].data || []).filter(function(t){
-        var ts = t.completed_at || t.assigned_at || t.created_at;
+        // Pakai assigned_at/created_at = kapan kurir berangkat kerja (bukan completed_at)
+        var ts = t.assigned_at || t.created_at;
         return matchDate(ts);
       }).map(function(t){ return Object.assign({}, t, {
         _type: 'task',
         customer_name: t.destination || t.description || t.task_type,
         customer_address: t.contact_name || '',
-        delivered_at: t.completed_at || t.assigned_at || t.created_at,
+        delivered_at: t.assigned_at || t.created_at,
         invoice_number: t.task_type,
         end_location: t.end_location || t.arrived_location || null,
         _status: t.status
