@@ -20560,6 +20560,9 @@ function AdminOnlineOrders(_ref144) {
 
 function OpsKurirHistory(_ref_okh) {
   var db = _ref_okh.db;
+  var _gskLocal = function(a, b) {
+    return parseFloat(a.lat).toFixed(4) + '_' + parseFloat(a.lng).toFixed(4) + '_' + parseFloat(b.lat).toFixed(4) + '_' + parseFloat(b.lng).toFixed(4);
+  };
   var couriers = USER_ACCOUNTS.filter(function(u){ return u.role === 'courier'; }).map(function(u){ return u.name; });
   var today = new Date().toISOString().slice(0,10);
   var _sc = React.useState(couriers[0] || ''); var selCourier = _sc[0]; var setSelCourier = _sc[1];
@@ -20693,7 +20696,7 @@ function OpsKurirHistory(_ref_okh) {
     if (!checkins.length) return;
     checkins.forEach(function(c, i) {
       if (i === 0 || !checkins[i-1].lat || !c.lat) return;
-      var k = _gsk(checkins[i-1], c);
+      var k = _gskLocal(checkins[i-1], c);
       if (gpsSegKm[k] !== undefined) return;
       getRoadDistanceKm(parseFloat(checkins[i-1].lat), parseFloat(checkins[i-1].lng), parseFloat(c.lat), parseFloat(c.lng))
         .then(function(km) {
@@ -20729,7 +20732,7 @@ function OpsKurirHistory(_ref_okh) {
   for (var _gi = 1; _gi < checkins.length; _gi++) {
     var _ga = checkins[_gi-1], _gb = checkins[_gi];
     if (!_ga.lat || !_gb.lat) continue;
-    var _gk = _gsk(_ga, _gb);
+    var _gk = _gskLocal(_ga, _gb);
     gpsKm += gpsSegKm[_gk] !== undefined ? gpsSegKm[_gk] : distanceKm(parseFloat(_ga.lat), parseFloat(_ga.lng), parseFloat(_gb.lat), parseFloat(_gb.lng));
   }
   var totalKm = parseFloat(Math.max(gpsKm, actKm).toFixed(1));
