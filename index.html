@@ -17947,7 +17947,7 @@ function exportCheckinToExcel(checkins) {
   XLSX.utils.book_append_sheet(wb, ws2, 'Ringkasan per Kurir');
   XLSX.writeFile(wb, "DZ_GPS_Checkin_".concat(new Date().toISOString().slice(0, 10), ".xlsx"));
 }
-function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
+async function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
   try {
     if (!courierData || courierData.length === 0) {
       alert('Tidak ada data untuk di-export');
@@ -18001,14 +18001,29 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
       return _xlsR((note || '').replace(/\.?\s*[\d.]+\s*km\s*$/i, '').replace(/^[\u2705\uD83D\uDCCD\u25B6]\s*/g, '').trim());
     };
     var routeRows = [];
-    courierData.filter(function(c) { return KURIR_LIST.indexOf(c.name) !== -1; }).forEach(function(c) {
-      var cks = (c.myCheckins || []);
-      if (cks.length < 2) return;
+    var _rCouriers = courierData.filter(function(c) { return KURIR_LIST.indexOf(c.name) !== -1; });
+    // Pre-fetch semua OSRM segment secara parallel (seperti CourierSummary useEffect)
+    var _allSegs = [];
+    _rCouriers.forEach(function(c) {
+      var _cks2 = (c.myCheckins || []).filter(function(_ck) { return !(_ck.note || '').startsWith('▶'); });
+      for (var _si2 = 1; _si2 < _cks2.length; _si2++) {
+        var _a2 = _cks2[_si2-1], _b2 = _cks2[_si2];
+        if (_a2.lat && _b2.lat) _allSegs.push([parseFloat(_a2.lat), parseFloat(_a2.lng), parseFloat(_b2.lat), parseFloat(_b2.lng)]);
+      }
+    });
+    await Promise.all(_allSegs.map(function(s) { return getRoadDistanceKm(s[0], s[1], s[2], s[3]); }));
+    // Sekarang semua hasil ada di _osrmCache, build rows pakai cache (instant)
+    for (var _ci = 0; _ci < _rCouriers.length; _ci++) {
+      var c = _rCouriers[_ci];
+      var cks = (c.myCheckins || []).filter(function(_ck) { return !(_ck.note || '').startsWith('▶'); });
+      if (cks.length < 2) continue;
       var prevDate = null;
+      var _cStart = routeRows.length;
       for (var _ri = 1; _ri < cks.length; _ri++) {
         var _fa = cks[_ri - 1], _tb = cks[_ri];
         if (!_fa.lat || !_tb.lat) continue;
-        var _km = parseFloat((distanceKm(parseFloat(_fa.lat), parseFloat(_fa.lng), parseFloat(_tb.lat), parseFloat(_tb.lng)) * 1.2).toFixed(1));
+        var _kmOsrm = await getRoadDistanceKm(parseFloat(_fa.lat), parseFloat(_fa.lng), parseFloat(_tb.lat), parseFloat(_tb.lng));
+        var _km = (_kmOsrm != null) ? parseFloat(_kmOsrm.toFixed(2)) : parseFloat((distanceKm(parseFloat(_fa.lat), parseFloat(_fa.lng), parseFloat(_tb.lat), parseFloat(_tb.lng)) * 1.2).toFixed(2));
         var _tbl = _tb.created_at ? new Date(_tb.created_at) : null;
         var tgl = _tbl ? _tbl.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() : '';
         var jam = _tbl ? _tbl.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -18027,10 +18042,10 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         });
         prevDate = tgl;
       }
-      var _sumC = routeRows.filter(function(r) { return r['Kurir'] === c.name && r['Ke'] !== 'TOTAL GPS'; })
+      var _sumC = routeRows.slice(_cStart).filter(function(r) { return r['Ke'] !== 'TOTAL GPS'; })
         .reduce(function(s, r) { return s + (parseFloat(r['KM Via Jalan (OSRM)']) || 0); }, 0);
-      routeRows.push({ 'Tgl': '', 'Kurir': c.name, 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL GPS', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumC.toFixed(1)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
-    });
+      routeRows.push({ 'Tgl': '', 'Kurir': c.name, 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL GPS', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumC.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
+    }
         if (routeRows.length > 0) {
       var wsRoute = XLSX.utils.json_to_sheet(routeRows);
       wsRoute['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 55 }, { wch: 55 }, { wch: 14 }, { wch: 14 }, { wch: 8 }];
