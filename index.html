@@ -11257,6 +11257,7 @@ function CourierDailyMonitor(_ref84) {
     _React$useState144 = _slicedToArray(_React$useState143, 2),
     expanded = _React$useState144[0],
     setExpanded = _React$useState144[1];
+  var _gpsOsrmState = React.useState({}), gpsOsrm = _gpsOsrmState[0], setGpsOsrm = _gpsOsrmState[1];
   var FUEL_PER_KM = 600;
 
   // Shortcut helpers
@@ -11473,7 +11474,10 @@ function CourierDailyMonitor(_ref84) {
     });
     totalTaskKm = parseFloat(totalTaskKm.toFixed(3));
     var hasActivity = myCheckins.length > 0 || myOrders.length > 0 || myTasks.length > 0 || myPickups.length > 0 || myTrips.length > 0 || mySI.length > 0;
-    var summaryKmStr = totalGpsStr || fmtKmD(totalTaskKm);
+    var _osrmKm = gpsOsrm[name];
+    var summaryKmStr = _osrmKm != null
+      ? ((_osrmKm === 0 ? null : _osrmKm < 0.1 ? Math.round(_osrmKm * 1000) + ' m' : _osrmKm + ' km') || fmtKmD(totalTaskKm))
+      : (totalGpsStr || fmtKmD(totalTaskKm));
 
     // Bangun unified timeline: semua aktivitas disatukan & diurut berdasarkan jam
     var timeline = [];
@@ -11581,6 +11585,22 @@ function CourierDailyMonitor(_ref84) {
       timeline: timeline
     };
   });
+  // Hitung GPS km via OSRM per kurir (async), update display saat selesai
+  React.useEffect(function() {
+    setGpsOsrm({});
+    courierData.forEach(function(c) {
+      var cks = (c.myCheckins || []).filter(function(ck) { return !(ck.note || '').startsWith('▶'); });
+      if (cks.length < 2) { setGpsOsrm(function(p) { var n = Object.assign({}, p); n[c.name] = 0; return n; }); return; }
+      Promise.all(Array.from({length: cks.length - 1}, function(_, _i) {
+        var a = cks[_i], b = cks[_i + 1];
+        if (!a.lat || !b.lat) return Promise.resolve(0);
+        return getRoadDistanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng));
+      })).then(function(dists) {
+        var km = parseFloat(dists.reduce(function(s, d) { return s + (d || 0); }, 0).toFixed(3));
+        setGpsOsrm(function(p) { var n = Object.assign({}, p); n[c.name] = km; return n; });
+      });
+    });
+  }, [dateFrom, dateTo, checkins.length]);
   var activeList = courierData.filter(function (c) {
     return c.hasActivity;
   });
@@ -20667,10 +20687,11 @@ function OpsKurirHistory(_ref_okh) {
 
   // Hitung GPS km antar checkin pakai Promise.all supaya update sekaligus
   React.useEffect(function() {
-    if (checkins.length < 2) { setGpsKmTotal(0); return; }
+    var _gpsOnly = checkins.filter(function(c) { return !(c.note || '').startsWith('▶'); });
+    if (_gpsOnly.length < 2) { setGpsKmTotal(0); return; }
     var pairs = [];
-    for (var _pi = 1; _pi < checkins.length; _pi++) {
-      pairs.push([checkins[_pi-1], checkins[_pi]]);
+    for (var _pi = 1; _pi < _gpsOnly.length; _pi++) {
+      pairs.push([_gpsOnly[_pi-1], _gpsOnly[_pi]]);
     }
     Promise.all(pairs.map(function(pair) {
       var a = pair[0], b = pair[1];
@@ -20760,8 +20781,8 @@ function OpsKurirHistory(_ref_okh) {
         history.length, " aktivitas · Total GPS ",
         gpsKmTotal === null && checkins.length > 0
           ? React.createElement("b", { style: { color: 'var(--text3)' } }, "menghitung...")
-          : React.createElement("b", { style: { color: 'var(--accent2)' } }, totalKm, " km"),
-        checkins.length > 0 ? React.createElement("span", { style: { color: 'var(--text3)', marginLeft: 8 } }, "(", checkins.length, " titik GPS)") : null
+          : React.createElement("b", { style: { color: 'var(--accent2)' } }, gpsKmTotal !== null ? gpsKmTotal : totalKm, " km"),
+        checkins.filter(function(c){ return !(c.note||'').startsWith('▶'); }).length > 0 ? React.createElement("span", { style: { color: 'var(--text3)', marginLeft: 8 } }, "(", checkins.filter(function(c){ return !(c.note||'').startsWith('▶'); }).length, " titik GPS)") : null
       ),
       history.map(function(o, i) {
         var jam = o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
