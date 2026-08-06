@@ -11427,25 +11427,29 @@ function CourierDailyMonitor(_ref84) {
         role: "Jemput dari ".concat(s.branch_name || 'cabang'),
         customer: s.customer_name,
         unit: s.unit_type,
-        time: siTime
+        time: s.delivered_at || s.courier_picked_up_at || siTime,
+        km: s.pickup_distance_km || null
       });
       if (s.sc_delivery_courier === name) mySI.push({
         role: "Antar ke ".concat(s.service_center_name || 'SC'),
         customer: s.customer_name,
         unit: s.unit_type,
-        time: siTime
+        time: s.sc_delivered_at || siTime,
+        km: s.sc_distance_km || null
       });
       if (s.sc_pickup_courier === name) mySI.push({
         role: "Ambil dari ".concat(s.service_center_name || 'SC'),
         customer: s.customer_name,
         unit: s.unit_type,
-        time: siTime
+        time: s.sc_picked_up_at || siTime,
+        km: s.scp_distance_km || null
       });
       if (s.assigned_courier === name && s.return_status) mySI.push({
         role: "Antar balik ke ".concat(s.customer_name),
         customer: s.customer_name,
         unit: s.unit_type,
-        time: siTime
+        time: s.returned_at || siTime,
+        km: s.return_distance_km || null
       });
     });
 
@@ -18023,7 +18027,8 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
       });
       (c.mySI || []).forEach(function(s) {
         var dest = (s.role || s.customer || '').toUpperCase().replace(/\s+/g, ' ').trim();
-        acts.push({ time: s.time, dest: dest, km: null, tipe: 'Servis', loc: null, fallback: mkSearch(dest) });
+        var siKm = s.km && parseFloat(s.km) > 0 ? parseFloat(parseFloat(s.km).toFixed(1)) : null;
+        acts.push({ time: s.time, dest: dest, km: siKm, tipe: 'Servis', loc: null, fallback: mkSearch(dest) });
       });
       if (acts.length === 0) return;
       acts.sort(function(a, b) { return new Date(a.time || 0) - new Date(b.time || 0); });
@@ -18039,7 +18044,8 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         var fromLink = a.startLoc && (a.startLoc.lat || a.startLoc.latitude)
           ? 'https://maps.google.com?q=' + (a.startLoc.lat || a.startLoc.latitude) + ',' + (a.startLoc.lng || a.startLoc.longitude || a.startLoc.lon)
           : dusitLink;
-        // Pergi: BERANGKAT → TUJUAN
+        // Satu baris per aktivitas — tidak hitung return trip
+        var fromName = a.startLoc && (a.startLoc.lat || a.startLoc.latitude) ? BASE_NAME : BASE_NAME;
         routeRows.push({
           'Tgl': tgl !== prevDate ? tgl : '',
           'Kurir': c.name,
@@ -18050,18 +18056,6 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'KM Via Jalan (OSRM)': km,
           'Tipe': a.tipe,
           'Jam Tiba di Tujuan': jam
-        });
-        // Pulang: TUJUAN → DUSIT
-        routeRows.push({
-          'Tgl': '',
-          'Kurir': c.name,
-          'Dari': destName,
-          'Link Dari': destLink,
-          'Ke': BASE_NAME,
-          'Link Tujuan': dusitLink,
-          'KM Via Jalan (OSRM)': km,
-          'Tipe': a.tipe,
-          'Jam Tiba di Tujuan': ''
         });
         prevDate = tgl;
       });
