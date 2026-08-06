@@ -20738,7 +20738,8 @@ function OpsKurirHistory(_ref_okh) {
     });
     var _actKmExp = history.reduce(function(s, o){ return s + (o.distance_km || 0); }, 0);
     var _totalKmExp = gpsKmTotal !== null ? parseFloat(Math.max(gpsKmTotal, _actKmExp).toFixed(1)) : parseFloat(_actKmExp.toFixed(1));
-    rows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': _totalKmExp, 'Tipe': '', 'Jam Tiba di Tujuan': '' });
+    var _sumKmOps = history.reduce(function(s, o) { return s + (o.distance_km || 0); }, 0);
+    rows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumKmOps.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
     var ws = XLSX.utils.json_to_sheet(rows);
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'History');
@@ -23594,7 +23595,8 @@ function CourierSummary(_ref159) {
         'Jam Tiba di Tujuan': jam
       };
     });
-    rows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': totalKm, 'Tipe': '', 'Jam Tiba di Tujuan': '' });
+    var _sumKm = acts.reduce(function(s, e) { return s + (e.km || 0); }, 0);
+    rows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumKm.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
     var ws = XLSX.utils.json_to_sheet(rows);
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Summary');
