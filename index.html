@@ -20570,13 +20570,13 @@ function OpsKurirHistory(_ref_okh) {
   var _sh = React.useState([]); var history = _sh[0]; var setHistory = _sh[1];
   var _sl = React.useState(false); var loading = _sl[0]; var setLoading = _sl[1];
   var _sch = React.useState([]); var checkins = _sch[0]; var setCheckins = _sch[1];
-  var _sgk = React.useState({}); var gpsSegKm = _sgk[0]; var setGpsSegKm = _sgk[1];
+  var _sgt = React.useState(null); var gpsKmTotal = _sgt[0]; var setGpsKmTotal = _sgt[1];
 
   var load = function(courier, date) {
     if (!db || !courier || !date) return;
     setLoading(true);
     setCheckins([]);
-    setGpsSegKm({});
+    setGpsKmTotal(null);
     var dateFrom = date + 'T00:00:00+07:00';
     var dateTo = date + 'T23:59:59+07:00';
     var since60 = new Date(); since60.setDate(since60.getDate() - 60);
@@ -20690,17 +20690,20 @@ function OpsKurirHistory(_ref_okh) {
 
   React.useEffect(function(){ load(selCourier, selDate); }, [selCourier, selDate]);
 
-  // Hitung GPS km antar checkin (OSRM road distance)
+  // Hitung GPS km antar checkin pakai Promise.all supaya update sekaligus
   React.useEffect(function() {
-    if (!checkins.length) return;
-    checkins.forEach(function(c, i) {
-      if (i === 0 || !checkins[i-1].lat || !c.lat) return;
-      var k = _gskLocal(checkins[i-1], c);
-      if (gpsSegKm[k] !== undefined) return;
-      getRoadDistanceKm(parseFloat(checkins[i-1].lat), parseFloat(checkins[i-1].lng), parseFloat(c.lat), parseFloat(c.lng))
-        .then(function(km) {
-          setGpsSegKm(function(d) { var obj = Object.assign({}, d); obj[k] = km; return obj; });
-        });
+    if (checkins.length < 2) { setGpsKmTotal(0); return; }
+    var pairs = [];
+    for (var _pi = 1; _pi < checkins.length; _pi++) {
+      pairs.push([checkins[_pi-1], checkins[_pi]]);
+    }
+    Promise.all(pairs.map(function(pair) {
+      var a = pair[0], b = pair[1];
+      if (!a.lat || !b.lat) return Promise.resolve(0);
+      return getRoadDistanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng))
+        .catch(function() { return distanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng)); });
+    })).then(function(dists) {
+      setGpsKmTotal(parseFloat(dists.reduce(function(s, d) { return s + (d || 0); }, 0).toFixed(1)));
     });
   }, [checkins.length]);
 
@@ -20727,14 +20730,7 @@ function OpsKurirHistory(_ref_okh) {
       };
     });
     var actKm = history.reduce(function(s, o){ return s + (o.distance_km || 0); }, 0);
-  var gpsKm = 0;
-  for (var _gi = 1; _gi < checkins.length; _gi++) {
-    var _ga = checkins[_gi-1], _gb = checkins[_gi];
-    if (!_ga.lat || !_gb.lat) continue;
-    var _gk = _gskLocal(_ga, _gb);
-    gpsKm += gpsSegKm[_gk] !== undefined ? gpsSegKm[_gk] : distanceKm(parseFloat(_ga.lat), parseFloat(_ga.lng), parseFloat(_gb.lat), parseFloat(_gb.lng));
-  }
-  var totalKm = parseFloat(Math.max(gpsKm, actKm).toFixed(1));
+  var totalKm = gpsKmTotal !== null ? parseFloat(Math.max(gpsKmTotal, actKm).toFixed(1)) : parseFloat(actKm.toFixed(1));
     rows.push({ 'No': '', 'Invoice': '', 'Customer': 'TOTAL', 'Alamat': '', 'Jam Tiba': '', 'KM (OSRM)': Math.round(totalKm * 10) / 10, 'Link Berangkat': '', 'Link Tiba': '' });
     var ws = XLSX.utils.json_to_sheet(rows);
     var wb = XLSX.utils.book_new();
@@ -20779,7 +20775,9 @@ function OpsKurirHistory(_ref_okh) {
     React.createElement(React.Fragment, null,
       React.createElement("div", { style: { marginBottom: 10, fontSize: 13, color: 'var(--text2)' } },
         history.length, " aktivitas · Total GPS ",
-        React.createElement("b", { style: { color: 'var(--accent2)' } }, totalKm, " km"),
+        gpsKmTotal === null && checkins.length > 0
+          ? React.createElement("b", { style: { color: 'var(--text3)' } }, "menghitung...")
+          : React.createElement("b", { style: { color: 'var(--accent2)' } }, totalKm, " km"),
         checkins.length > 0 ? React.createElement("span", { style: { color: 'var(--text3)', marginLeft: 8 } }, "(", checkins.length, " titik GPS)") : null
       ),
       history.map(function(o, i) {
