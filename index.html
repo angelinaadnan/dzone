@@ -23576,14 +23576,15 @@ function CourierSummary(_ref159) {
   };
   var exportExcelCS = function() {
     var acts = timeline.filter(function(e) { return e._t !== 'gps'; });
-    if (!acts.length) return;
     var _tlLabel = function(e) {
       return { order: 'Order', task: 'Tugas', pickup: 'Ambil PO', trip: 'Kirim Cabang', si: 'Servis' }[e._t] || '';
     };
-    var rows = acts.map(function(e) {
+    // Aktivitas (order, tugas, servis, dll)
+    var actRows = acts.map(function(e) {
       var jam = e._time ? new Date(e._time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
       var toLink = e.mapsUrl || (e.lat ? 'https://maps.google.com?q=' + e.lat + ',' + e.lng : '');
       return {
+        _sortTime: e._time || '',
         'Tgl': selDate,
         'Kurir': courierName,
         'Dari': '',
@@ -23595,8 +23596,38 @@ function CourierSummary(_ref159) {
         'Jam Tiba di Tujuan': jam
       };
     });
-    var _sumKm = acts.reduce(function(s, e) { return s + (e.km || 0); }, 0);
-    rows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumKm.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
+    // Segmen GPS (titik check-in ke titik berikutnya)
+    var gpsRows = [];
+    for (var _gi = 1; _gi < keyCheckins.length; _gi++) {
+      var _fa = keyCheckins[_gi - 1], _tb = keyCheckins[_gi];
+      var segKm = getGpsSegDist(_fa, _tb);
+      var _jam = _tb.created_at ? new Date(_tb.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+      var fromLink = _fa.lat ? 'https://maps.google.com?q=' + parseFloat(_fa.lat) + ',' + parseFloat(_fa.lng) : '';
+      var toLink2 = _tb.lat ? 'https://maps.google.com?q=' + parseFloat(_tb.lat) + ',' + parseFloat(_tb.lng) : '';
+      gpsRows.push({
+        _sortTime: _tb.created_at || '',
+        'Tgl': selDate,
+        'Kurir': courierName,
+        'Dari': cleanNote(_fa.note) || ('Titik ' + _gi),
+        'Link Dari': fromLink,
+        'Ke': cleanNote(_tb.note) || ('Titik ' + (_gi + 1)),
+        'Link Tujuan': toLink2,
+        'KM Via Jalan (OSRM)': parseFloat((segKm || 0).toFixed(2)),
+        'Tipe': 'GPS',
+        'Jam Tiba di Tujuan': _jam
+      });
+    }
+    // Gabung, sort by time
+    var allRows = actRows.concat(gpsRows).sort(function(a, b) {
+      return (a._sortTime || '') < (b._sortTime || '') ? -1 : 1;
+    });
+    var rows = allRows.map(function(r) {
+      var out = {};
+      ['Tgl','Kurir','Dari','Link Dari','Ke','Link Tujuan','KM Via Jalan (OSRM)','Tipe','Jam Tiba di Tujuan'].forEach(function(k){ out[k] = r[k]; });
+      return out;
+    });
+    var _sumGps = gpsRows.reduce(function(s, r) { return s + (r['KM Via Jalan (OSRM)'] || 0); }, 0);
+    rows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL GPS', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumGps.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
     var ws = XLSX.utils.json_to_sheet(rows);
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Summary');
