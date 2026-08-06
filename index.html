@@ -20703,43 +20703,98 @@ function OpsKurirHistory(_ref_okh) {
     });
   }, [checkins.length]);
 
-  var exportExcel = function() {
-    if (!history.length) return;
+  var exportExcel = async function() {
+    if (!history.length && checkins.length < 2) return;
+    var _xls = function(s) {
+      return (s || '').replace(/[\uD800-\uDFFF]|[^ -￿]/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
+    };
+    var _cn = function(note) {
+      return _xls((note || '').replace(/·?\s*[\d.]+\s*km\s*$/i, '').replace(/^[✅📍▶]\s*/g, '').trim());
+    };
     var _tipeLabel = function(o) {
-      if (o._type === 'task') return 'Tugas: ' + (o.invoice_number || 'Tugas');
+      if (o._type === 'task') return 'Tugas: ' + (o.invoice_number || o.customer_name || 'Tugas');
       if (o._type === 'pickup') return 'Ambil PO';
       if (o._type === 'trip') return 'Kirim Cabang';
       if (o._type === 'servis') return 'Servis';
       return 'Order';
     };
-    var rows = history.map(function(o, i) {
-      var jam = o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
-      var fromLink = o.start_location && (o.start_location.lat || o.start_location.latitude)
-        ? 'https://maps.google.com?q=' + (o.start_location.lat || o.start_location.latitude) + ',' + (o.start_location.lng || o.start_location.longitude)
-        : '';
-      var toLink = o.end_location && (o.end_location.lat || o.end_location.latitude)
-        ? 'https://maps.google.com?q=' + (o.end_location.lat || o.end_location.latitude) + ',' + (o.end_location.lng || o.end_location.longitude)
-        : '';
-      return {
-        'Tgl': selDate,
-        'Kurir': selCourier,
-        'Dari': fromLink ? 'Lihat' : '',
-        'Link Dari': fromLink,
-        'Ke': o.customer_name || '',
-        'Link Tujuan': toLink,
-        'KM Via Jalan (OSRM)': o.distance_km != null ? o.distance_km : '',
-        'Tipe': _tipeLabel(o),
-        'Jam Tiba di Tujuan': jam
-      };
-    });
-    var _actKmExp = history.reduce(function(s, o){ return s + (o.distance_km || 0); }, 0);
-    var _totalKmExp = gpsKmTotal !== null ? parseFloat(Math.max(gpsKmTotal, _actKmExp).toFixed(1)) : parseFloat(_actKmExp.toFixed(1));
-    var _sumKmOps = history.reduce(function(s, o) { return s + (o.distance_km || 0); }, 0);
-    rows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumKmOps.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
-    var ws = XLSX.utils.json_to_sheet(rows);
     var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'History');
-    XLSX.writeFile(wb, 'history_kurir_' + selCourier.replace(/ /g,'_') + '_' + selDate + '.xlsx');
+
+    // Sheet 1: Aktivitas (format lama)
+    if (history.length) {
+      var actRows = history.map(function(o) {
+        var jam = o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+        var fromLink = o.start_location && (o.start_location.lat || o.start_location.latitude)
+          ? 'https://maps.google.com?q=' + (o.start_location.lat || o.start_location.latitude) + ',' + (o.start_location.lng || o.start_location.longitude) : '';
+        var toLink = o.end_location && (o.end_location.lat || o.end_location.latitude)
+          ? 'https://maps.google.com?q=' + (o.end_location.lat || o.end_location.latitude) + ',' + (o.end_location.lng || o.end_location.longitude) : '';
+        return {
+          'Tgl': selDate, 'Kurir': selCourier,
+          'Dari': fromLink ? 'Lihat' : '', 'Link Dari': fromLink,
+          'Ke': o.customer_name || '', 'Link Tujuan': toLink,
+          'KM Via Jalan (OSRM)': o.distance_km != null ? o.distance_km : '',
+          'Tipe': _tipeLabel(o),
+          'Jam Tiba di Tujuan': jam
+        };
+      });
+      var _sumAct = history.reduce(function(s, o) { return s + (o.distance_km || 0); }, 0);
+      actRows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL AKTIVITAS', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumAct.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(actRows), 'Aktivitas');
+    }
+
+    // Sheet 2: Rute GPS dengan label deskriptif
+    var gpsOnly = checkins.filter(function(c) { return !(c.note || '').startsWith('▶'); });
+    if (gpsOnly.length >= 2) {
+      // Prefetch OSRM parallel
+      await Promise.all(Array.from({length: gpsOnly.length - 1}, function(_, i) {
+        var a = gpsOnly[i], b = gpsOnly[i + 1];
+        if (a.lat && b.lat) return getRoadDistanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng));
+        return Promise.resolve(0);
+      }));
+      // Timeline aktivitas untuk match label
+      var actTimeline = history.map(function(o) {
+        return {
+          ms: new Date(o.delivered_at || o.updated_at || o.created_at).getTime(),
+          label: _xls((o.customer_name || '') + ' - ' + _tipeLabel(o))
+        };
+      }).filter(function(a) { return a.ms; }).sort(function(a, b) { return a.ms - b.ms; });
+      var ACT_WIN = 25 * 60 * 1000; // 25 menit window match
+      var gpsRows = [];
+      for (var _gi = 1; _gi < gpsOnly.length; _gi++) {
+        var _fa = gpsOnly[_gi - 1], _tb = gpsOnly[_gi];
+        var _km = 0;
+        if (_fa.lat && _tb.lat) {
+          var _r = await getRoadDistanceKm(parseFloat(_fa.lat), parseFloat(_fa.lng), parseFloat(_tb.lat), parseFloat(_tb.lng));
+          _km = parseFloat((_r || 0).toFixed(2));
+        }
+        var _jam = _tb.created_at ? new Date(_tb.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+        // Label titik asal
+        var _fromLbl = _cn(_fa.note) || ('Titik ' + _gi);
+        // Label titik tujuan: prioritaskan note, lalu match aktivitas terdekat
+        var _toLbl = _cn(_tb.note);
+        if (!_toLbl) {
+          var _tbMs = new Date(_tb.created_at).getTime();
+          var _best = null, _bestDiff = Infinity;
+          actTimeline.forEach(function(a) { var d = Math.abs(a.ms - _tbMs); if (d < _bestDiff) { _bestDiff = d; _best = a; } });
+          if (_best && _bestDiff <= ACT_WIN) _toLbl = _best.label;
+          else _toLbl = 'Titik ' + (_gi + 1);
+        }
+        gpsRows.push({
+          'Tgl': selDate, 'Kurir': selCourier,
+          'Dari': _fromLbl, 'Link Dari': _fa.lat ? 'https://maps.google.com?q=' + parseFloat(_fa.lat) + ',' + parseFloat(_fa.lng) : '',
+          'Ke': _toLbl, 'Link Tujuan': _tb.lat ? 'https://maps.google.com?q=' + parseFloat(_tb.lat) + ',' + parseFloat(_tb.lng) : '',
+          'KM Via Jalan (OSRM)': _km, 'Tipe': 'GPS',
+          'Jam Tiba di Tujuan': _jam
+        });
+      }
+      var _sumGps = gpsRows.reduce(function(s, r) { return s + (parseFloat(r['KM Via Jalan (OSRM)']) || 0); }, 0);
+      gpsRows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL GPS', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumGps.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gpsRows), 'Rute GPS');
+    }
+
+    try {
+      XLSX.writeFile(wb, 'history_kurir_' + selCourier.replace(/ /g, '_') + '_' + selDate + '.xlsx');
+    } catch(e) { alert('Export error: ' + e.message); }
   };
 
   var totalKm = history.reduce(function(s, o){ return s + (o.distance_km || 0); }, 0);
@@ -23697,7 +23752,7 @@ function CourierSummary(_ref159) {
     style: {
       color: 'var(--amber)'
     }
-  }, totalKm > 0 ? totalKm.toFixed(1) : '—'), totalKm > 0 && /*#__PURE__*/React.createElement("div", {
+  }, totalKm > 0 ? totalKm.toFixed(2) : '—'), totalKm > 0 && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: 'var(--text3)'
