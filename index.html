@@ -23597,6 +23597,10 @@ function CourierSummary(_ref159) {
       };
     });
     // Segmen GPS (titik check-in ke titik berikutnya)
+    // _xls: strip emoji & non-BMP chars that corrupt SheetJS 0.16.9
+    var _xls = function(s) {
+      return (s || '').replace(/[\uD800-\uDFFF]|[^\u0000-\uFFFF]/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
+    };
     var gpsRows = [];
     for (var _gi = 1; _gi < keyCheckins.length; _gi++) {
       var _fa = keyCheckins[_gi - 1], _tb = keyCheckins[_gi];
@@ -23608,9 +23612,9 @@ function CourierSummary(_ref159) {
         _sortTime: _tb.created_at || '',
         'Tgl': selDate,
         'Kurir': courierName,
-        'Dari': cleanNote(_fa.note) || ('Titik ' + _gi),
+        'Dari': _xls(cleanNote(_fa.note)) || ('Titik ' + _gi),
         'Link Dari': fromLink,
-        'Ke': cleanNote(_tb.note) || ('Titik ' + (_gi + 1)),
+        'Ke': _xls(cleanNote(_tb.note)) || ('Titik ' + (_gi + 1)),
         'Link Tujuan': toLink2,
         'KM Via Jalan (OSRM)': parseFloat((segKm || 0).toFixed(2)),
         'Tipe': 'GPS',
