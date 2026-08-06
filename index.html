@@ -1008,8 +1008,25 @@ function debounceReload(key, fn) {
 }
 
 // Jarak jalan raya via OSRM (akurat seperti Google Maps), fallback ke Haversine×1.2
-// Module-level cache supaya rute yang sama tidak di-request ulang
-var _osrmCache = {};
+// Cache di-persist ke localStorage per hari — hari berganti cache lama otomatis dihapus
+var _OSRM_LSKEY = 'dz_osrm_' + new Date().toISOString().slice(0, 10);
+(function() {
+  try {
+    Object.keys(localStorage).forEach(function(k) {
+      if (k.startsWith('dz_osrm_') && k !== _OSRM_LSKEY) localStorage.removeItem(k);
+    });
+  } catch(e) {}
+})();
+var _osrmCache = (function() {
+  try { return JSON.parse(localStorage.getItem(_OSRM_LSKEY) || '{}'); } catch(e) { return {}; }
+})();
+var _osrmSaveTimer = null;
+function _osrmPersist() {
+  if (_osrmSaveTimer) clearTimeout(_osrmSaveTimer);
+  _osrmSaveTimer = setTimeout(function() {
+    try { localStorage.setItem(_OSRM_LSKEY, JSON.stringify(_osrmCache)); } catch(e) {}
+  }, 300);
+}
 function getRoadDistanceKm(_x3, _x4, _x5, _x6) {
   return _getRoadDistanceKm.apply(this, arguments);
 } // ─── MAIN APP ──────────────────────────────────────────────────────
@@ -1056,6 +1073,7 @@ function _getRoadDistanceKm() {
             break;
           }
           _osrmCache[key] = parseFloat((json.routes[0].distance / 1000).toFixed(2));
+          _osrmPersist();
           return _context118.abrupt("return", _osrmCache[key]);
         case 19:
           _context118.next = 24;
@@ -1066,6 +1084,7 @@ function _getRoadDistanceKm() {
           console.warn('OSRM fallback:', _context118.t0.message);
         case 24:
           _osrmCache[key] = parseFloat((distanceKm(lat1, lng1, lat2, lng2) * 1.2).toFixed(2));
+          _osrmPersist();
           return _context118.abrupt("return", _osrmCache[key]);
         case 26:
         case "end":
