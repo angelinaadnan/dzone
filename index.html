@@ -20682,8 +20682,7 @@ function OpsKurirHistory(_ref_okh) {
         return new Date(a.delivered_at || 0) - new Date(b.delivered_at || 0);
       });
       var rawCheckins = (results[5].data || []);
-      var keyCheckins = rawCheckins.filter(function(c){ return !(c.note || '').startsWith('▶'); });
-      setCheckins(keyCheckins);
+      setCheckins(rawCheckins);
       setHistory(combined);
       setLoading(false);
     }).catch(function(){ setLoading(false); });
