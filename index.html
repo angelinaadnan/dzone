@@ -18002,21 +18002,16 @@ async function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
     };
     var routeRows = [];
     var _rCouriers = courierData.filter(function(c) { return KURIR_LIST.indexOf(c.name) !== -1; });
-    // Pre-fetch semua OSRM segment secara parallel (seperti CourierSummary useEffect)
-    var _allSegs = [];
-    _rCouriers.forEach(function(c) {
-      var _cks2 = (c.myCheckins || []).filter(function(_ck) { return !(_ck.note || '').startsWith('▶'); });
-      for (var _si2 = 1; _si2 < _cks2.length; _si2++) {
-        var _a2 = _cks2[_si2-1], _b2 = _cks2[_si2];
-        if (_a2.lat && _b2.lat) _allSegs.push([parseFloat(_a2.lat), parseFloat(_a2.lng), parseFloat(_b2.lat), parseFloat(_b2.lng)]);
-      }
-    });
-    await Promise.all(_allSegs.map(function(s) { return getRoadDistanceKm(s[0], s[1], s[2], s[3]); }));
-    // Sekarang semua hasil ada di _osrmCache, build rows pakai cache (instant)
     for (var _ci = 0; _ci < _rCouriers.length; _ci++) {
       var c = _rCouriers[_ci];
       var cks = (c.myCheckins || []).filter(function(_ck) { return !(_ck.note || '').startsWith('▶'); });
       if (cks.length < 2) continue;
+      // Pre-fetch OSRM untuk kurir ini secara parallel (max ~29 request, tidak overwhelm server)
+      var _segsC = [];
+      for (var _pi = 1; _pi < cks.length; _pi++) {
+        if (cks[_pi-1].lat && cks[_pi].lat) _segsC.push([parseFloat(cks[_pi-1].lat), parseFloat(cks[_pi-1].lng), parseFloat(cks[_pi].lat), parseFloat(cks[_pi].lng)]);
+      }
+      await Promise.all(_segsC.map(function(s) { return getRoadDistanceKm(s[0], s[1], s[2], s[3]); }));
       var prevDate = null;
       var _cStart = routeRows.length;
       for (var _ri = 1; _ri < cks.length; _ri++) {
