@@ -17967,7 +17967,7 @@ function exportCheckinToExcel(checkins) {
   XLSX.utils.book_append_sheet(wb, ws2, 'Ringkasan per Kurir');
   XLSX.writeFile(wb, "DZ_GPS_Checkin_".concat(new Date().toISOString().slice(0, 10), ".xlsx"));
 }
-async function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
+function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
   try {
     if (!courierData || courierData.length === 0) {
       alert('Tidak ada data untuk di-export');
@@ -18026,19 +18026,19 @@ async function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
       var c = _rCouriers[_ci];
       var cks = (c.myCheckins || []).filter(function(_ck) { return !(_ck.note || '').startsWith('▶'); });
       if (cks.length < 2) continue;
-      // Pre-fetch OSRM untuk kurir ini secara parallel (max ~29 request, tidak overwhelm server)
-      var _segsC = [];
-      for (var _pi = 1; _pi < cks.length; _pi++) {
-        if (cks[_pi-1].lat && cks[_pi].lat) _segsC.push([parseFloat(cks[_pi-1].lat), parseFloat(cks[_pi-1].lng), parseFloat(cks[_pi].lat), parseFloat(cks[_pi].lng)]);
-      }
-      await Promise.all(_segsC.map(function(s) { return getRoadDistanceKm(s[0], s[1], s[2], s[3]); }));
+      // Baca dari _osrmCache yang sudah di-prefetch saat halaman load (useEffect gpsOsrm)
+      var _f5 = function(v) { return parseFloat(v).toFixed(5); };
+      var _cacheKm = function(la1, lo1, la2, lo2) {
+        var _key = _f5(lo1) + ',' + _f5(la1) + ';' + _f5(lo2) + ',' + _f5(la2);
+        var _c = _osrmCache[_key];
+        return _c !== undefined ? _c : distanceKm(la1, lo1, la2, lo2) * 1.2;
+      };
       var prevDate = null;
       var _cStart = routeRows.length;
       for (var _ri = 1; _ri < cks.length; _ri++) {
         var _fa = cks[_ri - 1], _tb = cks[_ri];
         if (!_fa.lat || !_tb.lat) continue;
-        var _kmOsrm = await getRoadDistanceKm(parseFloat(_fa.lat), parseFloat(_fa.lng), parseFloat(_tb.lat), parseFloat(_tb.lng));
-        var _km = (_kmOsrm != null) ? parseFloat(_kmOsrm.toFixed(2)) : parseFloat((distanceKm(parseFloat(_fa.lat), parseFloat(_fa.lng), parseFloat(_tb.lat), parseFloat(_tb.lng)) * 1.2).toFixed(2));
+        var _km = parseFloat(_cacheKm(parseFloat(_fa.lat), parseFloat(_fa.lng), parseFloat(_tb.lat), parseFloat(_tb.lng)).toFixed(2));
         var _tbl = _tb.created_at ? new Date(_tb.created_at) : null;
         var tgl = _tbl ? _tbl.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase() : '';
         var jam = _tbl ? _tbl.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -18061,16 +18061,16 @@ async function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         .reduce(function(s, r) { return s + (parseFloat(r['KM Via Jalan (OSRM)']) || 0); }, 0);
       routeRows.push({ 'Tgl': '', 'Kurir': c.name, 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL GPS', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumC.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
     }
-        if (routeRows.length > 0) {
-      var wsRoute = XLSX.utils.json_to_sheet(routeRows);
+    var wsRoute = XLSX.utils.json_to_sheet(routeRows.length > 0 ? routeRows : [{ 'Info': 'Tidak ada data GPS untuk tanggal ini' }]);
+    if (routeRows.length > 0) {
       wsRoute['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 55 }, { wch: 55 }, { wch: 14 }, { wch: 14 }, { wch: 8 }];
       var _rng = XLSX.utils.decode_range(wsRoute['!ref']);
       for (var _hc = _rng.s.c; _hc <= _rng.e.c; _hc++) {
         var _ha = XLSX.utils.encode_cell({ r: 0, c: _hc });
         if (wsRoute[_ha]) wsRoute[_ha].s = { font: { bold: true } };
       }
-      XLSX.utils.book_append_sheet(wb, wsRoute, 'Rute Harian');
     }
+    XLSX.utils.book_append_sheet(wb, wsRoute, 'Rute Harian');
 
     XLSX.writeFile(wb, "DZ_Monitor_Kurir_".concat(dateStr, ".xlsx"), { cellStyles: true });
   } catch (e) {
@@ -20704,7 +20704,7 @@ function OpsKurirHistory(_ref_okh) {
   }, [checkins.length]);
 
   var exportExcel = async function() {
-    if (!history.length && checkins.length < 2) return;
+    if (checkins.length < 2) return;
     var _xls = function(s) {
       return (s || '').replace(/[\uD800-\uDFFF]|[^ -￿]/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
     };
@@ -20720,29 +20720,7 @@ function OpsKurirHistory(_ref_okh) {
     };
     var wb = XLSX.utils.book_new();
 
-    // Sheet 1: Aktivitas (format lama)
-    if (history.length) {
-      var actRows = history.map(function(o) {
-        var jam = o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
-        var fromLink = o.start_location && (o.start_location.lat || o.start_location.latitude)
-          ? 'https://maps.google.com?q=' + (o.start_location.lat || o.start_location.latitude) + ',' + (o.start_location.lng || o.start_location.longitude) : '';
-        var toLink = o.end_location && (o.end_location.lat || o.end_location.latitude)
-          ? 'https://maps.google.com?q=' + (o.end_location.lat || o.end_location.latitude) + ',' + (o.end_location.lng || o.end_location.longitude) : '';
-        return {
-          'Tgl': selDate, 'Kurir': selCourier,
-          'Dari': fromLink ? 'Lihat' : '', 'Link Dari': fromLink,
-          'Ke': o.customer_name || '', 'Link Tujuan': toLink,
-          'KM Via Jalan (OSRM)': o.distance_km != null ? o.distance_km : '',
-          'Tipe': _tipeLabel(o),
-          'Jam Tiba di Tujuan': jam
-        };
-      });
-      var _sumAct = history.reduce(function(s, o) { return s + (o.distance_km || 0); }, 0);
-      actRows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL AKTIVITAS', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumAct.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(actRows), 'Aktivitas');
-    }
-
-    // Sheet 2: Rute GPS dengan label deskriptif
+    // Sheet: Rute GPS dengan label deskriptif
     var gpsOnly = checkins.filter(function(c) { return !(c.note || '').startsWith('▶'); });
     if (gpsOnly.length >= 2) {
       // Prefetch OSRM parallel
