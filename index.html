@@ -11428,28 +11428,32 @@ function CourierDailyMonitor(_ref84) {
         customer: s.customer_name,
         unit: s.unit_type,
         time: s.delivered_at || s.courier_picked_up_at || siTime,
-        km: s.pickup_distance_km || null
+        km: s.pickup_distance_km || null,
+        loc: s.pickup_arrived_location || null
       });
       if (s.sc_delivery_courier === name) mySI.push({
         role: "Antar ke ".concat(s.service_center_name || 'SC'),
         customer: s.customer_name,
         unit: s.unit_type,
         time: s.sc_delivered_at || siTime,
-        km: s.sc_distance_km || null
+        km: s.sc_distance_km || null,
+        loc: s.sc_arrived_location || null
       });
       if (s.sc_pickup_courier === name) mySI.push({
         role: "Ambil dari ".concat(s.service_center_name || 'SC'),
         customer: s.customer_name,
         unit: s.unit_type,
         time: s.sc_picked_up_at || siTime,
-        km: s.scp_distance_km || null
+        km: s.scp_distance_km || null,
+        loc: s.sc_pickup_location || s.sc_arrived_location || null
       });
       if (s.assigned_courier === name && s.return_status) mySI.push({
         role: "Antar balik ke ".concat(s.customer_name),
         customer: s.customer_name,
         unit: s.unit_type,
         time: s.returned_at || siTime,
-        km: s.return_distance_km || null
+        km: s.return_distance_km || null,
+        loc: s.return_arrived_location || null
       });
     });
 
@@ -18028,7 +18032,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
       (c.mySI || []).forEach(function(s) {
         var dest = (s.role || s.customer || '').toUpperCase().replace(/\s+/g, ' ').trim();
         var siKm = s.km && parseFloat(s.km) > 0 ? parseFloat(parseFloat(s.km).toFixed(1)) : null;
-        acts.push({ time: s.time, dest: dest, km: siKm, tipe: 'Servis', loc: null, fallback: mkSearch(dest) });
+        acts.push({ time: s.time, dest: dest, km: siKm, tipe: 'Servis', loc: s.loc || null, fallback: mkSearch(dest) });
       });
       if (acts.length === 0) return;
       acts.sort(function(a, b) { return new Date(a.time || 0) - new Date(b.time || 0); });
@@ -18044,8 +18048,15 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
         var fromLink = a.startLoc && (a.startLoc.lat || a.startLoc.latitude)
           ? 'https://maps.google.com?q=' + (a.startLoc.lat || a.startLoc.latitude) + ',' + (a.startLoc.lng || a.startLoc.longitude || a.startLoc.lon)
           : dusitLink;
-        // Satu baris per aktivitas — tidak hitung return trip
-        var fromName = a.startLoc && (a.startLoc.lat || a.startLoc.latitude) ? BASE_NAME : BASE_NAME;
+        // Fallback km: haversine dari start→end jika km tidak ada di database
+        var _km = km;
+        if ((_km === null || _km === '') && a.loc && (a.loc.lat || a.loc.latitude)) {
+          var _sLat = a.startLoc && (a.startLoc.lat || a.startLoc.latitude) ? parseFloat(a.startLoc.lat || a.startLoc.latitude) : dusitLat;
+          var _sLng = a.startLoc && (a.startLoc.lng || a.startLoc.longitude) ? parseFloat(a.startLoc.lng || a.startLoc.longitude) : dusitLng;
+          var _eLat = parseFloat(a.loc.lat || a.loc.latitude);
+          var _eLng = parseFloat(a.loc.lng || a.loc.longitude || a.loc.lon);
+          _km = parseFloat(distanceKm(_sLat, _sLng, _eLat, _eLng).toFixed(1));
+        }
         routeRows.push({
           'Tgl': tgl !== prevDate ? tgl : '',
           'Kurir': c.name,
@@ -18053,7 +18064,7 @@ function exportCourierDailyMonitorToExcel(courierData, dateFilter) {
           'Link Dari': fromLink,
           'Ke': destName,
           'Link Tujuan': destLink,
-          'KM Via Jalan (OSRM)': km,
+          'KM Via Jalan (OSRM)': _km !== null ? _km : '',
           'Tipe': a.tipe,
           'Jam Tiba di Tujuan': jam
         });
