@@ -23628,10 +23628,12 @@ function CourierSummary(_ref159) {
     });
     var _sumGps = gpsRows.reduce(function(s, r) { return s + (r['KM Via Jalan (OSRM)'] || 0); }, 0);
     rows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL GPS', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumGps.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
-    var ws = XLSX.utils.json_to_sheet(rows);
-    var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Summary');
-    XLSX.writeFile(wb, 'summary_' + courierName.replace(/ /g,'_') + '_' + selDate + '.xlsx');
+    try {
+      var ws = XLSX.utils.json_to_sheet(rows);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Summary');
+      XLSX.writeFile(wb, 'summary_' + courierName.replace(/ /g,'_') + '_' + selDate + '.xlsx');
+    } catch(e) { alert('Export error: ' + e.message); }
   };
   return /*#__PURE__*/React.createElement("div", {
     style: {
