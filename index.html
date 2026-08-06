@@ -11585,21 +11585,29 @@ function CourierDailyMonitor(_ref84) {
       timeline: timeline
     };
   });
-  // Hitung GPS km via OSRM per kurir (async), update display saat selesai
+  // Hitung GPS km via OSRM per kurir (sequential: satu kurir selesai dulu baru kurir berikutnya)
   React.useEffect(function() {
     setGpsOsrm({});
-    courierData.forEach(function(c) {
-      var cks = (c.myCheckins || []).filter(function(ck) { return !(ck.note || '').startsWith('▶'); });
-      if (cks.length < 2) { setGpsOsrm(function(p) { var n = Object.assign({}, p); n[c.name] = 0; return n; }); return; }
-      Promise.all(Array.from({length: cks.length - 1}, function(_, _i) {
-        var a = cks[_i], b = cks[_i + 1];
-        if (!a.lat || !b.lat) return Promise.resolve(0);
-        return getRoadDistanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng));
-      })).then(function(dists) {
+    var _couriers = courierData.slice();
+    (async function() {
+      for (var _si = 0; _si < _couriers.length; _si++) {
+        var _sc = _couriers[_si];
+        var cks = (_sc.myCheckins || []).filter(function(ck) { return !(ck.note || '').startsWith('▶'); });
+        if (cks.length < 2) {
+          var _sn = _sc.name;
+          setGpsOsrm(function(p) { var n = Object.assign({}, p); n[_sn] = 0; return n; });
+          continue;
+        }
+        var dists = await Promise.all(Array.from({length: cks.length - 1}, function(_, _i) {
+          var a = cks[_i], b = cks[_i + 1];
+          if (!a.lat || !b.lat) return Promise.resolve(0);
+          return getRoadDistanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng));
+        }));
         var km = parseFloat(dists.reduce(function(s, d) { return s + (d || 0); }, 0).toFixed(3));
-        setGpsOsrm(function(p) { var n = Object.assign({}, p); n[c.name] = km; return n; });
-      });
-    });
+        var _sname = _sc.name;
+        setGpsOsrm(function(p) { var n = Object.assign({}, p); n[_sname] = km; return n; });
+      }
+    })();
   }, [dateFrom, dateTo, checkins.length]);
   var activeList = courierData.filter(function (c) {
     return c.hasActivity;
