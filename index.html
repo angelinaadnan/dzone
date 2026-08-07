@@ -3227,7 +3227,7 @@ function App() {
             since14.setDate(since14.getDate() - 14);
             checkinsQ = db.from('courier_checkins').select('*').gte('created_at', since14.toISOString()).order('created_at', {
               ascending: false
-            }).limit(500);
+            }).limit(3000);
             if (role === 'courier') checkinsQ = checkinsQ.eq('courier_name', userName);
             _context28.next = 9;
             return checkinsQ;
