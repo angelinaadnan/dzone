@@ -11276,6 +11276,12 @@ function CourierDailyMonitor(_ref84) {
     expanded = _React$useState144[0],
     setExpanded = _React$useState144[1];
   var _gpsOsrmState = React.useState({}), gpsOsrm = _gpsOsrmState[0], setGpsOsrm = _gpsOsrmState[1];
+  // Debounced trigger: OSRM baru re-run setelah checkins stabil 2.5 detik (bukan setiap checkin baru)
+  var _gpsVerState = React.useState(0), _gpsVer = _gpsVerState[0], _setGpsVer = _gpsVerState[1];
+  React.useEffect(function() {
+    var t = setTimeout(function() { _setGpsVer(function(v) { return v + 1; }); }, 2500);
+    return function() { clearTimeout(t); };
+  }, [checkins.length]);
   var FUEL_PER_KM = 600;
 
   // Shortcut helpers
@@ -11630,7 +11636,7 @@ function CourierDailyMonitor(_ref84) {
       }
     })();
     return function() { cancelled = true; };
-  }, [dateFrom, dateTo, checkins.length]);
+  }, [dateFrom, dateTo, _gpsVer]);
   var activeList = courierData.filter(function (c) {
     return c.hasActivity;
   });
