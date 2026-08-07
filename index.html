@@ -1083,8 +1083,7 @@ function _getRoadDistanceKm() {
           _context118.t0 = _context118["catch"](4);
           console.warn('OSRM fallback:', _context118.t0.message);
         case 24:
-          _osrmCache[key] = parseFloat((distanceKm(lat1, lng1, lat2, lng2) * 1.2).toFixed(2));
-          return _context118.abrupt("return", _osrmCache[key]);
+          return _context118.abrupt("return", parseFloat((distanceKm(lat1, lng1, lat2, lng2) * 1.2).toFixed(2)));
         case 26:
         case "end":
           return _context118.stop();
@@ -11278,10 +11277,13 @@ function CourierDailyMonitor(_ref84) {
   var _gpsOsrmState = React.useState({}), gpsOsrm = _gpsOsrmState[0], setGpsOsrm = _gpsOsrmState[1];
   // Debounced trigger: OSRM baru re-run setelah checkins stabil 2.5 detik (bukan setiap checkin baru)
   var _gpsVerState = React.useState(0), _gpsVer = _gpsVerState[0], _setGpsVer = _gpsVerState[1];
+  var _gpsRetried = React.useRef(false);
   React.useEffect(function() {
-    var t = setTimeout(function() { _setGpsVer(function(v) { return v + 1; }); }, 2500);
+    var t = setTimeout(function() { _gpsRetried.current = false; _setGpsVer(function(v) { return v + 1; }); }, 2500);
     return function() { clearTimeout(t); };
   }, [checkins.length]);
+  // Reset retry flag kalau date berubah
+  React.useEffect(function() { _gpsRetried.current = false; }, [dateFrom, dateTo]);
   var FUEL_PER_KM = 600;
 
   // Shortcut helpers
@@ -11633,6 +11635,12 @@ function CourierDailyMonitor(_ref84) {
         var km = parseFloat(dists.reduce(function(s, d) { return s + (d || 0); }, 0).toFixed(3));
         var _sname = _sc.name;
         setGpsOsrm(function(p) { var n = Object.assign({}, p); n[_sname] = km; return n; });
+      }
+      // Auto-retry sekali setelah 3 detik untuk segmen yg OSRM-nya gagal (tidak ter-cache)
+      if (!cancelled && !_gpsRetried.current) {
+        _gpsRetried.current = true;
+        await new Promise(function(r) { setTimeout(r, 3000); });
+        if (!cancelled) _setGpsVer(function(v) { return v + 1; });
       }
     })();
     return function() { cancelled = true; };
