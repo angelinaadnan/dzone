@@ -19795,8 +19795,6 @@ function AdminOnlineOrders(_ref144) {
     setSaving = _React$useState230[1];
   var _psf1 = React.useState({}); var pickupSerahFile = _psf1[0]; var setPickupSerahFile = _psf1[1];
   var _pss1 = React.useState({}); var pickupSerahSaving = _pss1[0]; var setPickupSerahSaving = _pss1[1];
-  var _aosf = React.useState('all'); var srcFilter = _aosf[0]; var setSrcFilter = _aosf[1];
-  var _aostf = React.useState('all'); var statusFilter = _aostf[0]; var setStatusFilter = _aostf[1];
   var setField = function setField(id, k, v) {
     return setEkspedisiForm(function (p) {
       return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, id, _objectSpread(_objectSpread({}, p[id] || {}), {}, _defineProperty({}, k, v))));
@@ -19912,57 +19910,47 @@ function AdminOnlineOrders(_ref144) {
       return _ref147.apply(this, arguments);
     };
   }();
-  var _AO_SG = [
-    { key:'gantung', label:'\u23F3 Masih Gantung', statuses:['invoiced','prep','tech','tech_done','cancel_requested'], color:'var(--amber)', order:0 },
-    { key:'siap',    label:'\uD83D\uDCE6 Siap Dikirim',   statuses:['ao_serah'],    color:'var(--blue)',  order:1 },
-    { key:'jalan',   label:'\uD83D\uDE9A Sedang Dikirim', statuses:['on_delivery'], color:'var(--teal)',  order:2 },
-    { key:'selesai', label:'\u2705 Selesai',              statuses:['delivered'],   color:'var(--green)', order:3 },
-    { key:'batal',   label:'\u274C Dibatalkan',           statuses:['cancelled'],   color:'var(--red)',   order:4 }
-  ];
-  var _getGrp = function(o) { return _AO_SG.find(function(g){ return g.statuses.includes(o.status); }); };
-  var _allAO = orders.filter(function(o){ return SALES_AO.includes(o.sales_name); });
-  var myOrders = _allAO.filter(function(o) {
-    if (srcFilter === 'cabang') return (o.info_tambahan||'').includes('[Titip Kirim dari Cabang:');
-    if (srcFilter === 'online') return !(o.info_tambahan||'').includes('[Titip Kirim dari Cabang:');
-    return true;
-  }).filter(function(o) {
-    if (statusFilter !== 'all') { var g=_AO_SG.find(function(x){ return x.key===statusFilter; }); return g ? g.statuses.includes(o.status) : true; }
-    return true;
-  }).filter(function(o) {
-    return !search || [o.customer_name, o.sales_name, o.invoice_number].some(function(v){ return (v||'').toLowerCase().includes(search.toLowerCase()); });
-  }).sort(function(a,b){ return ((_getGrp(a)||{order:9}).order)-((_getGrp(b)||{order:9}).order); });
-  var _renderItems = [];
-  var _lastGrpKey = null;
-  myOrders.forEach(function(o) {
-    var g = _getGrp(o);
-    var gKey = g ? g.key : 'other';
-    if (gKey !== _lastGrpKey && statusFilter === 'all') {
-      _renderItems.push({ _hdr: true, grp: g || { label: o.status, color: 'var(--text3)' } });
-      _lastGrpKey = gKey;
-    }
-    _renderItems.push(o);
+  var ACTIVE_STATUSES = ['invoiced', 'prep', 'tech', 'tech_done'];
+  var myOrders = orders.filter(function (o) {
+    return SALES_AO.includes(o.sales_name);
+  }).filter(function (o) {
+    return !search || [o.customer_name, o.sales_name, o.invoice_number].some(function (v) {
+      return (v || '').toLowerCase().includes(search.toLowerCase());
+    });
   });
-  return /*#__PURE__*/React.createElement("div", { style: { maxWidth: 900 } },
-    /*#__PURE__*/React.createElement("div", { className: "section-title" }, "\uD83D\uDCCB All Orders ", /*#__PURE__*/React.createElement("span", { style: { fontSize:12, color:'var(--blue)' } }, "Admin Online")),
-    /*#__PURE__*/React.createElement("div", { style: { display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 } },
-      [{ key:'all', label:'Semua', cnt:_allAO.length }, { key:'online', label:'\uD83C\uDF10 Online', cnt:_allAO.filter(function(o){ return !(o.info_tambahan||'').includes('[Titip Kirim dari Cabang:'); }).length }, { key:'cabang', label:'\uD83C\uDFE2 Cabang', cnt:_allAO.filter(function(o){ return (o.info_tambahan||'').includes('[Titip Kirim dari Cabang:'); }).length }].map(function(s) {
-        return /*#__PURE__*/React.createElement("button", { key:s.key, className:srcFilter===s.key?'btn-primary btn-sm':'btn-secondary btn-sm', onClick:function(){ setSrcFilter(s.key); setStatusFilter('all'); } }, s.label, ' (', s.cnt, ')');
-      })
-    ),
-    /*#__PURE__*/React.createElement("input", {
-      placeholder: "\uD83D\uDD0D Cari customer / sales / invoice...",
-      value: search, onChange: function(e){ return setSearch(e.target.value); },
-      style: { width:'100%', padding:'8px 12px', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', marginBottom:8, fontSize:13, boxSizing:'border-box' }
-    }),
-    /*#__PURE__*/React.createElement("div", { style: { display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 } },
-      [{ key:'all', label:'Semua', color:'', cnt:myOrders.length }].concat(_AO_SG.map(function(g){ return Object.assign({}, g, { cnt: _allAO.filter(function(o){ if(srcFilter==='cabang') return (o.info_tambahan||'').includes('[Titip Kirim dari Cabang:'); if(srcFilter==='online') return !(o.info_tambahan||'').includes('[Titip Kirim dari Cabang:'); return true; }).filter(function(o){ return g.statuses.includes(o.status); }).length }); })).map(function(g) {
-        return /*#__PURE__*/React.createElement("button", { key:g.key, className:statusFilter===g.key?'btn-primary btn-sm':'btn-secondary btn-sm', style:statusFilter!==g.key&&g.color?{ color:g.color, borderColor:g.color+'66' }:{}, onClick:function(){ setStatusFilter(g.key); } }, g.label||'Semua', ' (', g.cnt, ')');
-      })
-    ),
-    _renderItems.length === 0 && /*#__PURE__*/React.createElement("div", { className:"empty-state" }, /*#__PURE__*/React.createElement("div",{className:"icon"},"\uD83D\uDCCB"), /*#__PURE__*/React.createElement("div",null,"Tidak ada order")),
-    _renderItems.map(function (o) {
-      if (o._hdr) return /*#__PURE__*/React.createElement("div", { key:'hdr-'+o.grp.key, style:{ fontSize:12, fontWeight:700, color:o.grp.color, marginBottom:6, marginTop:8, paddingBottom:4, borderBottom:'2px solid '+o.grp.color+'44' } }, o.grp.label, ' \u2014 ', myOrders.filter(function(x){ return o.grp.statuses&&o.grp.statuses.includes(x.status); }).length, ' order');
-
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      maxWidth: 900
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "section-title"
+  }, "\uD83D\uDCCB All Orders ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: 'var(--blue)'
+    }
+  }, "Admin Online")), /*#__PURE__*/React.createElement("input", {
+    placeholder: "\uD83D\uDD0D Cari customer / sales / invoice...",
+    value: search,
+    onChange: function onChange(e) {
+      return setSearch(e.target.value);
+    },
+    style: {
+      width: '100%',
+      padding: '8px 12px',
+      background: 'var(--bg3)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
+      color: 'var(--text)',
+      marginBottom: 14,
+      fontSize: 13,
+      boxSizing: 'border-box'
+    }
+  }), myOrders.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "empty-state"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "icon"
+  }, "\uD83D\uDCCB"), /*#__PURE__*/React.createElement("div", null, "Tidak ada data")), myOrders.map(function (o) {
     var _ekspedisiForm$o$id2, _ekspedisiForm$o$id3, _ekspedisiForm$o$id5, _ekspedisiForm$o$id6, _ekspedisiForm$o$id7;
     var pendingRev = (o.revisions || []).reduce(function (li, r, i) {
       return r.status === 'pending_ops' && r.ao_can_approve ? i : li;
