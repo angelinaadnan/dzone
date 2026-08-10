@@ -20415,7 +20415,27 @@ function AdminOnlineOrders(_ref144) {
           return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, o.id, null));
         });
       }
-    }, "Batal")))), o.status === 'delivered' && o.tracking && /*#__PURE__*/React.createElement("div", {
+    }, "Batal")))), SALES_AO.includes(o.sales_name) && o.status === 'ao_serah' && !o.delivery_method && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' },
+      onClick: function(e){ e.stopPropagation(); }
+    }, !pengirimanOpen[o.id] ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+      /*#__PURE__*/React.createElement("button", { className: "btn-primary btn-sm", style: { flex: 1, minWidth: 110 }, disabled: saving[o.id], onClick: function(){ submitKurirInternal(o); } }, saving[o.id]==='kurir'?'Menyimpan...':'🚚 Kurir Internal'),
+      /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { flex: 1, minWidth: 110, color: 'var(--blue)', borderColor: 'var(--blue)' }, onClick: function(){ setPengirimanOpen(function(p){ return Object.assign({},p,_defineProperty({},o.id,'eks')); }); } }, '📦 Ekspedisi (JNE dll.)'),
+      /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { flex: 1, minWidth: 110 }, disabled: saving[o.id], onClick: function(){ submitAmbilSendiri(o); } }, saving[o.id]==='ambil'?'Menyimpan...':'🤝 Ambil Sendiri')
+    ) : /*#__PURE__*/React.createElement("div", { style: { background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '12px' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: 'var(--blue)' } }, '📦 Kirim via Ekspedisi'),
+        /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { fontSize: 10 }, onClick: function(){ setPengirimanOpen(function(p){ return Object.assign({},p,_defineProperty({},o.id,null)); }); } }, '← Ganti')
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 } },
+        ['JNE','J&T','SiCepat','Anteraja','Ninja','POS','Tiki','Lion Parcel'].map(function(eks){
+          return /*#__PURE__*/React.createElement("button", { key: eks, className: (ekspedisiForm[o.id]||{}).nama===eks?'btn-primary btn-sm':'btn-secondary btn-sm', style: { fontSize: 11 }, onClick: function(){ setField(o.id,'nama',eks); } }, eks);
+        })
+      ),
+      /*#__PURE__*/React.createElement("input", { placeholder: "Atau ketik nama ekspedisi lain...", value: (ekspedisiForm[o.id]||{}).nama||'', onChange: function(e){ setField(o.id,'nama',e.target.value); }, style: { width:'100%', padding:'7px 10px', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:6, color:'var(--text)', fontSize:12, boxSizing:'border-box', marginBottom:8 } }),
+      /*#__PURE__*/React.createElement("input", { placeholder: "Nomor Resi / Tracking...", value: (ekspedisiForm[o.id]||{}).resi||'', onChange: function(e){ setField(o.id,'resi',e.target.value); }, style: { width:'100%', padding:'7px 10px', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:6, color:'var(--text)', fontSize:12, boxSizing:'border-box', marginBottom:10 } }),
+      /*#__PURE__*/React.createElement("button", { className: "btn-primary btn-sm", style: { width:'100%' }, disabled: saving[o.id]==='eks', onClick: function(){ submitEkspedisi(o); } }, saving[o.id]==='eks'?'Menyimpan...':'✅ Konfirmasi Terkirim')
+    )), o.status === 'delivered' && o.tracking && /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 6,
         paddingTop: 6,
