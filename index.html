@@ -10063,10 +10063,12 @@ function SupervisorOrders(_ref77) {
   var _ksel2 = React.useState({}); var kurirSel2 = _ksel2[0]; var setKurirSel2 = _ksel2[1];
   var _spic2 = React.useState({}); var selfPic2 = _spic2[0]; var setSelfPic2 = _spic2[1];
   var _dls2 = React.useState({}); var dlSaving2 = _dls2[0]; var setDlSaving2 = _dls2[1];
+  var _ef2 = React.useState({}); var eksForm2 = _ef2[0]; var setEksForm2 = _ef2[1];
+  var setEksField2 = function(id, k, v) { setEksForm2(function(p){ var n=Object.assign({},p); n[id]=Object.assign({},n[id]||{},_defineProperty({},k,v)); return n; }); };
   var confirmKurirOps = function(o) {
     if (!kurirSel2[o.id]) { alert('Pilih kurir dulu'); return; }
     setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, 'kurir')); });
-    onUpdate(o.id, { status: 'on_delivery', courier_name: kurirSel2[o.id], assigned_to: 'courier', status_note: 'Diteruskan ke kurir ' + kurirSel2[o.id] })
+    onUpdate(o.id, { status: 'on_delivery', delivery_method: 'Kurir Internal', courier_name: kurirSel2[o.id], assigned_to: 'courier', status_note: 'Diteruskan ke kurir ' + kurirSel2[o.id] })
       .then(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); setDlOpen2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); })
       .catch(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); });
   };
@@ -10076,6 +10078,16 @@ function SupervisorOrders(_ref77) {
     uploadPhoto(selfPic2[o.id], 'delivery')
       .then(function(url) { return onUpdate(o.id, { status: 'delivered', courier_name: 'Ambil Sendiri', delivery_photo: url, delivered_at: new Date().toISOString(), status_note: 'Customer ambil sendiri — bukti foto tersimpan' }); })
       .then(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); })
+      .catch(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); });
+  };
+  var confirmEkspedisi2 = function(o) {
+    var form = eksForm2[o.id] || {};
+    if (!form.nama) { alert('Pilih atau ketik nama ekspedisi dulu'); return; }
+    if (!form.resi) { alert('Masukkan nomor resi dulu'); return; }
+    if (!window.confirm('Tandai terkirim via ' + form.nama + ', resi ' + form.resi + '?')) return;
+    setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, 'eks')); });
+    onUpdate(o.id, { status: 'delivered', delivery_method: form.nama, tracking: form.resi, delivered_at: new Date().toISOString(), courier_name: form.nama, status_note: 'Dikirim via ' + form.nama + ', resi: ' + form.resi })
+      .then(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); setDlOpen2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); })
       .catch(function(){ setDlSaving2(function(p){ return Object.assign({}, p, _defineProperty({}, o.id, null)); }); });
   };
   var _pg = React.useState(1); var currentPage = _pg[0]; var setCurrentPage = _pg[1];
@@ -10365,24 +10377,38 @@ function SupervisorOrders(_ref77) {
         borderRadius: 6
       }
     }, "\uD83D\uDEAB Menunggu approval ops", o.cancel_reason ? " \xB7 \"".concat(o.cancel_reason, "\"") : ''),
-    filter === 'cabang' && ['tech_done','ao_serah'].includes(o.status) && /*#__PURE__*/React.createElement("div", {
+    o.status === 'ao_serah' && /*#__PURE__*/React.createElement("div", {
       style: { marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' },
       onClick: function(e){ e.stopPropagation(); }
-    }, !dlOpen2[o.id] ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
-      /*#__PURE__*/React.createElement("button", { className: "btn-primary btn-sm", style: { flex: 1 }, onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,'kurir')); }); } }, "\uD83D\uDE9A Kirim via Kurir"),
-      /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { flex: 1 }, onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,'self')); }); } }, "\uD83D\uDEB6 Ambil Sendiri")
+    }, !dlOpen2[o.id] ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+      /*#__PURE__*/React.createElement("button", { className: "btn-primary btn-sm", style: { flex: 1, minWidth: 120 }, onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,'kurir')); }); } }, "\uD83D\uDE9A Kurir Internal"),
+      /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { flex: 1, minWidth: 120, color: 'var(--blue)', borderColor: 'var(--blue)' }, onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,'eks')); }); } }, "\uD83D\uDCE6 Ekspedisi (JNE dll.)"),
+      /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { flex: 1, minWidth: 120 }, onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,'self')); }); } }, "\uD83E\uDD1D Ambil Sendiri")
     ) : dlOpen2[o.id] === 'kurir' ? /*#__PURE__*/React.createElement("div", null,
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 } },
-        /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, fontWeight: 600, margin: 0 } }, "Pilih Kurir"),
+        /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, fontWeight: 600, margin: 0 } }, "Pilih Kurir Internal"),
         /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { fontSize: 10 }, onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,null)); }); } }, "\u2190 Ganti")
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 } },
         KURIR_LIST.map(function(n){ return /*#__PURE__*/React.createElement("button", { key: n, onClick: function(){ setKurirSel2(function(s){ return Object.assign({},s,_defineProperty({},o.id,n)); }); }, style: { padding: '5px 12px', borderRadius: 6, fontSize: 12, border: '1px solid var(--border)', background: kurirSel2[o.id]===n?'var(--blue)':'var(--bg3)', color: kurirSel2[o.id]===n?'#fff':'var(--text)', cursor: 'pointer', fontWeight: kurirSel2[o.id]===n?700:400 } }, n); })
       ),
       /*#__PURE__*/React.createElement("button", { className: "btn-green btn-sm", style: { width: '100%' }, disabled: dlSaving2[o.id]==='kurir', onClick: function(){ confirmKurirOps(o); } }, dlSaving2[o.id]==='kurir'?'Menyimpan...':'\uD83D\uDE9A Kirim ke Kurir')
+    ) : dlOpen2[o.id] === 'eks' ? /*#__PURE__*/React.createElement("div", { style: { background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: '10px' } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: 'var(--blue)' } }, "\uD83D\uDCE6 Kirim via Ekspedisi"),
+        /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { fontSize: 10 }, onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,null)); }); } }, "\u2190 Ganti")
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 } },
+        ['JNE', 'J&T', 'SiCepat', 'Anteraja', 'Ninja', 'POS', 'Tiki', 'Lion Parcel'].map(function(eks){
+          return /*#__PURE__*/React.createElement("button", { key: eks, className: (eksForm2[o.id]||{}).nama===eks?'btn-primary btn-sm':'btn-secondary btn-sm', style: { fontSize: 11 }, onClick: function(){ setEksField2(o.id,'nama',eks); } }, eks);
+        })
+      ),
+      /*#__PURE__*/React.createElement("input", { placeholder: "Atau ketik nama ekspedisi lain...", value: (eksForm2[o.id]||{}).nama||'', onChange: function(e){ setEksField2(o.id,'nama',e.target.value); }, style: { width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, boxSizing: 'border-box', marginBottom: 8 } }),
+      /*#__PURE__*/React.createElement("input", { placeholder: "Nomor Resi / Tracking...", value: (eksForm2[o.id]||{}).resi||'', onChange: function(e){ setEksField2(o.id,'resi',e.target.value); }, style: { width: '100%', padding: '7px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)', fontSize: 12, boxSizing: 'border-box', marginBottom: 10 } }),
+      /*#__PURE__*/React.createElement("button", { className: "btn-primary btn-sm", style: { width: '100%' }, disabled: dlSaving2[o.id]==='eks', onClick: function(){ confirmEkspedisi2(o); } }, dlSaving2[o.id]==='eks'?'Menyimpan...':'\u2705 Konfirmasi Terkirim')
     ) : /*#__PURE__*/React.createElement("div", { style: { background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 8, padding: '10px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: 'var(--green)' } }, "\uD83D\uDEB6 Ambil Sendiri"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: 'var(--green)' } }, "\uD83E\uDD1D Ambil Sendiri"),
         /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { fontSize: 10 }, onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,null)); }); } }, "\u2190 Ganti")
       ),
       /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 } }, "Foto bukti pengambilan (wajib):"),
