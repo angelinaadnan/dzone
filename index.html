@@ -2942,7 +2942,7 @@ function App() {
   }();
   var saveQuotation = /*#__PURE__*/function () {
     var _ref25 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee21(q) {
-      var n, qPayload, _yield$db$from$insert5, data, error;
+      var n, qPayload, _freshNums, _maxNum, _yr, _pfx, _yield$db$from$insert5, data, error;
       return _regeneratorRuntime().wrap(function _callee21$(_context23) {
         while (1) switch (_context23.prev = _context23.next) {
           case 0:
@@ -2960,11 +2960,13 @@ function App() {
             showToast('Penawaran disimpan (demo)');
             return _context23.abrupt("return", n);
           case 5:
-            // Generate quotation_number fresh from DB to avoid duplicates across concurrent users
-            var _yr = new Date().getFullYear();
-            var _pfx = _yr + '/PNW/';
-            var _freshNums = await db.from('quotations').select('quotation_number').like('quotation_number', _pfx + '%');
-            var _maxNum = (_freshNums.data || []).reduce(function(mx, row) {
+            _yr = new Date().getFullYear();
+            _pfx = _yr + '/PNW/';
+            _context23.next = 6;
+            return db.from('quotations').select('quotation_number').like('quotation_number', _pfx + '%');
+          case 6:
+            _freshNums = _context23.sent;
+            _maxNum = (_freshNums.data || []).reduce(function(mx, row) {
               var n = parseInt((row.quotation_number || '').slice(_pfx.length), 10);
               return isNaN(n) ? mx : Math.max(mx, n);
             }, 0);
