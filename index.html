@@ -2960,6 +2960,14 @@ function App() {
             showToast('Penawaran disimpan (demo)');
             return _context23.abrupt("return", n);
           case 5:
+            // Generate quotation_number fresh from DB to avoid duplicates across concurrent users
+            var _yr = new Date().getFullYear();
+            var _pfx = _yr + '/PNW/';
+            var _freshNums = await db.from('quotations').select('quotation_number').like('quotation_number', _pfx + '%');
+            var _maxNum = (_freshNums.data || []).reduce(function(mx, row) {
+              var n = parseInt((row.quotation_number || '').slice(_pfx.length), 10);
+              return isNaN(n) ? mx : Math.max(mx, n);
+            }, 0);
             // Only send columns that exist in the quotations table
             qPayload = {
               type: q.type,
@@ -2978,7 +2986,7 @@ function App() {
               po_no: q.po_no || '',
               sales_name: q.sales_name,
               status: q.status || 'draft',
-              quotation_number: q.quotation_number,
+              quotation_number: _pfx + String(_maxNum + 1).padStart(5, '0'),
               quotation_date: q.quotation_date || new Date().toISOString().split('T')[0],
               updated_at: q.updated_at
             };
@@ -14572,7 +14580,7 @@ function QuotationForm(_ref106) {
               }),
               updated_at: new Date().toISOString()
             });
-            if (!editing) payload.quotation_number = genQNum(allQuotations);
+            // quotation_number generated fresh in saveQuotation to avoid duplicates
             _context53.next = 11;
             return onSave(payload);
           case 11:
