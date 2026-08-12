@@ -11429,7 +11429,17 @@ function CourierDailyMonitor(_ref84) {
 
     // Orders untuk kurir ini pada tanggal ini (termasuk extra_couriers)
     var myOrders = (orders || []).filter(function (o) {
-      return (o.courier_name === name || (o.extra_couriers || []).includes(name)) && (matchDate(o.delivered_at) || matchDate(o.updated_at) || matchDate(o.created_at));
+      var _iP = o.courier_name === name;
+      var _iE = !_iP && (o.extra_couriers || []).includes(name);
+      if (_iP) return matchDate(o.delivered_at) || matchDate(o.updated_at) || matchDate(o.created_at);
+      if (_iE) {
+        // extra courier: tampil di kolom ini sampai dia sendiri selesai
+        var _xDone = (o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === name; });
+        var _xDoneToday = (o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === name && (h.time || '').startsWith(dateFrom || ''); });
+        if (_xDone) return _xDoneToday; // sudah selesai: tampil hanya di tanggal selesainya
+        return matchDate(o.created_at); // belum selesai: tampil di hari order dibuat
+      }
+      return false;
     });
 
     // Courier tasks untuk kurir ini pada tanggal ini
@@ -31491,7 +31501,11 @@ function OpsDashboard(_ref192) {
 
     // ── DONE hari ini ──
     (orders || []).filter(function (o) {
-      return (o.courier_name === name || (o.extra_couriers || []).includes(name)) && o.status === 'delivered' && (o.delivered_at || o.updated_at || '').startsWith(today);
+      var _isPrimary = o.courier_name === name;
+      var _isExtra = !_isPrimary && (o.extra_couriers || []).includes(name);
+      if (_isPrimary) return o.status === 'delivered' && (o.delivered_at || o.updated_at || '').startsWith(today);
+      if (_isExtra) return (o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === name && (h.time || '').startsWith(today); });
+      return false;
     }).sort(function (a, b) {
       return new Date(a.delivered_at || a.updated_at) - new Date(b.delivered_at || b.updated_at);
     }).forEach(function (o) {
@@ -31582,7 +31596,14 @@ function OpsDashboard(_ref192) {
 
     // ── SEDANG JALAN / TIBA ──
     (orders || []).filter(function (o) {
-      return (o.courier_name === name || (o.extra_couriers || []).includes(name)) && o.status === 'on_delivery';
+      var _isPri = o.courier_name === name;
+      var _isExt = !_isPri && (o.extra_couriers || []).includes(name);
+      if (_isPri) return o.status === 'on_delivery';
+      if (_isExt) {
+        var _iAmDone = (o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === name; });
+        return !_iAmDone && ['on_delivery', 'delivered'].includes(o.status);
+      }
+      return false;
     }).forEach(function (o) {
       return items.push({
         label: o.customer_name,
