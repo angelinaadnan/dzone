@@ -3767,7 +3767,8 @@ function App() {
     return n.id !== 'branch_request' || BRANCH_REQUEST_ALLOWED.includes(userName);
   }) : ROLE_NAV[role]).filter(function (n) {
     return n.id !== 'pesan_barang' || canAccessPesanBarang;
-  }).concat(SALES_HARIAN_USERS.includes(userName) ? [{ id: 'sales_harian', icon: '📈', label: 'Sales Harian' }] : []);
+  }).concat(SALES_HARIAN_USERS.includes(userName) ? [{ id: 'sales_harian', icon: '📈', label: 'Sales Harian' }] : [])
+  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -4013,7 +4014,7 @@ function App() {
     orders: orders,
     branchName: userName,
     branchMembers: getBranchMembers(userName)
-  }), role === 'ops' && page === 'op_kurir_history' && /*#__PURE__*/React.createElement(OpsKurirHistory, {
+  }), (role === 'ops' || (role === 'sales' && userName === 'Eliwaty')) && page === 'op_kurir_history' && /*#__PURE__*/React.createElement(OpsKurirHistory, {
     db: db
   }), role === 'ops' && page === 'assign' && /*#__PURE__*/React.createElement(OpsAssign, {
     orders: orders,
@@ -20744,6 +20745,10 @@ function OpsKurirHistory(_ref_okh) {
   var _sl = React.useState(false); var loading = _sl[0]; var setLoading = _sl[1];
   var _sch = React.useState([]); var checkins = _sch[0]; var setCheckins = _sch[1];
   var _sgt = React.useState(null); var gpsKmTotal = _sgt[0]; var setGpsKmTotal = _sgt[1];
+  var _sbc = React.useState({}); var batchSel = _sbc[0]; var setBatchSel = _sbc[1];
+  var _sbf = React.useState(today); var batchFrom = _sbf[0]; var setBatchFrom = _sbf[1];
+  var _sbt = React.useState(today); var batchTo = _sbt[0]; var setBatchTo = _sbt[1];
+  var _sbl = React.useState(false); var batchLoading = _sbl[0]; var setBatchLoading = _sbl[1];
 
   var load = function(courier, date) {
     if (!db || !courier || !date) return;
@@ -20881,6 +20886,57 @@ function OpsKurirHistory(_ref_okh) {
     });
   }, [checkins.length]);
 
+  var batchDownload = async function() {
+    var selected = couriers.filter(function(c){ return batchSel[c]; });
+    if (!selected.length) { alert('Pilih minimal 1 kurir!'); return; }
+    var _bDates = [];
+    var _bIter = new Date(batchFrom);
+    var _bEnd = new Date(batchTo);
+    if (_bEnd < _bIter) _bEnd = new Date(batchFrom);
+    while (_bIter <= _bEnd) { _bDates.push(_bIter.toISOString().slice(0,10)); _bIter.setDate(_bIter.getDate()+1); }
+    if (_bDates.length > 31) { alert('Maksimal 31 hari sekaligus!'); return; }
+    setBatchLoading(true);
+    try {
+      for (var _bci = 0; _bci < selected.length; _bci++) {
+        var _bco = selected[_bci];
+        var _bwb = XLSX.utils.book_new();
+        var _brows = [];
+        var _bs60 = new Date(); _bs60.setDate(_bs60.getDate()-60);
+        var _bs180 = new Date(); _bs180.setDate(_bs180.getDate()-180);
+        for (var _bdi = 0; _bdi < _bDates.length; _bdi++) {
+          var _bd = _bDates[_bdi];
+          var _bdFrom = _bd + 'T00:00:00+07:00';
+          var _bdTo = _bd + 'T23:59:59+07:00';
+          var _bmD = (function(dd){ return function(ts){ if (!ts) return false; return new Date(new Date(ts).getTime()+7*3600000).toISOString().slice(0,10)===dd; }; })(_bd);
+          var _bres = await Promise.all([
+            db.from('orders').select('id,customer_name,customer_address,delivered_at,distance_km,invoice_number').eq('courier_name',_bco).eq('status','delivered').gte('delivered_at',_bdFrom).lte('delivered_at',_bdTo).order('delivered_at',{ascending:true}),
+            db.from('courier_tasks').select('id,task_type,destination,description,assigned_at,created_at,status,distance_km,contact_name').eq('assigned_courier',_bco).gte('created_at',_bs60.toISOString()).order('created_at',{ascending:true}),
+            db.from('purchase_orders').select('id,supplier_name,supplier_address,pickups,created_at').gte('created_at',_bs60.toISOString()).limit(300),
+            db.from('branch_requests').select('id,branch_name,trips,created_at').gte('created_at',_bs60.toISOString()).limit(300),
+            db.from('service_intakes').select('*').gte('created_at',_bs180.toISOString()).limit(500)
+          ]);
+          var _bords = (_bres[0].data||[]).map(function(o){ return {_type:'order',customer_name:o.customer_name,customer_address:o.customer_address,delivered_at:o.delivered_at,distance_km:o.distance_km,invoice_number:o.invoice_number}; });
+          var _btsks = (_bres[1].data||[]).filter(function(t){ return _bmD(t.assigned_at||t.created_at); }).map(function(t){ return {_type:'task',customer_name:t.destination||t.description||t.task_type,customer_address:t.contact_name||'',delivered_at:t.assigned_at||t.created_at,distance_km:t.distance_km}; });
+          var _bpku = []; (_bres[2].data||[]).forEach(function(po){ (po.pickups||[]).forEach(function(p){ if (p.courier===_bco&&_bmD(p.done_at||po.created_at)) _bpku.push({_type:'pickup',customer_name:(po.supplier_name||'').toUpperCase(),customer_address:p.address||po.supplier_address||'',delivered_at:p.done_at||po.created_at,distance_km:p.distance_km}); }); });
+          var _btrp = []; (_bres[3].data||[]).forEach(function(r){ (r.trips||[]).forEach(function(t){ if (t.courier===_bco&&_bmD(t.delivered_at||r.created_at)) _btrp.push({_type:'trip',customer_name:(r.branch_name||t.branch||'').toUpperCase(),customer_address:'',delivered_at:t.delivered_at||r.created_at,distance_km:t.distance_km}); }); });
+          var _bsis = []; (_bres[4].data||[]).forEach(function(s){
+            var _badd = function(lbl,ts,km){ if (_bmD(ts||s.created_at)) _bsis.push({_type:'servis',customer_name:lbl,customer_address:(s.customer_name||'')+(s.unit_type?' · '+s.unit_type:''),delivered_at:ts||s.created_at,distance_km:km}); };
+            if (s.courier_name===_bco) _badd('Jemput dari '+(s.branch_name||'Cabang'),s.delivered_at||s.created_at,s.pickup_distance_km);
+            if (s.sc_delivery_courier===_bco) _badd('Antar ke '+(s.service_center_name||'SC'),s.sc_delivered_at||s.created_at,s.sc_distance_km);
+            if (s.sc_pickup_courier===_bco) _badd('Ambil dari '+(s.service_center_name||'SC'),s.sc_picked_up_at||s.created_at,s.scp_distance_km);
+            if (s.assigned_courier===_bco) _badd('Antar balik ke '+(s.customer_name||''),s.returned_at||s.created_at,s.return_distance_km);
+          });
+          var _bcomb = _bords.concat(_btsks).concat(_bpku).concat(_btrp).concat(_bsis).sort(function(a,b){ return new Date(a.delivered_at||0)-new Date(b.delivered_at||0); });
+          _bcomb.forEach(function(o,idx){ _brows.push({'Tgl':_bd,'Kurir':_bco,'No':idx+1,'Nama / Tujuan':o.customer_name||'','Tipe':o._type==='task'?'Tugas':o._type==='pickup'?'Ambil PO':o._type==='trip'?'Kirim Cabang':o._type==='servis'?'Servis':'Order','Jam':o.delivered_at?new Date(o.delivered_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'-','Jarak (km)':o.distance_km||'','Alamat':o.customer_address||''}); });
+        }
+        XLSX.utils.book_append_sheet(_bwb, XLSX.utils.json_to_sheet(_brows.length?_brows:[{'Info':'Tidak ada aktivitas'}]), 'Aktivitas');
+        XLSX.writeFile(_bwb, 'history_'+_bco.replace(/ /g,'_')+'_'+batchFrom+(_bDates.length>1?'_sd_'+batchTo:'')+'.xlsx');
+        await new Promise(function(r){ setTimeout(r,400); });
+      }
+    } catch(e) { alert('Download error: '+e.message); }
+    setBatchLoading(false);
+  };
+
   var exportExcel = async function() {
     if (checkins.length < 2) return;
     var _xls = function(s) {
@@ -20984,6 +21040,27 @@ function OpsKurirHistory(_ref_okh) {
         disabled: !history.length,
         style: { padding: '8px 16px', borderRadius: 8, background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, border: 'none', cursor: history.length ? 'pointer' : 'not-allowed', opacity: history.length ? 1 : 0.5 }
       }, "🗺 Lihat Rute di Maps")
+    ),
+    React.createElement("div", { style: { background: 'var(--card)', borderRadius: 12, padding: '12px 16px', marginBottom: 16, border: '1px solid var(--border)' } },
+      React.createElement("div", { style: { fontWeight: 700, fontSize: 13, marginBottom: 10, color: 'var(--text2)' } }, "📥 Batch Download"),
+      React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' } },
+        React.createElement("span", { style: { fontSize: 12, color: 'var(--text2)' } }, "Tanggal:"),
+        React.createElement("input", { type: "date", value: batchFrom, onChange: function(e){ setBatchFrom(e.target.value); }, style: { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 13 } }),
+        React.createElement("span", { style: { fontSize: 12, color: 'var(--text2)' } }, "s.d."),
+        React.createElement("input", { type: "date", value: batchTo, onChange: function(e){ setBatchTo(e.target.value); }, style: { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 13 } })
+      ),
+      React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 } },
+        React.createElement("button", { onClick: function(){ var all = {}; couriers.forEach(function(c){ all[c]=true; }); setBatchSel(all); }, style: { fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--accent)', cursor: 'pointer' } }, "Pilih Semua"),
+        React.createElement("button", { onClick: function(){ setBatchSel({}); }, style: { fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text2)', cursor: 'pointer' } }, "Hapus Pilihan"),
+        couriers.map(function(c){ return React.createElement("label", { key: c, style: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer', padding: '4px 10px', borderRadius: 6, border: '1px solid ' + (batchSel[c] ? 'var(--accent)' : 'var(--border)'), background: batchSel[c] ? 'rgba(99,102,241,0.1)' : 'transparent', color: batchSel[c] ? 'var(--accent)' : 'var(--text)' } },
+          React.createElement("input", { type: "checkbox", checked: !!batchSel[c], onChange: function(e){ setBatchSel(function(prev){ var n=Object.assign({},prev); if(e.target.checked) n[c]=true; else delete n[c]; return n; }); }, style: { accentColor: 'var(--accent)' } }), c
+        ); })
+      ),
+      React.createElement("button", {
+        onClick: batchDownload,
+        disabled: batchLoading || !couriers.some(function(c){ return batchSel[c]; }),
+        style: { padding: '8px 18px', borderRadius: 8, background: 'var(--green)', color: '#fff', fontWeight: 700, fontSize: 13, border: 'none', cursor: (!batchLoading && couriers.some(function(c){ return batchSel[c]; })) ? 'pointer' : 'not-allowed', opacity: (!batchLoading && couriers.some(function(c){ return batchSel[c]; })) ? 1 : 0.5 }
+      }, batchLoading ? "⏳ Mengunduh..." : "📥 Download Terpilih")
     ),
     loading ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text2)' } }, "Memuat...") :
     !history.length ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text3)' } }, "Tidak ada pengiriman untuk kurir ini pada tanggal tersebut.") :
