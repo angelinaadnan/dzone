@@ -11380,6 +11380,8 @@ function CourierDailyMonitor(_ref84) {
     return o.courier_name;
   }).map(function (o) {
     return o.courier_name;
+  })), _toConsumableArray((orders || []).flatMap(function (o) {
+    return o.extra_couriers || [];
   })), _toConsumableArray((purchaseOrders || []).flatMap(function (po) {
     return (po.pickups || []).filter(function (p) {
       return p.courier;
@@ -11425,9 +11427,9 @@ function CourierDailyMonitor(_ref84) {
     };
     var totalGpsStr = totalGpsKm === 0 ? null : totalGpsKm < 0.1 ? "".concat(Math.round(totalGpsKm * 1000), " m") : "".concat(totalGpsKm, " km");
 
-    // Orders untuk kurir ini pada tanggal ini
+    // Orders untuk kurir ini pada tanggal ini (termasuk extra_couriers)
     var myOrders = (orders || []).filter(function (o) {
-      return o.courier_name === name && (matchDate(o.delivered_at) || matchDate(o.updated_at) || matchDate(o.created_at));
+      return (o.courier_name === name || (o.extra_couriers || []).includes(name)) && (matchDate(o.delivered_at) || matchDate(o.updated_at) || matchDate(o.created_at));
     });
 
     // Courier tasks untuk kurir ini pada tanggal ini
