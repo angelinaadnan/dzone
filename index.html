@@ -31491,7 +31491,7 @@ function OpsDashboard(_ref192) {
 
     // ── DONE hari ini ──
     (orders || []).filter(function (o) {
-      return o.courier_name === name && o.status === 'delivered' && (o.delivered_at || o.updated_at || '').startsWith(today);
+      return (o.courier_name === name || (o.extra_couriers || []).includes(name)) && o.status === 'delivered' && (o.delivered_at || o.updated_at || '').startsWith(today);
     }).sort(function (a, b) {
       return new Date(a.delivered_at || a.updated_at) - new Date(b.delivered_at || b.updated_at);
     }).forEach(function (o) {
@@ -31582,7 +31582,7 @@ function OpsDashboard(_ref192) {
 
     // ── SEDANG JALAN / TIBA ──
     (orders || []).filter(function (o) {
-      return o.courier_name === name && o.status === 'on_delivery';
+      return (o.courier_name === name || (o.extra_couriers || []).includes(name)) && o.status === 'on_delivery';
     }).forEach(function (o) {
       return items.push({
         label: o.customer_name,
