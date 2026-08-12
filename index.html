@@ -11433,10 +11433,8 @@ function CourierDailyMonitor(_ref84) {
       var _iE = !_iP && (o.extra_couriers || []).includes(name);
       if (_iP) return matchDate(o.delivered_at) || matchDate(o.updated_at) || matchDate(o.created_at);
       if (_iE) {
-        // extra courier: tampil di kolom ini sampai dia sendiri selesai
-        var _xDone = (o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === name; });
-        var _xDoneToday = (o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === name && (h.time || '').startsWith(dateFrom || ''); });
-        if (_xDone) return _xDoneToday; // sudah selesai: tampil hanya di tanggal selesainya
+        var _xDoneEntry = (o.status_history || []).find(function(h){ return h.status === 'extra_delivered' && h.by === name; });
+        if (_xDoneEntry) return matchDate(_xDoneEntry.time); // selesai: tampil di tanggal dia selesai
         return matchDate(o.created_at); // belum selesai: tampil di hari order dibuat
       }
       return false;
@@ -31501,11 +31499,9 @@ function OpsDashboard(_ref192) {
 
     // ── DONE hari ini ──
     (orders || []).filter(function (o) {
-      var _isPrimary = o.courier_name === name;
-      var _isExtra = !_isPrimary && (o.extra_couriers || []).includes(name);
-      if (_isPrimary) return o.status === 'delivered' && (o.delivered_at || o.updated_at || '').startsWith(today);
-      if (_isExtra) return (o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === name && (h.time || '').startsWith(today); });
-      return false;
+      if (o.courier_name === name) return o.status === 'delivered' && (o.delivered_at || o.updated_at || '').startsWith(today);
+      if ((o.extra_couriers || []).includes(name)) return (o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === name && (h.time || '').startsWith(today); });
+      return false; // shape sentinel:
     }).sort(function (a, b) {
       return new Date(a.delivered_at || a.updated_at) - new Date(b.delivered_at || b.updated_at);
     }).forEach(function (o) {
@@ -31600,15 +31596,16 @@ function OpsDashboard(_ref192) {
       var _isExt = !_isPri && (o.extra_couriers || []).includes(name);
       if (_isPri) return o.status === 'on_delivery';
       if (_isExt) {
-        var _iAmDone = (o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === name; });
-        return !_iAmDone && ['on_delivery', 'delivered'].includes(o.status);
+        if (!['on_delivery','delivered'].includes(o.status)) return false;
+        return !(o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === name; });
       }
       return false;
     }).forEach(function (o) {
+      var _isExtO = (o.extra_couriers || []).includes(name) && o.courier_name !== name;
       return items.push({
         label: o.customer_name,
         addr: o.customer_address || '',
-        st: o.in_transit ? 'jalan' : 'antri'
+        st: _isExtO ? 'antri' : (o.in_transit ? 'jalan' : 'antri')
       });
     });
     (courierTasks || []).filter(function (t) {
@@ -33999,10 +33996,9 @@ function CourierJobTasks(_ref207) {
     };
   }();
   var myOrders = (orders || []).filter(function (o) {
-    var isPrimary = o.courier_name === courierName;
-    var isExtra = !isPrimary && (o.extra_couriers || []).includes(courierName);
-    if (isPrimary) return ['on_delivery', 'tech'].includes(o.status);
-    if (isExtra && o.status === 'on_delivery') {
+    if (o.courier_name === courierName) return ['on_delivery', 'tech'].includes(o.status);
+    if ((o.extra_couriers || []).includes(courierName)) {
+      if (!['on_delivery', 'delivered'].includes(o.status)) return false;
       return !(o.status_history || []).some(function(h){ return h.status === 'extra_delivered' && h.by === courierName; });
     }
     return false;
@@ -34077,17 +34073,16 @@ function CourierJobTasks(_ref207) {
   var markExtraDelivered = async function(o) {
     if (!orderPhoto[o.id]) { alert('Foto bukti pengiriman wajib diupload dulu'); return; }
     setOrderDelivering(function(d){ return Object.assign({},d,_defineProperty({},o.id,true)); });
-    var startLoc = getLastCheckin();
-    var loc = null;
-    try { loc = await getGPS(); } catch(e) {}
-    if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setOrderDelivering(function(d){ var n=Object.assign({},d); n[o.id]=false; return n; }); return; }
-    var photoUrl = await uploadPhoto(orderPhoto[o.id], 'delivery', 0, setUploadMsg('ord_' + o.id));
-    if (!photoUrl) { setPhotoMsg(function(p){ return Object.assign({},p,_defineProperty({},'ord_err_'+o.id,'❌ Foto gagal diupload. Pastikan internet aktif lalu coba lagi.')); }); setOrderDelivering(function(d){ return Object.assign({},d,_defineProperty({},o.id,false)); }); return; }
-    var km = null;
-    if (startLoc && loc) { try { km = await getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng); } catch(e) {} }
-    var newHistory = (o.status_history || []).concat([Object.assign({ status: 'extra_delivered', by: courierName, time: new Date().toISOString(), delivery_photo: photoUrl }, loc ? { end_location: loc } : {}, km ? { distance_km: km } : {})]);
-    await onUpdateOrder(o.id, { status_history: newHistory });
-    if (onCheckin) onCheckin({ courier_name: courierName, lat: loc ? loc.lat : null, lng: loc ? loc.lng : null, note: '✅ Terkirim ke ' + o.customer_name + (km ? ' · ' + km + ' km' : '') });
+    var _exLoc = null;
+    try { _exLoc = await getGPS(); } catch(e) {}
+    if (!_exLoc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.','error'); setOrderDelivering(function(d){ var n=Object.assign({},d); n[o.id]=false; return n; }); return; }
+    var _exPhoto = await uploadPhoto(orderPhoto[o.id],'delivery',0,setUploadMsg('ord_'+o.id));
+    if (!_exPhoto) { setPhotoMsg(function(p){ return Object.assign({},p,_defineProperty({},'ord_err_'+o.id,'❌ Foto gagal diupload.')); }); setOrderDelivering(function(d){ return Object.assign({},d,_defineProperty({},o.id,false)); }); return; }
+    var _exStart = getLastCheckin(); var _exKm = null;
+    if (_exStart && _exLoc) { try { _exKm = await getRoadDistanceKm(_exStart.lat,_exStart.lng,_exLoc.lat,_exLoc.lng); } catch(e){} }
+    var _exEntry = Object.assign({status:'extra_delivered',by:courierName,time:new Date().toISOString(),delivery_photo:_exPhoto},_exLoc?{end_location:_exLoc}:{},_exKm?{distance_km:_exKm}:{});
+    await onUpdateOrder(o.id,{status_history:(o.status_history||[]).concat([_exEntry])});
+    if (onCheckin) onCheckin({courier_name:courierName,lat:_exLoc.lat,lng:_exLoc.lng,note:'✅ Terkirim ke '+o.customer_name+(_exKm?' · '+_exKm+' km':'')});
     setOrderDelivering(function(d){ return Object.assign({},d,_defineProperty({},o.id,false)); });
   };
 
@@ -34431,10 +34426,6 @@ function CourierJobTasks(_ref207) {
     return o.courier_name === courierName && o.status === 'delivered' && (o.delivered_at || '').startsWith(today);
   }).forEach(function (o) {
     return todayKm += o.distance_km || 0;
-  });
-  (orders || []).forEach(function (o) {
-    var _exDone = (o.status_history || []).find(function(h){ return h.status === 'extra_delivered' && h.by === courierName && (h.time || '').startsWith(today); });
-    if (_exDone) todayKm += _exDone.distance_km || 0;
   });
   (purchaseOrders || []).forEach(function (po) {
     return (po.pickups || []).filter(function (t) {
@@ -35173,8 +35164,8 @@ function CourierJobTasks(_ref207) {
             alert('Foto bukti pengiriman wajib diupload dulu');
             return;
           }
-          var _isExtra = (o.extra_couriers || []).includes(courierName) && o.courier_name !== courierName;
-          if (_isExtra) { markExtraDelivered(o); } else { markOrderDelivered(o); }
+          var _isExt = (o.extra_couriers||[]).includes(courierName) && o.courier_name !== courierName;
+          _isExt ? markExtraDelivered(o) : markOrderDelivered(o);
         }
       }, photoMsg['ord_' + o.id] || (orderDelivering[o.id] ? '📡 GPS...' : '✅ Konfirmasi Sudah Terkirim'))))));
     }
