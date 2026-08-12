@@ -1802,7 +1802,7 @@ function App() {
             since.setMonth(since.getMonth() - monthsBack);
             // npwp_file & po_file di-exclude — di-load on-demand via loadOrderFiles (lazy)
             orderColsBase = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,start_location,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status,admin_photo';
-            orderColsNew = ',upgrade_items,downgrade_items,has_component_change,extra_couriers';
+            orderColsNew = ',upgrade_items,downgrade_items,has_component_change,extra_couriers,extra_courier_completions';
             buildOrderQ = function buildOrderQ(cols) {
               var useExtraCourier = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
               var q = db.from('orders').select(cols).gte('created_at', since.toISOString()).order('created_at', {
@@ -33978,7 +33978,14 @@ function CourierJobTasks(_ref207) {
     };
   }();
   var myOrders = (orders || []).filter(function (o) {
-    return ['on_delivery', 'tech'].includes(o.status) && (o.courier_name === courierName || (o.extra_couriers || []).includes(courierName));
+    var isPrimary = o.courier_name === courierName;
+    var isExtra = !isPrimary && (o.extra_couriers || []).includes(courierName);
+    if (isPrimary) return ['on_delivery', 'tech'].includes(o.status);
+    if (isExtra && o.status === 'on_delivery') {
+      var _ec = ((o.extra_courier_completions || {})[courierName]) || {};
+      return !_ec.done;
+    }
+    return false;
   });
   var myTasks = tasks.filter(function (t) {
     return t.assigned_courier === courierName;
@@ -34047,6 +34054,24 @@ function CourierJobTasks(_ref207) {
     };
     r.readAsDataURL(f);
   };
+  var markExtraDelivered = async function(o) {
+    if (!orderPhoto[o.id]) { alert('Foto bukti pengiriman wajib diupload dulu'); return; }
+    setOrderDelivering(function(d){ return Object.assign({},d,_defineProperty({},o.id,true)); });
+    var startLoc = getLastCheckin();
+    var loc = null;
+    try { loc = await getGPS(); } catch(e) {}
+    if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setOrderDelivering(function(d){ var n=Object.assign({},d); n[o.id]=false; return n; }); return; }
+    var photoUrl = await uploadPhoto(orderPhoto[o.id], 'delivery', 0, setUploadMsg('ord_' + o.id));
+    if (!photoUrl) { setPhotoMsg(function(p){ return Object.assign({},p,_defineProperty({},'ord_err_'+o.id,'❌ Foto gagal diupload. Pastikan internet aktif lalu coba lagi.')); }); setOrderDelivering(function(d){ return Object.assign({},d,_defineProperty({},o.id,false)); }); return; }
+    var km = null;
+    if (startLoc && loc) { try { km = await getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng); } catch(e) {} }
+    var ecEntry = Object.assign({ done: true, delivered_at: new Date().toISOString(), delivery_photo: photoUrl }, loc ? { end_location: loc } : {}, km ? { distance_km: km } : {});
+    var newEC = Object.assign({}, o.extra_courier_completions || {}, _defineProperty({}, courierName, ecEntry));
+    await onUpdateOrder(o.id, { extra_courier_completions: newEC });
+    if (onCheckin) onCheckin({ courier_name: courierName, lat: loc ? loc.lat : null, lng: loc ? loc.lng : null, note: '✅ Terkirim ke ' + o.customer_name + (km ? ' · ' + km + ' km' : '') });
+    setOrderDelivering(function(d){ return Object.assign({},d,_defineProperty({},o.id,false)); });
+  };
+
   var markOrderDelivered = /*#__PURE__*/function () {
     var _ref210 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee83(o) {
       var _loc3, _loc4;
@@ -34387,6 +34412,10 @@ function CourierJobTasks(_ref207) {
     return o.courier_name === courierName && o.status === 'delivered' && (o.delivered_at || '').startsWith(today);
   }).forEach(function (o) {
     return todayKm += o.distance_km || 0;
+  });
+  (orders || []).forEach(function (o) {
+    var _ecDone = ((o.extra_courier_completions || {})[courierName]) || {};
+    if (_ecDone.done && (_ecDone.delivered_at || '').startsWith(today)) todayKm += _ecDone.distance_km || 0;
   });
   (purchaseOrders || []).forEach(function (po) {
     return (po.pickups || []).filter(function (t) {
@@ -35125,7 +35154,8 @@ function CourierJobTasks(_ref207) {
             alert('Foto bukti pengiriman wajib diupload dulu');
             return;
           }
-          markOrderDelivered(o);
+          var _isExtra = (o.extra_couriers || []).includes(courierName) && o.courier_name !== courierName;
+          if (_isExtra) { markExtraDelivered(o); } else { markOrderDelivered(o); }
         }
       }, photoMsg['ord_' + o.id] || (orderDelivering[o.id] ? '📡 GPS...' : '✅ Konfirmasi Sudah Terkirim'))))));
     }
