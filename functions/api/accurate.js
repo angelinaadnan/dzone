@@ -72,15 +72,35 @@ export async function onRequestGet(context) {
     const allInvoices = [...invAdl.data, ...invGroup.data];
 
     if (debugMode) {
-      return new Response(JSON.stringify({
-        totalInvoices: allInvoices.length,
-        startDate, endDate,
-        paginationADL: invAdl.rawFirst?.sp,
-        paginationGROUP: invGroup.rawFirst?.sp,
-        firstInvoice: allInvoices[0] || null,
-        firstItem: allInvoices[0]?.detailItem?.[0] || null,
-        sampleKeys: allInvoices[0] ? Object.keys(allInvoices[0]) : [],
-      }), { headers: corsHeaders });
+      // Run 3 test calls on ADL to find working filter params
+      const token = env.ACCURATE_TOKEN_ADL;
+      const tests = await Promise.all([
+        testFetch(token, appKey, sigSecret, {
+          page: '1', pageSize: '5',
+          // No date filter — baseline rowCount
+        }, 'no_filter'),
+        testFetch(token, appKey, sigSecret, {
+          page: '1', pageSize: '5',
+          'filter.startDate': startDate,        // yyyy-MM-dd
+          'filter.endDate': endDate,
+        }, 'filter_startDate_iso'),
+        testFetch(token, appKey, sigSecret, {
+          page: '1', pageSize: '5',
+          'filter.startDate': toAccurateDate(startDate),  // dd/MM/yyyy
+          'filter.endDate': toAccurateDate(endDate),
+        }, 'filter_startDate_dmy'),
+        testFetch(token, appKey, sigSecret, {
+          page: '1', pageSize: '5',
+          'filter.transDate.from': toAccurateDate(startDate),
+          'filter.transDate.to': toAccurateDate(endDate),
+        }, 'filter_transDate_range'),
+        testFetch(token, appKey, sigSecret, {
+          page: '1', pageSize: '5',
+          startDate: toAccurateDate(startDate),
+          endDate: toAccurateDate(endDate),
+        }, 'bare_startDate'),
+      ]);
+      return new Response(JSON.stringify({ startDate, endDate, tests }), { headers: corsHeaders });
     }
 
     const result = aggregateData(allInvoices, period);
@@ -98,6 +118,44 @@ export async function onRequestOptions() {
       'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
     },
   });
+}
+
+// ─── Helper: convert yyyy-MM-dd to dd/MM/yyyy ─────────────────────────────────
+function toAccurateDate(isoDate) {
+  const [y, m, d] = isoDate.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+// ─── Debug test: single page fetch, returns rowCount + firstDate + keys ────────
+async function testFetch(token, appKey, sigSecret, extraParams, label) {
+  try {
+    const params = new URLSearchParams(extraParams);
+    const timestamp = Date.now();
+    const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      'X-Api-Key': appKey,
+      'X-Api-Timestamp': String(timestamp),
+      'X-Api-Signature': signature,
+      Accept: 'application/json',
+      'User-Agent': 'DZone-Dashboard/1.0',
+    };
+    let resp = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?${params}`, { headers });
+    if (!resp.ok && resp.status >= 500)
+      resp = await fetch(`${ACCURATE_BASE_ALT}/sales-invoice/list.do?${params}`, { headers });
+    const json = await resp.json();
+    const rows = json.d || [];
+    return {
+      label,
+      rowCount: json.sp?.rowCount,
+      pageCount: json.sp?.pageCount,
+      firstDate: rows[0]?.transDate || null,
+      keys: rows[0] ? Object.keys(rows[0]) : [],
+      error: json.s === false ? json.d : null,
+    };
+  } catch (e) {
+    return { label, error: e.message };
+  }
 }
 
 // ─── Fetch all invoice pages ──────────────────────────────────────────────────
@@ -146,11 +204,10 @@ async function fetchAllInvoices(token, appKey, sigSecret, startDate, endDate) {
     if (!json.s || rows.length === 0) break;
 
     all.push(...rows);
-    // Stop when last page or safety limit
-    const totalRows = json.sp?.rowCount || json.total || Infinity;
-    if (rows.length < pageSize || all.length >= totalRows) break;
+    // Stop when on last page (use API-returned pageCount, not our requested pageSize)
+    const totalPages = json.sp?.pageCount || 1;
+    if (rows.length === 0 || page >= totalPages || page >= 50) break;
     page++;
-    if (page > 50) break;
   }
 
   return { data: all, rawFirst };
