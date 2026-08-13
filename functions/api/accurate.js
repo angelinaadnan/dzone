@@ -65,40 +65,8 @@ export async function onRequestGet(context) {
       const token = env.ACCURATE_TOKEN_ADL;
       const dmy = { startDate: toAccurateDate(startDate), endDate: toAccurateDate(endDate) };
 
-      // Test 0: filter.transDateFrom / filter.transDateTo
-      const tdResult = await testFetch(token, appKey, sigSecret, {
-        page: '1', pageSize: '3', fields: 'number,transDate,totalAmount',
-        'filter.transDateFrom': dmy.startDate,
-        'filter.transDateTo': dmy.endDate,
-      }, 'transDateFrom');
-
-      // Test 0b: period param
-      const periodResult = await testFetch(token, appKey, sigSecret, {
-        page: '1', pageSize: '3', fields: 'number,transDate,totalAmount',
-        period: `${year}-${String(month).padStart(2,'0')}`,
-      }, 'period');
-
-      // Test 1: POST with JSON body (with iris fallback)
-      const postResult = await (async () => {
-        try {
-          const timestamp = Date.now();
-          const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
-          const hdrs = {
-            Authorization: `Bearer ${token}`, 'X-Api-Key': appKey,
-            'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
-            Accept: 'application/json', 'Content-Type': 'application/json',
-            'User-Agent': 'DZone-Dashboard/1.0',
-          };
-          const path = '/sales-invoice/list.do?page=1&pageSize=5&fields=number,transDate,totalAmount';
-          let r = await fetch(`${ACCURATE_BASE}${path}`, { method:'POST', headers:hdrs, body:JSON.stringify({filter:dmy}) });
-          if (!r.ok && r.status >= 500) r = await fetch(`${ACCURATE_BASE_ALT}${path}`, { method:'POST', headers:hdrs, body:JSON.stringify({filter:dmy}) });
-          const json = await r.json();
-          return { rowCount: json.sp?.rowCount, firstDate: (json.d||[])[0]?.transDate, error: json.s===false?json.d:null };
-        } catch(e) { return { error: e.message }; }
-      })();
-
-      // Test 2: profit-loss report endpoint (with iris fallback)
-      const plResult = await (async () => {
+      // Test 1: Full profit-loss data
+      const plFull = await (async () => {
         try {
           const timestamp = Date.now();
           const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
@@ -111,11 +79,29 @@ export async function onRequestGet(context) {
           let r = await fetch(`${ACCURATE_BASE}/report/profit-loss.do?${qs}`, { headers:hdrs });
           if (!r.ok && r.status >= 500) r = await fetch(`${ACCURATE_BASE_ALT}/report/profit-loss.do?${qs}`, { headers:hdrs });
           const json = await r.json();
-          return { s: json.s, keys: Object.keys(json.d||json||{}), snippet: JSON.stringify(json).slice(0,400), error: json.s===false?json.d:null };
+          return { s: json.s, d: json.d, error: json.s===false?json.d:null };
         } catch(e) { return { error: e.message }; }
       })();
 
-      return new Response(JSON.stringify({ v: 8, dmy, tdResult, periodResult, postResult, plResult }), { headers: corsHeaders });
+      // Test 2: sales by salesman report
+      const salesmanResult = await (async () => {
+        try {
+          const timestamp = Date.now();
+          const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
+          const hdrs = {
+            Authorization: `Bearer ${token}`, 'X-Api-Key': appKey,
+            'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
+            Accept: 'application/json', 'User-Agent': 'DZone-Dashboard/1.0',
+          };
+          const qs = new URLSearchParams({ startDate: dmy.startDate, endDate: dmy.endDate });
+          let r = await fetch(`${ACCURATE_BASE}/report/sales-by-salesman.do?${qs}`, { headers:hdrs });
+          if (!r.ok && r.status >= 500) r = await fetch(`${ACCURATE_BASE_ALT}/report/sales-by-salesman.do?${qs}`, { headers:hdrs });
+          const json = await r.json();
+          return { s: json.s, snippet: JSON.stringify(json).slice(0,300), error: json.s===false?json.d:null };
+        } catch(e) { return { error: e.message }; }
+      })();
+
+      return new Response(JSON.stringify({ v: 9, dmy, plFull, salesmanResult }), { headers: corsHeaders });
     }
 
     const [invAdl, invGroup] = await Promise.all([
