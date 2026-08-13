@@ -99,16 +99,12 @@ async function fetchAllInvoices(token, startDate, endDate) {
   const pageSize = 100;
 
   while (true) {
+    // No 'fields' restriction — let API return all fields so we get everything
     const params = new URLSearchParams({
-      fields: [
-        'number', 'transactionDate', 'customerName',
-        'grandTotal', 'totalAmount', 'profitAmount',
-        'branchName', 'salesperson', 'detailItem',
-      ].join(','),
       'filter.startDate': startDate,
       'filter.endDate': endDate,
-      page: String(page),
-      pageSize: String(pageSize),
+      sp: String(page),      // Accurate uses 'sp' for page
+      l: String(pageSize),   // Accurate uses 'l' for limit
     });
 
     const headers = {
@@ -130,10 +126,13 @@ async function fetchAllInvoices(token, startDate, endDate) {
     }
 
     const json = await resp.json();
-    if (!json.s || !json.d || json.d.length === 0) break;
 
-    all.push(...json.d);
-    if (json.d.length < pageSize || all.length >= (json.total || Infinity)) break;
+    // Handle both {s, d} and {s, data} response formats
+    const rows = json.d || json.data || [];
+    if (!json.s || rows.length === 0) break;
+
+    all.push(...rows);
+    if (rows.length < pageSize || all.length >= (json.total || Infinity)) break;
     page++;
     if (page > 20) break;
   }
