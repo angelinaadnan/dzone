@@ -60,22 +60,49 @@ export async function onRequestGet(context) {
     const appKey = env.ACCURATE_APP_KEY || '';
     const sigSecret = env.ACCURATE_SIG_SECRET || '';
 
-    // Debug mode: test wildcard filter on invoice number
+    // Debug mode: try POST body filter + report endpoint
     if (debugMode) {
       const token = env.ACCURATE_TOKEN_ADL;
-      const numPrefix = `SI.${year}.${String(month).padStart(2,'0')}`;
-      const withStar  = await testFetch(token, appKey, sigSecret, {
-        page: '1', pageSize: '5', fields: 'number,transDate,totalAmount,branchName,masterSalesmanName',
-        'filter.number': numPrefix + '*',
-      }, 'star');
-      const withPct   = await testFetch(token, appKey, sigSecret, {
-        page: '1', pageSize: '5', fields: 'number,transDate,totalAmount,branchName,masterSalesmanName',
-        'filter.number': numPrefix + '%',
-      }, 'pct');
-      const noFilter  = await testFetch(token, appKey, sigSecret, {
-        page: '1', pageSize: '3', fields: 'number,transDate,totalAmount,branchName,masterSalesmanName',
-      }, 'no_filter_keys');
-      return new Response(JSON.stringify({ v: 6, numPrefix, withStar, withPct, noFilter }), { headers: corsHeaders });
+      const dmy = { startDate: toAccurateDate(startDate), endDate: toAccurateDate(endDate) };
+
+      // Test 1: POST with JSON body
+      const postResult = await (async () => {
+        try {
+          const timestamp = Date.now();
+          const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
+          const headers = {
+            Authorization: `Bearer ${token}`, 'X-Api-Key': appKey,
+            'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
+            Accept: 'application/json', 'Content-Type': 'application/json',
+            'User-Agent': 'DZone-Dashboard/1.0',
+          };
+          const resp = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?page=1&pageSize=5&fields=number,transDate,totalAmount`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ filter: dmy }),
+          });
+          const json = await resp.json();
+          return { rowCount: json.sp?.rowCount, firstDate: (json.d||[])[0]?.transDate, keys: Object.keys((json.d||[])[0]||{}), error: json.s===false?json.d:null };
+        } catch(e) { return { error: e.message }; }
+      })();
+
+      // Test 2: profit-loss report endpoint
+      const plResult = await (async () => {
+        try {
+          const timestamp = Date.now();
+          const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
+          const headers = {
+            Authorization: `Bearer ${token}`, 'X-Api-Key': appKey,
+            'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
+            Accept: 'application/json', 'User-Agent': 'DZone-Dashboard/1.0',
+          };
+          const params = new URLSearchParams({ startDate: dmy.startDate, endDate: dmy.endDate, asOf: dmy.endDate });
+          const resp = await fetch(`${ACCURATE_BASE}/report/profit-and-loss.do?${params}`, { headers });
+          const json = await resp.json();
+          return { s: json.s, keys: Object.keys(json.d||json||{}), d: json.d || json, error: json.s===false?json.d:null };
+        } catch(e) { return { error: e.message }; }
+      })();
+
+      return new Response(JSON.stringify({ v: 7, dmy, postResult, plResult }), { headers: corsHeaders });
     }
 
     const [invAdl, invGroup] = await Promise.all([
