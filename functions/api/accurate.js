@@ -5,6 +5,7 @@
 //   ACCURATE_API_KEY     = secret key untuk validasi request dari dashboard
 
 const ACCURATE_BASE = 'https://api.accurate.id/accurate/api';
+const ACCURATE_BASE_ALT = 'https://iris.accurate.id/accurate/api';
 
 // Branch prefix → display name
 const BRANCH_LABELS = { TC: 'Tangerang', PS: 'Poins', M2: 'Mangga Dua' };
@@ -99,13 +100,22 @@ async function fetchAllInvoices(token, startDate, endDate) {
       pageSize: String(pageSize),
     });
 
-    const resp = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?${params}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-    });
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+      'User-Agent': 'DZone-Dashboard/1.0',
+    };
+
+    let resp = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?${params}`, { headers });
+
+    // Fallback ke iris.accurate.id jika api.accurate.id error (Cloudflare 530)
+    if (!resp.ok && resp.status >= 500) {
+      resp = await fetch(`${ACCURATE_BASE_ALT}/sales-invoice/list.do?${params}`, { headers });
+    }
 
     if (!resp.ok) {
       const txt = await resp.text();
-      throw new Error(`Accurate API ${resp.status}: ${txt.slice(0, 200)}`);
+      throw new Error(`Accurate API ${resp.status}: ${txt.slice(0, 300)}`);
     }
 
     const json = await resp.json();
