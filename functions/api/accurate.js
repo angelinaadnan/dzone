@@ -44,11 +44,6 @@ export async function onRequestGet(context) {
     'Access-Control-Allow-Origin': '*',
   };
 
-  const apiKey = url.searchParams.get('key') || request.headers.get('X-API-Key');
-  if (env.ACCURATE_API_KEY && apiKey !== env.ACCURATE_API_KEY) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
-  }
-
   const period = url.searchParams.get('period') || getThisMonth();
 
   try {
