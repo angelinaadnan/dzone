@@ -46643,22 +46643,16 @@ function OrderDetailModal(_ref278) {
 
 // ─── SANTO DASHBOARD ──────────────────────────────────────────────
 function SantoDashboard() {
-  var _React$useState = React.useState(function() {
-    var now = new Date();
-    return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-  });
-  var period = _React$useState[0]; var setPeriod = _React$useState[1];
-  var _React$useState2 = React.useState(null);
-  var data = _React$useState2[0]; var setData = _React$useState2[1];
-  var _React$useState3 = React.useState(false);
-  var loading = _React$useState3[0]; var setLoading = _React$useState3[1];
-  var _React$useState4 = React.useState(null);
-  var error = _React$useState4[0]; var setError = _React$useState4[1];
-  var _React$useState5 = React.useState('Semua');
-  var activeBranch = _React$useState5[0]; var setActiveBranch = _React$useState5[1];
+  var _s1 = React.useState(function() {
+    var n = new Date(); return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0');
+  }); var period = _s1[0]; var setPeriod = _s1[1];
+  var _s2 = React.useState(null); var data = _s2[0]; var setData = _s2[1];
+  var _s3 = React.useState(false); var loading = _s3[0]; var setLoading = _s3[1];
+  var _s4 = React.useState(null); var error = _s4[0]; var setError = _s4[1];
+  var _s5 = React.useState('Semua'); var activeBranch = _s5[0]; var setActiveBranch = _s5[1];
 
   var BRANCHES = ['Semua', 'Tangerang', 'Poins', 'Mangga Dua'];
-  var BRANCH_STORES = { Tangerang: 'TC DZ, TC NMC, TC HOI', Poins: 'PS NMC', 'Mangga Dua': 'M2 DZ, M2 BIG, M2 ADL' };
+  var BRANCH_STORES = { Tangerang: 'TC DZ · TC NMC · TC HOI', Poins: 'PS NMC', 'Mangga Dua': 'M2 DZ · M2 BIG · M2 ADL' };
 
   var fmtRp = function(v) {
     if (!v && v !== 0) return '-';
@@ -46680,27 +46674,39 @@ function SantoDashboard() {
 
   var view = React.useMemo(function() {
     if (!data) return null;
-    if (activeBranch === 'Semua') return { summary: data.summary, salesList: data.salesList, topItems: data.topItems, topBrands: data.topBrands, categoryList: data.categoryList };
+    if (activeBranch === 'Semua') return {
+      summary: data.summary,
+      salesList: data.salesList, topItems: data.topItems,
+      topBrands: data.topBrands, categoryList: data.categoryList,
+      stores: null
+    };
     var b = data.branches && data.branches[activeBranch];
-    if (!b) return { summary: { revenue:0,profit:0,profitMargin:0,transactions:0 }, salesList:[], topItems:[], topBrands:[], categoryList:[] };
-    var bsum = (data.branchSummary||[]).find(function(x){ return x.name===activeBranch; }) || { revenue:0,profit:0,profitMargin:0,transactions:0 };
-    return { summary: bsum, salesList: b.salesList||[], topItems: b.topItems||[], topBrands: b.topBrands||[], categoryList: b.categoryList||[] };
+    var bSum = (data.branchSummary||[]).find(function(x){ return x.name===activeBranch; });
+    var bStores = bSum && bSum.stores && bSum.stores.length > 0 ? bSum.stores : null;
+    return {
+      summary: bSum || { revenue:0, profit:0, profitMargin:0, transactions:0 },
+      salesList: b ? b.salesList||[] : [],
+      topItems: b ? b.topItems||[] : [],
+      topBrands: b ? b.topBrands||[] : [],
+      categoryList: b ? b.categoryList||[] : [],
+      stores: bStores
+    };
   }, [data, activeBranch]);
 
-  var cs = { background: 'var(--surface)', borderRadius: 12, padding: '16px 20px', border: '1px solid var(--border)' };
-  var lbl = { fontSize: 12, color: 'var(--text3)', marginBottom: 4 };
-  var val = { fontSize: 22, fontWeight: 700, fontFamily: 'DM Mono', color: 'var(--text1)' };
-  var sub = { fontSize: 12, color: 'var(--text3)', marginTop: 2 };
-  var barBg = { height: 4, background: 'var(--border)', borderRadius: 2 };
+  var cs = { background:'var(--surface)', borderRadius:12, padding:'16px 20px', border:'1px solid var(--border)' };
+  var lbl = { fontSize:12, color:'var(--text3)', marginBottom:4 };
+  var bigVal = { fontSize:22, fontWeight:700, fontFamily:'DM Mono', color:'var(--text1)' };
+  var sub = { fontSize:12, color:'var(--text3)', marginTop:2 };
+  var barBg = { height:4, background:'var(--border)', borderRadius:2 };
+  var barFill = function(pct, color) { return { height:'100%', width:pct.toFixed(1)+'%', background:color||'#3b82f6', borderRadius:2 }; };
 
-  return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 1100, margin: '0 auto' } },
+  return React.createElement('div', { style:{ padding:'20px 24px', maxWidth:1100, margin:'0 auto' } },
 
-    // Header row
-    React.createElement('div', { style: { display:'flex', alignItems:'center', gap:12, marginBottom:20 } },
-      React.createElement('h2', { style: { fontSize:20, fontWeight:700, margin:0, flex:1 } }, '📊 Sales Dashboard'),
+    // Header
+    React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:12, marginBottom:20 } },
+      React.createElement('h2', { style:{ fontSize:20, fontWeight:700, margin:0, flex:1 } }, '📊 Sales Dashboard'),
       React.createElement('input', {
-        type:'month', value:period,
-        onChange: function(e){ setPeriod(e.target.value); },
+        type:'month', value:period, onChange:function(e){ setPeriod(e.target.value); },
         style:{ padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--surface)', color:'var(--text1)', fontSize:14 }
       })
     ),
@@ -46712,62 +46718,82 @@ function SantoDashboard() {
         return React.createElement('button', {
           key:b, onClick:function(){ setActiveBranch(b); },
           style:{ padding:'6px 14px', borderRadius:20, border:'1px solid '+(active?'#3b82f6':'var(--border)'),
-            background: active?'#3b82f6':'var(--surface)', color: active?'#fff':'var(--text1)',
-            fontWeight: active?600:400, fontSize:13, cursor:'pointer' }
+            background:active?'#3b82f6':'var(--surface)', color:active?'#fff':'var(--text1)',
+            fontWeight:active?600:400, fontSize:13, cursor:'pointer', transition:'all 0.15s' }
         },
-          b === 'Semua' ? 'Semua Cabang' : b,
-          b !== 'Semua' && React.createElement('span', { style:{ fontSize:11, opacity:0.8, marginLeft:5 } }, '(', BRANCH_STORES[b], ')')
+          b === 'Semua' ? 'Semua Cabang' : b
         );
       })
     ),
 
-    loading && React.createElement('div', { style:{ textAlign:'center', padding:60, color:'var(--text3)' } }, '⏳ Memuat data...'),
+    loading && React.createElement('div', { style:{ textAlign:'center', padding:60, color:'var(--text3)' } }, '⏳ Memuat data Accurate...'),
+
     error && React.createElement('div', { style:{ textAlign:'center', padding:40, color:'#ef4444', background:'var(--surface)', borderRadius:12, border:'1px solid var(--border)' } },
       React.createElement('div', { style:{ fontSize:18, marginBottom:8 } }, '⚠️ Gagal memuat'),
-      React.createElement('div', { style:{ fontSize:13, color:'var(--text2)' } }, error),
-      React.createElement('div', { style:{ fontSize:12, color:'var(--text3)', marginTop:8 } }, 'Pastikan token Accurate sudah diset di Cloudflare.')
+      React.createElement('div', { style:{ fontSize:13, color:'var(--text2)', marginBottom:4 } }, error),
+      React.createElement('div', { style:{ fontSize:12, color:'var(--text3)' } }, 'Pastikan ACCURATE_TOKEN_ADL dan ACCURATE_TOKEN_GROUP sudah diset di Cloudflare.')
     ),
 
     view && React.createElement(React.Fragment, null,
 
       // Summary cards
-      React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:12, marginBottom:20 } },
+      React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px,1fr))', gap:12, marginBottom:20 } },
         React.createElement('div', { style:cs },
           React.createElement('div', { style:lbl }, 'Total Penjualan'),
-          React.createElement('div', { style:val }, fmtRp(view.summary.revenue)),
-          React.createElement('div', { style:sub }, fmtNum(view.summary.transactions) + ' transaksi')
+          React.createElement('div', { style:bigVal }, fmtRp(view.summary.revenue)),
+          React.createElement('div', { style:sub }, fmtNum(view.summary.transactions)+' transaksi')
         ),
         React.createElement('div', { style:cs },
           React.createElement('div', { style:lbl }, 'Total Profit'),
-          React.createElement('div', { style:Object.assign({},val,{ color: view.summary.profit>=0?'#22c55e':'#ef4444' }) }, fmtRp(view.summary.profit)),
-          React.createElement('div', { style:sub }, 'Margin: ' + (view.summary.profitMargin||0) + '%')
+          React.createElement('div', { style:Object.assign({},bigVal,{ color:view.summary.profit>=0?'#22c55e':'#ef4444' }) }, fmtRp(view.summary.profit)),
+          React.createElement('div', { style:sub }, 'Margin: '+(view.summary.profitMargin||0)+'%')
         ),
         React.createElement('div', { style:cs },
           React.createElement('div', { style:lbl }, 'Jumlah Transaksi'),
-          React.createElement('div', { style:val }, fmtNum(view.summary.transactions)),
-          React.createElement('div', { style:sub }, 'Invoice ' + period)
+          React.createElement('div', { style:bigVal }, fmtNum(view.summary.transactions)),
+          React.createElement('div', { style:sub }, 'Invoice bulan '+period)
         )
       ),
 
-      // Branch breakdown (only on "Semua" tab)
+      // Semua: branch breakdown cards
       activeBranch === 'Semua' && data.branchSummary && data.branchSummary.length > 0 &&
         React.createElement('div', { style:Object.assign({},cs,{ marginBottom:20 }) },
           React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:12 } }, '🏪 Breakdown per Cabang'),
-          React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:10 } },
+          React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px,1fr))', gap:10 } },
             data.branchSummary.map(function(b) {
               var pct = data.summary.revenue > 0 ? b.revenue/data.summary.revenue*100 : 0;
-              return React.createElement('div', { key:b.name, style:{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg)' } },
-                React.createElement('div', { style:{ fontWeight:600, fontSize:13, marginBottom:6 } }, b.name,
-                  React.createElement('span', { style:{ fontWeight:400, fontSize:11, color:'var(--text3)', marginLeft:6 } }, BRANCH_STORES[b.name]||'')
+              return React.createElement('div', {
+                key:b.name, onClick:function(){ setActiveBranch(b.name); },
+                style:{ padding:'14px 16px', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg)', cursor:'pointer' }
+              },
+                React.createElement('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:4 } },
+                  React.createElement('span', { style:{ fontWeight:600, fontSize:14 } }, b.name),
+                  React.createElement('span', { style:{ fontSize:11, color:'var(--text3)' } }, BRANCH_STORES[b.name]||'')
                 ),
-                React.createElement('div', { style:{ fontFamily:'DM Mono', fontWeight:700, fontSize:16 } }, fmtRp(b.revenue)),
-                React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2, marginBottom:6 } },
-                  b.transactions + ' transaksi • margin ' + (b.profitMargin||0) + '%'
+                React.createElement('div', { style:{ fontFamily:'DM Mono', fontWeight:700, fontSize:18, marginBottom:2 } }, fmtRp(b.revenue)),
+                React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginBottom:8 } },
+                  b.transactions+' trx • margin '+(b.profitMargin||0)+'%'
                 ),
-                React.createElement('div', { style:barBg },
-                  React.createElement('div', { style:{ height:'100%', width: pct.toFixed(1)+'%', background:'#3b82f6', borderRadius:2 } })
-                ),
-                React.createElement('div', { style:{ fontSize:10, color:'var(--text3)', marginTop:3 } }, pct.toFixed(1) + '% dari total')
+                React.createElement('div', { style:barBg }, React.createElement('div', { style:barFill(pct) })),
+                React.createElement('div', { style:{ fontSize:10, color:'var(--text3)', marginTop:3 } }, pct.toFixed(1)+'% dari total → klik untuk detail')
+              );
+            })
+          )
+        ),
+
+      // Per-branch: store breakdown (when warehouse data available)
+      activeBranch !== 'Semua' && view.stores && view.stores.length > 0 &&
+        React.createElement('div', { style:Object.assign({},cs,{ marginBottom:20 }) },
+          React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:12 } }, '🏪 Breakdown per Toko — '+activeBranch),
+          React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px,1fr))', gap:10 } },
+            view.stores.map(function(st) {
+              var pct = view.summary.revenue > 0 ? st.revenue/view.summary.revenue*100 : 0;
+              return React.createElement('div', { key:st.code, style:{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg)' } },
+                React.createElement('div', { style:{ fontWeight:600, fontSize:13, marginBottom:4, fontFamily:'DM Mono' } }, st.code),
+                React.createElement('div', { style:{ fontSize:16, fontWeight:700 } }, fmtRp(st.revenue)),
+                React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginBottom:6 } }, 'profit '+fmtRp(st.profit)),
+                React.createElement('div', { style:barBg }, React.createElement('div', { style:barFill(pct,'#8b5cf6') })),
+                React.createElement('div', { style:{ fontSize:10, color:'var(--text3)', marginTop:3 } }, pct.toFixed(1)+'%')
               );
             })
           )
@@ -46788,7 +46814,7 @@ function SantoDashboard() {
               })
         ),
         React.createElement('div', { style:cs },
-          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '🏆 Barang Terlaris'),
+          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '🏆 Barang Terlaris (Top 10)'),
           view.topItems.length === 0
             ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
             : view.topItems.map(function(it, i) {
@@ -46814,9 +46840,7 @@ function SantoDashboard() {
                     React.createElement('span', null, b.name),
                     React.createElement('span', { style:{ color:'var(--text3)', fontFamily:'DM Mono' } }, fmtNum(b.qty)+' unit')
                   ),
-                  React.createElement('div', { style:barBg },
-                    React.createElement('div', { style:{ height:'100%', width:pct+'%', background:'#3b82f6', borderRadius:2 } })
-                  )
+                  React.createElement('div', { style:barBg }, React.createElement('div', { style:barFill(pct) }))
                 );
               })
         ),
@@ -46832,9 +46856,7 @@ function SantoDashboard() {
                     React.createElement('span', null, c.name),
                     React.createElement('span', { style:{ color:'var(--text3)', fontFamily:'DM Mono' } }, fmtNum(c.units)+' unit ('+pct.toFixed(0)+'%)')
                   ),
-                  React.createElement('div', { style:barBg },
-                    React.createElement('div', { style:{ height:'100%', width:pct.toFixed(1)+'%', background:'#8b5cf6', borderRadius:2 } })
-                  )
+                  React.createElement('div', { style:barBg }, React.createElement('div', { style:barFill(pct,'#8b5cf6') }))
                 );
               })
         )

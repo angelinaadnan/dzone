@@ -7,23 +7,32 @@
 const ACCURATE_BASE = 'https://api.accurate.id/accurate/api';
 
 // Branch prefix → display name
-const BRANCH_LABELS = {
-  'TC': 'Tangerang',
-  'PS': 'Poins',
-  'M2': 'Mangga Dua',
+const BRANCH_LABELS = { TC: 'Tangerang', PS: 'Poins', M2: 'Mangga Dua' };
+
+// Invoice branch codes per branch
+const INVOICE_BRANCHES = {
+  Tangerang:  ['TC DZ', 'TC NMC', 'TC HOI'],
+  Poins:      ['PS NMC'],
+  'Mangga Dua': ['M2 ADL'],
 };
 
-// All known branch codes → their prefix
-const BRANCH_CODES = [
-  'TC DZ', 'TC NMC', 'TC HOI',
-  'PS NMC',
-  'M2 DZ', 'M2 BIG', 'M2 ADL',
-];
+// Warehouse codes per branch (item level — includes M2 DZ, M2 BIG)
+const WAREHOUSE_BRANCHES = {
+  Tangerang:  ['TC DZ', 'TC NMC', 'TC HOI'],
+  Poins:      ['PS NMC'],
+  'Mangga Dua': ['M2 DZ', 'M2 BIG', 'M2 ADL'],
+};
 
 function getBranchLabel(branchName) {
   if (!branchName) return 'Lainnya';
-  const prefix = branchName.trim().split(/\s+/)[0].toUpperCase();
+  const prefix = branchName.trim().split(/[\s-]+/)[0].toUpperCase();
   return BRANCH_LABELS[prefix] || branchName;
+}
+
+// Normalize warehouse name: "TC - DZ" → "TC DZ", "TC DZ" → "TC DZ"
+function normalizeWarehouse(name) {
+  if (!name) return '';
+  return name.replace(/\s*-\s*/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
 }
 
 export async function onRequestGet(context) {
@@ -35,7 +44,6 @@ export async function onRequestGet(context) {
     'Access-Control-Allow-Origin': '*',
   };
 
-  // Simple API key guard
   const apiKey = url.searchParams.get('key') || request.headers.get('X-API-Key');
   if (env.ACCURATE_API_KEY && apiKey !== env.ACCURATE_API_KEY) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
@@ -77,7 +85,7 @@ export async function onRequestOptions() {
   });
 }
 
-// ─── Fetch all pages of invoices from Accurate ───────────────────────────────
+// ─── Fetch all invoice pages ──────────────────────────────────────────────────
 async function fetchAllInvoices(token, startDate, endDate) {
   const all = [];
   let page = 1;
@@ -97,10 +105,7 @@ async function fetchAllInvoices(token, startDate, endDate) {
     });
 
     const resp = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?${params}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     });
 
     if (!resp.ok) {
@@ -112,39 +117,38 @@ async function fetchAllInvoices(token, startDate, endDate) {
     if (!json.s || !json.d || json.d.length === 0) break;
 
     all.push(...json.d);
-
     if (json.d.length < pageSize || all.length >= (json.total || Infinity)) break;
     page++;
-    if (page > 20) break; // safety: 2000 invoices max
+    if (page > 20) break;
   }
 
   return all;
 }
 
-// ─── Aggregate into overall + per-branch breakdowns ──────────────────────────
+// ─── Aggregate into overall + per-branch + per-store ─────────────────────────
 function aggregateData(invoices, period) {
-  // overall accumulators
-  const overall = makeAccumulators();
-
-  // per-branch accumulators: key = 'Tangerang' | 'Poins' | 'Mangga Dua' | 'Lainnya'
-  const byBranch = {};
+  const overall = makeAcc();
+  const byBranch = {};   // 'Tangerang' | 'Poins' | 'Mangga Dua' → acc
+  const byStore = {};    // 'TC DZ' | 'TC NMC' | ... → acc (warehouse-level from items)
 
   for (const inv of invoices) {
     const branchLabel = getBranchLabel(inv.branchName);
-    if (!byBranch[branchLabel]) byBranch[branchLabel] = makeAccumulators();
+    if (!byBranch[branchLabel]) byBranch[branchLabel] = makeAcc();
 
     const invRevenue = inv.grandTotal || inv.totalAmount || 0;
     const invProfit = inv.profitAmount || 0;
 
-    overall.revenue += invRevenue;
-    overall.profit += invProfit;
-    overall.transactions += 1;
-    byBranch[branchLabel].revenue += invRevenue;
-    byBranch[branchLabel].profit += invProfit;
-    byBranch[branchLabel].transactions += 1;
+    addRevenue(overall, invRevenue, invProfit);
+    addRevenue(byBranch[branchLabel], invRevenue, invProfit);
 
-    const items = inv.detailItem || [];
-    for (const item of items) {
+    for (const item of (inv.detailItem || [])) {
+      // Warehouse/gudang field — try multiple possible names from Accurate API
+      const rawWh = item.warehouseName || item.warehouse?.name
+        || item.gudangName || item.gudang?.name || '';
+      const wh = normalizeWarehouse(rawWh) || normalizeWarehouse(inv.branchName || '');
+
+      if (wh && !byStore[wh]) byStore[wh] = makeAcc();
+
       const sp = (item.salespersonName || item.salesperson?.name
         || inv.salesperson?.name || '').trim() || 'Tidak Ada';
       const amount = item.amount || (item.quantity * (item.unitPrice || 0)) || 0;
@@ -154,40 +158,65 @@ function aggregateData(invoices, period) {
       const brand = itemName ? itemName.split(/[\s-]/)[0].toUpperCase() : null;
       const cat = (item.itemCategory?.name || item.categoryName || 'Lainnya').trim();
 
-      accumulate(overall, sp, amount, qty, profit, itemName, brand, cat);
-      accumulate(byBranch[branchLabel], sp, amount, qty, profit, itemName, brand, cat);
+      accItem(overall, sp, amount, qty, profit, itemName, brand, cat);
+      accItem(byBranch[branchLabel], sp, amount, qty, profit, itemName, brand, cat);
+      if (wh) {
+        addRevenue(byStore[wh], 0, 0); // ensure entry exists
+        accItem(byStore[wh], sp, amount, qty, profit, itemName, brand, cat);
+        // store revenue comes from items since store = warehouse (item level)
+        byStore[wh].revenue += amount;
+        byStore[wh].profit += profit;
+        byStore[wh].transactions = null; // can't count transactions at item level
+      }
     }
   }
 
+  // Build branch summary list
   const branchSummary = Object.entries(byBranch)
     .map(([name, acc]) => ({
       name,
-      revenue: acc.revenue,
-      profit: acc.profit,
-      profitMargin: acc.revenue > 0 ? parseFloat((acc.profit / acc.revenue * 100).toFixed(1)) : 0,
+      revenue: acc.revenue, profit: acc.profit,
+      profitMargin: acc.revenue > 0 ? parseFloat((acc.profit/acc.revenue*100).toFixed(1)) : 0,
       transactions: acc.transactions,
+      // stores within this branch, keyed by warehouse code
+      stores: Object.entries(byStore)
+        .filter(([wCode]) => (WAREHOUSE_BRANCHES[name] || []).some(s => wCode.startsWith(s.split(' ')[0]) && wCode === s))
+        .map(([wCode, wAcc]) => ({
+          code: wCode,
+          revenue: wAcc.revenue,
+          profit: wAcc.profit,
+          ...finalizeAcc(wAcc),
+        }))
+        .sort((a, b) => b.revenue - a.revenue),
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
   return {
     period,
-    summary: finalizeSummary(overall),
+    summary: {
+      revenue: overall.revenue, profit: overall.profit,
+      profitMargin: overall.revenue > 0 ? parseFloat((overall.profit/overall.revenue*100).toFixed(1)) : 0,
+      transactions: overall.transactions,
+    },
     branchSummary,
     branches: Object.fromEntries(
-      Object.entries(byBranch).map(([name, acc]) => [name, finalizeAccumulators(acc)])
+      Object.entries(byBranch).map(([name, acc]) => [name, finalizeAcc(acc)])
     ),
-    ...finalizeAccumulators(overall),
+    ...finalizeAcc(overall),
   };
 }
 
-function makeAccumulators() {
-  return {
-    revenue: 0, profit: 0, transactions: 0,
-    salesMap: {}, itemMap: {}, brandMap: {}, catMap: {},
-  };
+function makeAcc() {
+  return { revenue: 0, profit: 0, transactions: 0, salesMap: {}, itemMap: {}, brandMap: {}, catMap: {} };
 }
 
-function accumulate(acc, sp, amount, qty, profit, itemName, brand, cat) {
+function addRevenue(acc, rev, profit) {
+  acc.revenue += rev;
+  acc.profit += profit;
+  acc.transactions += 1;
+}
+
+function accItem(acc, sp, amount, qty, profit, itemName, brand, cat) {
   if (!acc.salesMap[sp]) acc.salesMap[sp] = { revenue: 0, profit: 0, qty: 0 };
   acc.salesMap[sp].revenue += amount;
   acc.salesMap[sp].profit += profit;
@@ -197,44 +226,26 @@ function accumulate(acc, sp, amount, qty, profit, itemName, brand, cat) {
     if (!acc.itemMap[itemName]) acc.itemMap[itemName] = { qty: 0, revenue: 0 };
     acc.itemMap[itemName].qty += qty;
     acc.itemMap[itemName].revenue += amount;
-
-    if (brand) {
-      acc.brandMap[brand] = (acc.brandMap[brand] || 0) + qty;
-    }
+    if (brand) acc.brandMap[brand] = (acc.brandMap[brand] || 0) + qty;
   }
-
   acc.catMap[cat] = (acc.catMap[cat] || 0) + qty;
 }
 
-function finalizeSummary(acc) {
+function finalizeAcc(acc) {
   return {
-    revenue: acc.revenue,
-    profit: acc.profit,
-    profitMargin: acc.revenue > 0 ? parseFloat((acc.profit / acc.revenue * 100).toFixed(1)) : 0,
-    transactions: acc.transactions,
+    salesList: Object.entries(acc.salesMap)
+      .map(([name, d]) => ({ name, revenue: d.revenue, profit: d.profit, qty: d.qty }))
+      .sort((a, b) => b.revenue - a.revenue),
+    topItems: Object.entries(acc.itemMap)
+      .map(([name, d]) => ({ name, qty: d.qty, revenue: d.revenue }))
+      .sort((a, b) => b.qty - a.qty).slice(0, 10),
+    topBrands: Object.entries(acc.brandMap)
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => b.qty - a.qty).slice(0, 10),
+    categoryList: Object.entries(acc.catMap)
+      .map(([name, units]) => ({ name, units }))
+      .sort((a, b) => b.units - a.units),
   };
-}
-
-function finalizeAccumulators(acc) {
-  const salesList = Object.entries(acc.salesMap)
-    .map(([name, d]) => ({ name, revenue: d.revenue, profit: d.profit, qty: d.qty }))
-    .sort((a, b) => b.revenue - a.revenue);
-
-  const topItems = Object.entries(acc.itemMap)
-    .map(([name, d]) => ({ name, qty: d.qty, revenue: d.revenue }))
-    .sort((a, b) => b.qty - a.qty)
-    .slice(0, 10);
-
-  const topBrands = Object.entries(acc.brandMap)
-    .map(([name, qty]) => ({ name, qty }))
-    .sort((a, b) => b.qty - a.qty)
-    .slice(0, 10);
-
-  const categoryList = Object.entries(acc.catMap)
-    .map(([name, units]) => ({ name, units }))
-    .sort((a, b) => b.units - a.units);
-
-  return { salesList, topItems, topBrands, categoryList };
 }
 
 function getThisMonth() {
