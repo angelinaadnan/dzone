@@ -123,8 +123,8 @@ async function fetchAllInvoices(token, appKey, sigSecret, startDate, endDate, de
     const params = new URLSearchParams({
       'filter.startDate': startDate,
       'filter.endDate': endDate,
-      sp: String(page),
-      l: String(pageSize),
+      page: String(page),
+      pageSize: String(pageSize),
     });
 
     const timestamp = Date.now();
