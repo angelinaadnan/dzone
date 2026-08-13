@@ -60,21 +60,17 @@ export async function onRequestGet(context) {
     const appKey = env.ACCURATE_APP_KEY || '';
     const sigSecret = env.ACCURATE_SIG_SECRET || '';
 
-    // Debug mode: test filter params — must run BEFORE fetchAllInvoices to avoid subrequest limit
+    // Debug mode: 2 requests only — baseline vs date filter
     if (debugMode) {
       const token = env.ACCURATE_TOKEN_ADL;
-      // Run sequentially to avoid hitting concurrent subrequest limit
-      const tests = [];
-      for (const [label, extra] of [
-        ['no_filter',             {}],
-        ['filter_startDate_iso',  { 'filter.startDate': startDate, 'filter.endDate': endDate }],
-        ['filter_startDate_dmy',  { 'filter.startDate': toAccurateDate(startDate), 'filter.endDate': toAccurateDate(endDate) }],
-        ['filter_transDate_range',{ 'filter.transDate.from': toAccurateDate(startDate), 'filter.transDate.to': toAccurateDate(endDate) }],
-        ['bare_startDate',        { startDate: toAccurateDate(startDate), endDate: toAccurateDate(endDate) }],
-      ]) {
-        tests.push(await testFetch(token, appKey, sigSecret, { page: '1', pageSize: '5', ...extra }, label));
-      }
-      return new Response(JSON.stringify({ startDate, endDate, tests }), { headers: corsHeaders });
+      const dmy = toAccurateDate(startDate) + '_to_' + toAccurateDate(endDate);
+      const baseline = await testFetch(token, appKey, sigSecret, { page: '1', pageSize: '3' }, 'no_filter');
+      const filtered = await testFetch(token, appKey, sigSecret, {
+        page: '1', pageSize: '3',
+        'filter.startDate': toAccurateDate(startDate),
+        'filter.endDate': toAccurateDate(endDate),
+      }, 'filter_dmy');
+      return new Response(JSON.stringify({ v: 4, startDate, endDate, dmy, baseline, filtered }), { headers: corsHeaders });
     }
 
     const [invAdl, invGroup] = await Promise.all([
