@@ -20758,21 +20758,21 @@ function OpsKurirHistory(_ref_okh) {
   var _sdt = React.useState(today); var selDateTo = _sdt[0]; var setSelDateTo = _sdt[1];
   var _sel = React.useState(false); var exportLoading = _sel[0]; var setExportLoading = _sel[1];
 
-  var load = function(courier, date) {
+  var load = function(courier, date, dateEnd) {
     if (!db || !courier || !date) return;
+    var _dateEnd = (dateEnd && dateEnd >= date) ? dateEnd : date;
     setLoading(true);
     setCheckins([]);
     setGpsKmTotal(null);
     var dateFrom = date + 'T00:00:00+07:00';
-    var dateTo = date + 'T23:59:59+07:00';
+    var dateTo = _dateEnd + 'T23:59:59+07:00';
     var since60 = new Date(); since60.setDate(since60.getDate() - 60);
     var matchDate = function(ts) {
       if (!ts) return false;
-      // Convert to Jakarta UTC+7 and compare YYYY-MM-DD
       var utcMs = new Date(ts).getTime();
       var jakartaMs = utcMs + 7 * 60 * 60 * 1000;
       var d = new Date(jakartaMs).toISOString().slice(0, 10);
-      return d === date;
+      return d >= date && d <= _dateEnd;
     };
     var p1 = db.from('orders').select('id,customer_name,customer_address,delivered_at,distance_km,end_location,invoice_number,date,start_location')
       .eq('courier_name', courier).eq('status', 'delivered')
@@ -20874,7 +20874,7 @@ function OpsKurirHistory(_ref_okh) {
     }).catch(function(){ setLoading(false); });
   };
 
-  React.useEffect(function(){ load(selCourier, selDate); }, [selCourier, selDate]);
+  React.useEffect(function(){ load(selCourier, selDate, selDateTo); }, [selCourier, selDate, selDateTo]);
 
   // Hitung GPS km antar checkin pakai Promise.all supaya update sekaligus
   React.useEffect(function() {
@@ -21002,7 +21002,7 @@ function OpsKurirHistory(_ref_okh) {
       }, "🗺 Lihat Rute di Maps")
     ),
     loading ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text2)' } }, "Memuat...") :
-    !history.length ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text3)' } }, "Tidak ada pengiriman untuk kurir ini pada tanggal tersebut.") :
+    !history.length ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text3)' } }, selDateTo > selDate ? "Tidak ada aktivitas dalam rentang " + selDate + " s.d. " + selDateTo + "." : "Tidak ada aktivitas untuk kurir ini pada tanggal tersebut.") :
     React.createElement(React.Fragment, null,
       React.createElement("div", { style: { marginBottom: 10, fontSize: 13, color: 'var(--text2)' } },
         history.length, " aktivitas · Total GPS ",
