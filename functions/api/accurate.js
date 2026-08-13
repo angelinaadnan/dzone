@@ -1,5 +1,5 @@
 // Cloudflare Pages Function — proxy ke Accurate Online API
-// Secrets (set via Cloudflare Dashboard → Settings → Environment Variables):
+// Secrets (Cloudflare Dashboard → Settings → Environment Variables):
 //   ACCURATE_TOKEN_ADL   = API token DB PT ANUGERAH DIGITAL LESTARI (PPN)
 //   ACCURATE_TOKEN_GROUP = API token DB GROUP (non-PPN)
 //   ACCURATE_APP_KEY     = App Key dari Accurate Developer Portal
@@ -8,17 +8,7 @@
 const ACCURATE_BASE = 'https://api.accurate.id/accurate/api';
 const ACCURATE_BASE_ALT = 'https://iris.accurate.id/accurate/api';
 
-// Branch prefix → display name
 const BRANCH_LABELS = { TC: 'Tangerang', PS: 'Poins', M2: 'Mangga Dua' };
-
-// Invoice branch codes per branch
-const INVOICE_BRANCHES = {
-  Tangerang:  ['TC DZ', 'TC NMC', 'TC HOI'],
-  Poins:      ['PS NMC'],
-  'Mangga Dua': ['M2 ADL'],
-};
-
-// Warehouse codes per branch (item level — includes M2 DZ, M2 BIG)
 const WAREHOUSE_BRANCHES = {
   Tangerang:  ['TC DZ', 'TC NMC', 'TC HOI'],
   Poins:      ['PS NMC'],
@@ -31,7 +21,6 @@ function getBranchLabel(branchName) {
   return BRANCH_LABELS[prefix] || branchName;
 }
 
-// Normalize warehouse name: "TC - DZ" → "TC DZ", "TC DZ" → "TC DZ"
 function normalizeWarehouse(name) {
   if (!name) return '';
   return name.replace(/\s*-\s*/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
@@ -64,54 +53,37 @@ export async function onRequestGet(context) {
   try {
     const [year, month] = period.split('-').map(Number);
     const lastDay = new Date(year, month, 0).getDate();
-    // Accurate uses dd/MM/yyyy format
-    const startDate = `01/${String(month).padStart(2,'0')}/${year}`;
-    const endDate = `${String(lastDay).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`;
+    // Use yyyy-MM-dd format for date filters
+    const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
+    const endDate = `${year}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
 
     const appKey = env.ACCURATE_APP_KEY || '';
     const sigSecret = env.ACCURATE_SIG_SECRET || '';
 
     const [invAdl, invGroup] = await Promise.all([
       env.ACCURATE_TOKEN_ADL
-        ? fetchAllInvoices(env.ACCURATE_TOKEN_ADL, appKey, sigSecret, startDate, endDate, debugMode)
+        ? fetchAllInvoices(env.ACCURATE_TOKEN_ADL, appKey, sigSecret, startDate, endDate)
         : Promise.resolve({ data: [], rawFirst: null }),
       env.ACCURATE_TOKEN_GROUP
-        ? fetchAllInvoices(env.ACCURATE_TOKEN_GROUP, appKey, sigSecret, startDate, endDate, debugMode)
+        ? fetchAllInvoices(env.ACCURATE_TOKEN_GROUP, appKey, sigSecret, startDate, endDate)
         : Promise.resolve({ data: [], rawFirst: null }),
     ]);
 
     const allInvoices = [...invAdl.data, ...invGroup.data];
 
-    // Debug mode: fetch one invoice detail to inspect full field structure
     if (debugMode) {
-      const timestamp = Date.now();
-      const sigSecret = env.ACCURATE_SIG_SECRET || '';
-      const appKey = env.ACCURATE_APP_KEY || '';
-      const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
-      const dbgHeaders = {
-        Authorization: `Bearer ${env.ACCURATE_TOKEN_ADL}`,
-        'X-Api-Key': appKey, 'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
-        Accept: 'application/json',
-      };
-      const firstId = invAdl.rawFirst?.d?.[0]?.id;
-      let detailJson = null;
-      if (firstId) {
-        let dr = await fetch(`${ACCURATE_BASE}/sales-invoice/detail.do?id=${firstId}`, { headers: dbgHeaders });
-        if (!dr.ok || (await dr.clone().json().catch(()=>({s:false}))).s === false) {
-          dr = await fetch(`${ACCURATE_BASE_ALT}/sales-invoice/detail.do?id=${firstId}`, { headers: dbgHeaders });
-        }
-        detailJson = await dr.json();
-      }
       return new Response(JSON.stringify({
         totalInvoices: allInvoices.length,
         startDate, endDate,
         paginationADL: invAdl.rawFirst?.sp,
-        invoiceDetail: detailJson,
+        paginationGROUP: invGroup.rawFirst?.sp,
+        firstInvoice: allInvoices[0] || null,
+        firstItem: allInvoices[0]?.detailItem?.[0] || null,
+        sampleKeys: allInvoices[0] ? Object.keys(allInvoices[0]) : [],
       }), { headers: corsHeaders });
     }
 
     const result = aggregateData(allInvoices, period);
-
     return new Response(JSON.stringify(result), { headers: corsHeaders });
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
@@ -129,7 +101,7 @@ export async function onRequestOptions() {
 }
 
 // ─── Fetch all invoice pages ──────────────────────────────────────────────────
-async function fetchAllInvoices(token, appKey, sigSecret, startDate, endDate, debugMode = false) {
+async function fetchAllInvoices(token, appKey, sigSecret, startDate, endDate) {
   const all = [];
   let rawFirst = null;
   let page = 1;
@@ -137,7 +109,10 @@ async function fetchAllInvoices(token, appKey, sigSecret, startDate, endDate, de
 
   while (true) {
     const params = new URLSearchParams({
-      // No fields restriction — get all fields to inspect structure
+      // Correct field names confirmed from invoice detail endpoint
+      fields: 'number,transDate,totalAmount,branchName,masterSalesmanName,customer,detailItem',
+      'filter.startDate': startDate,
+      'filter.endDate': endDate,
       page: String(page),
       pageSize: String(pageSize),
     });
@@ -155,7 +130,6 @@ async function fetchAllInvoices(token, appKey, sigSecret, startDate, endDate, de
     };
 
     let resp = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?${params}`, { headers });
-
     if (!resp.ok && resp.status >= 500) {
       resp = await fetch(`${ACCURATE_BASE_ALT}/sales-invoice/list.do?${params}`, { headers });
     }
@@ -166,82 +140,77 @@ async function fetchAllInvoices(token, appKey, sigSecret, startDate, endDate, de
     }
 
     const json = await resp.json();
-    if (page === 1) rawFirst = json; // capture raw first response for debug
+    if (page === 1) rawFirst = json;
 
     const rows = json.d || json.data || [];
     if (!json.s || rows.length === 0) break;
 
     all.push(...rows);
-    if (rows.length < pageSize || all.length >= (json.total || Infinity)) break;
+    // Stop when last page or safety limit
+    const totalRows = json.sp?.rowCount || json.total || Infinity;
+    if (rows.length < pageSize || all.length >= totalRows) break;
     page++;
-    if (page > 20) break;
+    if (page > 50) break;
   }
 
   return { data: all, rawFirst };
 }
 
-// ─── Aggregate into overall + per-branch + per-store ─────────────────────────
+// ─── Aggregate data ───────────────────────────────────────────────────────────
 function aggregateData(invoices, period) {
   const overall = makeAcc();
-  const byBranch = {};   // 'Tangerang' | 'Poins' | 'Mangga Dua' → acc
-  const byStore = {};    // 'TC DZ' | 'TC NMC' | ... → acc (warehouse-level from items)
+  const byBranch = {};
+  const byStore = {};
 
   for (const inv of invoices) {
     const branchLabel = getBranchLabel(inv.branchName);
     if (!byBranch[branchLabel]) byBranch[branchLabel] = makeAcc();
 
-    const invRevenue = inv.grandTotal || inv.totalAmount || 0;
-    const invProfit = inv.profitAmount || 0;
+    const invRevenue = inv.totalAmount || 0;
 
-    addRevenue(overall, invRevenue, invProfit);
-    addRevenue(byBranch[branchLabel], invRevenue, invProfit);
+    overall.revenue += invRevenue;
+    overall.transactions += 1;
+    byBranch[branchLabel].revenue += invRevenue;
+    byBranch[branchLabel].transactions += 1;
+
+    // Salesperson at invoice level (fallback if no line item salesperson)
+    const invSp = (inv.masterSalesmanName || '').trim() || 'Tidak Ada';
 
     for (const item of (inv.detailItem || [])) {
-      // Warehouse/gudang field — try multiple possible names from Accurate API
-      const rawWh = item.warehouseName || item.warehouse?.name
-        || item.gudangName || item.gudang?.name || '';
-      const wh = normalizeWarehouse(rawWh) || normalizeWarehouse(inv.branchName || '');
+      // Salesperson: prefer line item level, fallback to invoice level
+      const sp = (item.salesmanName || invSp || '').trim() || 'Tidak Ada';
 
-      if (wh && !byStore[wh]) byStore[wh] = makeAcc();
+      // Warehouse from line item
+      const wh = normalizeWarehouse(item.warehouse?.name || inv.branchName || '');
 
-      const sp = (item.salespersonName || item.salesperson?.name
-        || inv.salesperson?.name || '').trim() || 'Tidak Ada';
-      const amount = item.amount || (item.quantity * (item.unitPrice || 0)) || 0;
+      const amount = item.totalPrice || (item.quantity * (item.unitPrice || 0)) || 0;
       const qty = item.quantity || 0;
-      const profit = item.profitAmount || 0;
-      const itemName = (item.itemName || item.name || '').trim();
+      const itemName = (item.detailName || item.item?.name || '').trim();
       const brand = itemName ? itemName.split(/[\s-]/)[0].toUpperCase() : null;
-      const cat = (item.itemCategory?.name || item.categoryName || 'Lainnya').trim();
+      // Category from item object
+      const cat = (item.item?.itemCategory?.name || item.item?.itemCategoryId
+        ? `Kategori ${item.item?.itemCategoryId}` : 'Lainnya');
 
-      accItem(overall, sp, amount, qty, profit, itemName, brand, cat);
-      accItem(byBranch[branchLabel], sp, amount, qty, profit, itemName, brand, cat);
+      accItem(overall, sp, amount, qty, itemName, brand, cat);
+      accItem(byBranch[branchLabel], sp, amount, qty, itemName, brand, cat);
+
       if (wh) {
-        addRevenue(byStore[wh], 0, 0); // ensure entry exists
-        accItem(byStore[wh], sp, amount, qty, profit, itemName, brand, cat);
-        // store revenue comes from items since store = warehouse (item level)
+        if (!byStore[wh]) byStore[wh] = makeAcc();
         byStore[wh].revenue += amount;
-        byStore[wh].profit += profit;
-        byStore[wh].transactions = null; // can't count transactions at item level
+        byStore[wh].transactions = null;
+        accItem(byStore[wh], sp, amount, qty, itemName, brand, cat);
       }
     }
   }
 
-  // Build branch summary list
   const branchSummary = Object.entries(byBranch)
     .map(([name, acc]) => ({
       name,
-      revenue: acc.revenue, profit: acc.profit,
-      profitMargin: acc.revenue > 0 ? parseFloat((acc.profit/acc.revenue*100).toFixed(1)) : 0,
+      revenue: acc.revenue,
       transactions: acc.transactions,
-      // stores within this branch, keyed by warehouse code
       stores: Object.entries(byStore)
-        .filter(([wCode]) => (WAREHOUSE_BRANCHES[name] || []).some(s => wCode.startsWith(s.split(' ')[0]) && wCode === s))
-        .map(([wCode, wAcc]) => ({
-          code: wCode,
-          revenue: wAcc.revenue,
-          profit: wAcc.profit,
-          ...finalizeAcc(wAcc),
-        }))
+        .filter(([wCode]) => (WAREHOUSE_BRANCHES[name] || []).includes(wCode))
+        .map(([code, wAcc]) => ({ code, revenue: wAcc.revenue, ...finalizeAcc(wAcc) }))
         .sort((a, b) => b.revenue - a.revenue),
     }))
     .sort((a, b) => b.revenue - a.revenue);
@@ -249,8 +218,8 @@ function aggregateData(invoices, period) {
   return {
     period,
     summary: {
-      revenue: overall.revenue, profit: overall.profit,
-      profitMargin: overall.revenue > 0 ? parseFloat((overall.profit/overall.revenue*100).toFixed(1)) : 0,
+      revenue: overall.revenue,
+      profit: 0, profitMargin: 0,
       transactions: overall.transactions,
     },
     branchSummary,
@@ -262,19 +231,12 @@ function aggregateData(invoices, period) {
 }
 
 function makeAcc() {
-  return { revenue: 0, profit: 0, transactions: 0, salesMap: {}, itemMap: {}, brandMap: {}, catMap: {} };
+  return { revenue: 0, transactions: 0, salesMap: {}, itemMap: {}, brandMap: {}, catMap: {} };
 }
 
-function addRevenue(acc, rev, profit) {
-  acc.revenue += rev;
-  acc.profit += profit;
-  acc.transactions += 1;
-}
-
-function accItem(acc, sp, amount, qty, profit, itemName, brand, cat) {
-  if (!acc.salesMap[sp]) acc.salesMap[sp] = { revenue: 0, profit: 0, qty: 0 };
+function accItem(acc, sp, amount, qty, itemName, brand, cat) {
+  if (!acc.salesMap[sp]) acc.salesMap[sp] = { revenue: 0, qty: 0 };
   acc.salesMap[sp].revenue += amount;
-  acc.salesMap[sp].profit += profit;
   acc.salesMap[sp].qty += qty;
 
   if (itemName) {
@@ -283,13 +245,13 @@ function accItem(acc, sp, amount, qty, profit, itemName, brand, cat) {
     acc.itemMap[itemName].revenue += amount;
     if (brand) acc.brandMap[brand] = (acc.brandMap[brand] || 0) + qty;
   }
-  acc.catMap[cat] = (acc.catMap[cat] || 0) + qty;
+  if (cat) acc.catMap[cat] = (acc.catMap[cat] || 0) + qty;
 }
 
 function finalizeAcc(acc) {
   return {
     salesList: Object.entries(acc.salesMap)
-      .map(([name, d]) => ({ name, revenue: d.revenue, profit: d.profit, qty: d.qty }))
+      .map(([name, d]) => ({ name, revenue: d.revenue, qty: d.qty }))
       .sort((a, b) => b.revenue - a.revenue),
     topItems: Object.entries(acc.itemMap)
       .map(([name, d]) => ({ name, qty: d.qty, revenue: d.revenue }))
