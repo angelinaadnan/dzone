@@ -20755,10 +20755,8 @@ function OpsKurirHistory(_ref_okh) {
   var _sl = React.useState(false); var loading = _sl[0]; var setLoading = _sl[1];
   var _sch = React.useState([]); var checkins = _sch[0]; var setCheckins = _sch[1];
   var _sgt = React.useState(null); var gpsKmTotal = _sgt[0]; var setGpsKmTotal = _sgt[1];
-  var _sbc = React.useState({}); var batchSel = _sbc[0]; var setBatchSel = _sbc[1];
-  var _sbf = React.useState(today); var batchFrom = _sbf[0]; var setBatchFrom = _sbf[1];
-  var _sbt = React.useState(today); var batchTo = _sbt[0]; var setBatchTo = _sbt[1];
-  var _sbl = React.useState(false); var batchLoading = _sbl[0]; var setBatchLoading = _sbl[1];
+  var _sdt = React.useState(today); var selDateTo = _sdt[0]; var setSelDateTo = _sdt[1];
+  var _sel = React.useState(false); var exportLoading = _sel[0]; var setExportLoading = _sel[1];
 
   var load = function(courier, date) {
     if (!db || !courier || !date) return;
@@ -20896,127 +20894,49 @@ function OpsKurirHistory(_ref_okh) {
     });
   }, [checkins.length]);
 
-  var batchDownload = async function() {
-    var selected = couriers.filter(function(c){ return batchSel[c]; });
-    if (!selected.length) { alert('Pilih minimal 1 kurir!'); return; }
-    var _bDates = [];
-    var _bIter = new Date(batchFrom);
-    var _bEnd = new Date(batchTo);
-    if (_bEnd < _bIter) _bEnd = new Date(batchFrom);
-    while (_bIter <= _bEnd) { _bDates.push(_bIter.toISOString().slice(0,10)); _bIter.setDate(_bIter.getDate()+1); }
-    if (_bDates.length > 31) { alert('Maksimal 31 hari sekaligus!'); return; }
-    setBatchLoading(true);
-    try {
-      for (var _bci = 0; _bci < selected.length; _bci++) {
-        var _bco = selected[_bci];
-        var _bwb = XLSX.utils.book_new();
-        var _brows = [];
-        var _bs60 = new Date(); _bs60.setDate(_bs60.getDate()-60);
-        var _bs180 = new Date(); _bs180.setDate(_bs180.getDate()-180);
-        for (var _bdi = 0; _bdi < _bDates.length; _bdi++) {
-          var _bd = _bDates[_bdi];
-          var _bdFrom = _bd + 'T00:00:00+07:00';
-          var _bdTo = _bd + 'T23:59:59+07:00';
-          var _bmD = (function(dd){ return function(ts){ if (!ts) return false; return new Date(new Date(ts).getTime()+7*3600000).toISOString().slice(0,10)===dd; }; })(_bd);
-          var _bres = await Promise.all([
-            db.from('orders').select('id,customer_name,customer_address,delivered_at,distance_km,invoice_number').eq('courier_name',_bco).eq('status','delivered').gte('delivered_at',_bdFrom).lte('delivered_at',_bdTo).order('delivered_at',{ascending:true}),
-            db.from('courier_tasks').select('id,task_type,destination,description,assigned_at,created_at,status,distance_km,contact_name').eq('assigned_courier',_bco).gte('created_at',_bs60.toISOString()).order('created_at',{ascending:true}),
-            db.from('purchase_orders').select('id,supplier_name,supplier_address,pickups,created_at').gte('created_at',_bs60.toISOString()).limit(300),
-            db.from('branch_requests').select('id,branch_name,trips,created_at').gte('created_at',_bs60.toISOString()).limit(300),
-            db.from('service_intakes').select('*').gte('created_at',_bs180.toISOString()).limit(500)
-          ]);
-          var _bords = (_bres[0].data||[]).map(function(o){ return {_type:'order',customer_name:o.customer_name,customer_address:o.customer_address,delivered_at:o.delivered_at,distance_km:o.distance_km,invoice_number:o.invoice_number}; });
-          var _btsks = (_bres[1].data||[]).filter(function(t){ return _bmD(t.assigned_at||t.created_at); }).map(function(t){ return {_type:'task',customer_name:t.destination||t.description||t.task_type,customer_address:t.contact_name||'',delivered_at:t.assigned_at||t.created_at,distance_km:t.distance_km}; });
-          var _bpku = []; (_bres[2].data||[]).forEach(function(po){ (po.pickups||[]).forEach(function(p){ if (p.courier===_bco&&_bmD(p.done_at||po.created_at)) _bpku.push({_type:'pickup',customer_name:(po.supplier_name||'').toUpperCase(),customer_address:p.address||po.supplier_address||'',delivered_at:p.done_at||po.created_at,distance_km:p.distance_km}); }); });
-          var _btrp = []; (_bres[3].data||[]).forEach(function(r){ (r.trips||[]).forEach(function(t){ if (t.courier===_bco&&_bmD(t.delivered_at||r.created_at)) _btrp.push({_type:'trip',customer_name:(r.branch_name||t.branch||'').toUpperCase(),customer_address:'',delivered_at:t.delivered_at||r.created_at,distance_km:t.distance_km}); }); });
-          var _bsis = []; (_bres[4].data||[]).forEach(function(s){
-            var _badd = function(lbl,ts,km){ if (_bmD(ts||s.created_at)) _bsis.push({_type:'servis',customer_name:lbl,customer_address:(s.customer_name||'')+(s.unit_type?' · '+s.unit_type:''),delivered_at:ts||s.created_at,distance_km:km}); };
-            if (s.courier_name===_bco) _badd('Jemput dari '+(s.branch_name||'Cabang'),s.delivered_at||s.created_at,s.pickup_distance_km);
-            if (s.sc_delivery_courier===_bco) _badd('Antar ke '+(s.service_center_name||'SC'),s.sc_delivered_at||s.created_at,s.sc_distance_km);
-            if (s.sc_pickup_courier===_bco) _badd('Ambil dari '+(s.service_center_name||'SC'),s.sc_picked_up_at||s.created_at,s.scp_distance_km);
-            if (s.assigned_courier===_bco) _badd('Antar balik ke '+(s.customer_name||''),s.returned_at||s.created_at,s.return_distance_km);
-          });
-          var _bcomb = _bords.concat(_btsks).concat(_bpku).concat(_btrp).concat(_bsis).sort(function(a,b){ return new Date(a.delivered_at||0)-new Date(b.delivered_at||0); });
-          _bcomb.forEach(function(o,idx){ _brows.push({'Tgl':_bd,'Kurir':_bco,'No':idx+1,'Nama / Tujuan':o.customer_name||'','Tipe':o._type==='task'?'Tugas':o._type==='pickup'?'Ambil PO':o._type==='trip'?'Kirim Cabang':o._type==='servis'?'Servis':'Order','Jam':o.delivered_at?new Date(o.delivered_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'-','Jarak (km)':o.distance_km||'','Alamat':o.customer_address||''}); });
-        }
-        XLSX.utils.book_append_sheet(_bwb, XLSX.utils.json_to_sheet(_brows.length?_brows:[{'Info':'Tidak ada aktivitas'}]), 'Aktivitas');
-        XLSX.writeFile(_bwb, 'history_'+_bco.replace(/ /g,'_')+'_'+batchFrom+(_bDates.length>1?'_sd_'+batchTo:'')+'.xlsx');
-        await new Promise(function(r){ setTimeout(r,400); });
-      }
-    } catch(e) { alert('Download error: '+e.message); }
-    setBatchLoading(false);
-  };
-
   var exportExcel = async function() {
-    if (checkins.length < 2) return;
-    var _xls = function(s) {
-      return (s || '').replace(/[\uD800-\uDFFF]|[^ -￿]/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
-    };
-    var _cn = function(note) {
-      return _xls((note || '').replace(/·?\s*[\d.]+\s*km\s*$/i, '').replace(/^[✅📍▶]\s*/g, '').trim());
-    };
-    var _tipeLabel = function(o) {
-      if (o._type === 'task') return 'Tugas: ' + (o.invoice_number || o.customer_name || 'Tugas');
-      if (o._type === 'pickup') return 'Ambil PO';
-      if (o._type === 'trip') return 'Kirim Cabang';
-      if (o._type === 'servis') return 'Servis';
-      return 'Order';
-    };
-    var wb = XLSX.utils.book_new();
-
-    // Sheet: Rute GPS dengan label deskriptif
-    var gpsOnly = checkins.filter(function(c) { return !(c.note || '').startsWith('▶'); });
-    if (gpsOnly.length >= 2) {
-      // Prefetch OSRM parallel
-      await Promise.all(Array.from({length: gpsOnly.length - 1}, function(_, i) {
-        var a = gpsOnly[i], b = gpsOnly[i + 1];
-        if (a.lat && b.lat) return getRoadDistanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng));
-        return Promise.resolve(0);
-      }));
-      // Timeline aktivitas untuk match label
-      var actTimeline = history.map(function(o) {
-        return {
-          ms: new Date(o.delivered_at || o.updated_at || o.created_at).getTime(),
-          label: _xls((o.customer_name || '') + ' - ' + _tipeLabel(o))
-        };
-      }).filter(function(a) { return a.ms; }).sort(function(a, b) { return a.ms - b.ms; });
-      var ACT_WIN = 25 * 60 * 1000; // 25 menit window match
-      var gpsRows = [];
-      for (var _gi = 1; _gi < gpsOnly.length; _gi++) {
-        var _fa = gpsOnly[_gi - 1], _tb = gpsOnly[_gi];
-        var _km = 0;
-        if (_fa.lat && _tb.lat) {
-          var _r = await getRoadDistanceKm(parseFloat(_fa.lat), parseFloat(_fa.lng), parseFloat(_tb.lat), parseFloat(_tb.lng));
-          _km = parseFloat((_r || 0).toFixed(2));
-        }
-        var _jam = _tb.created_at ? new Date(_tb.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
-        // Label titik asal
-        var _fromLbl = _cn(_fa.note) || ('Titik ' + _gi);
-        // Label titik tujuan: prioritaskan note, lalu match aktivitas terdekat
-        var _toLbl = _cn(_tb.note);
-        if (!_toLbl) {
-          var _tbMs = new Date(_tb.created_at).getTime();
-          var _best = null, _bestDiff = Infinity;
-          actTimeline.forEach(function(a) { var d = Math.abs(a.ms - _tbMs); if (d < _bestDiff) { _bestDiff = d; _best = a; } });
-          if (_best && _bestDiff <= ACT_WIN) _toLbl = _best.label;
-          else _toLbl = 'Titik ' + (_gi + 1);
-        }
-        gpsRows.push({
-          'Tgl': selDate, 'Kurir': selCourier,
-          'Dari': _fromLbl, 'Link Dari': _fa.lat ? 'https://maps.google.com?q=' + parseFloat(_fa.lat) + ',' + parseFloat(_fa.lng) : '',
-          'Ke': _toLbl, 'Link Tujuan': _tb.lat ? 'https://maps.google.com?q=' + parseFloat(_tb.lat) + ',' + parseFloat(_tb.lng) : '',
-          'KM Via Jalan (OSRM)': _km, 'Tipe': 'GPS',
-          'Jam Tiba di Tujuan': _jam
-        });
-      }
-      var _sumGps = gpsRows.reduce(function(s, r) { return s + (parseFloat(r['KM Via Jalan (OSRM)']) || 0); }, 0);
-      gpsRows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL GPS', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumGps.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gpsRows), 'Rute GPS');
-    }
-
+    var _dFrom = selDate;
+    var _dTo = selDateTo >= selDate ? selDateTo : selDate;
+    var _dates = [];
+    var _iter = new Date(_dFrom); var _end = new Date(_dTo);
+    while (_iter <= _end) { _dates.push(_iter.toISOString().slice(0,10)); _iter.setDate(_iter.getDate()+1); }
+    if (_dates.length > 31) { alert('Maksimal 31 hari sekaligus!'); return; }
+    setExportLoading(true);
+    var _rows = [];
+    var _bs60 = new Date(); _bs60.setDate(_bs60.getDate()-60);
+    var _bs180 = new Date(); _bs180.setDate(_bs180.getDate()-180);
     try {
-      XLSX.writeFile(wb, 'history_kurir_' + selCourier.replace(/ /g, '_') + '_' + selDate + '.xlsx');
-    } catch(e) { alert('Export error: ' + e.message); }
+      for (var _di = 0; _di < _dates.length; _di++) {
+        var _bd = _dates[_di];
+        var _bdFrom = _bd + 'T00:00:00+07:00';
+        var _bdTo2 = _bd + 'T23:59:59+07:00';
+        var _bmD = (function(dd){ return function(ts){ if (!ts) return false; return new Date(new Date(ts).getTime()+7*3600000).toISOString().slice(0,10)===dd; }; })(_bd);
+        var _res = await Promise.all([
+          db.from('orders').select('id,customer_name,customer_address,delivered_at,distance_km,invoice_number').eq('courier_name',selCourier).eq('status','delivered').gte('delivered_at',_bdFrom).lte('delivered_at',_bdTo2).order('delivered_at',{ascending:true}),
+          db.from('courier_tasks').select('id,task_type,destination,description,assigned_at,created_at,status,distance_km,contact_name').eq('assigned_courier',selCourier).gte('created_at',_bs60.toISOString()).order('created_at',{ascending:true}),
+          db.from('purchase_orders').select('id,supplier_name,supplier_address,pickups,created_at').gte('created_at',_bs60.toISOString()).limit(300),
+          db.from('branch_requests').select('id,branch_name,trips,created_at').gte('created_at',_bs60.toISOString()).limit(300),
+          db.from('service_intakes').select('*').gte('created_at',_bs180.toISOString()).limit(500)
+        ]);
+        var _ords = (_res[0].data||[]).map(function(o){ return {_type:'order',customer_name:o.customer_name,customer_address:o.customer_address,delivered_at:o.delivered_at,distance_km:o.distance_km}; });
+        var _tsks = (_res[1].data||[]).filter(function(t){ return _bmD(t.assigned_at||t.created_at); }).map(function(t){ return {_type:'task',customer_name:t.destination||t.description||t.task_type,customer_address:t.contact_name||'',delivered_at:t.assigned_at||t.created_at,distance_km:t.distance_km}; });
+        var _pku = []; (_res[2].data||[]).forEach(function(po){ (po.pickups||[]).forEach(function(p){ if (p.courier===selCourier&&_bmD(p.done_at||po.created_at)) _pku.push({_type:'pickup',customer_name:(po.supplier_name||'').toUpperCase(),customer_address:p.address||po.supplier_address||'',delivered_at:p.done_at||po.created_at,distance_km:p.distance_km}); }); });
+        var _trp = []; (_res[3].data||[]).forEach(function(r){ (r.trips||[]).forEach(function(t){ if (t.courier===selCourier&&_bmD(t.delivered_at||r.created_at)) _trp.push({_type:'trip',customer_name:(r.branch_name||t.branch||'').toUpperCase(),customer_address:'',delivered_at:t.delivered_at||r.created_at,distance_km:t.distance_km}); }); });
+        var _sis = []; (_res[4].data||[]).forEach(function(s){
+          var _add = function(lbl,ts,km){ if (_bmD(ts||s.created_at)) _sis.push({_type:'servis',customer_name:lbl,customer_address:(s.customer_name||'')+(s.unit_type?' \xb7 '+s.unit_type:''),delivered_at:ts||s.created_at,distance_km:km}); };
+          if (s.courier_name===selCourier) _add('Jemput dari '+(s.branch_name||'Cabang'),s.delivered_at||s.created_at,s.pickup_distance_km);
+          if (s.sc_delivery_courier===selCourier) _add('Antar ke '+(s.service_center_name||'SC'),s.sc_delivered_at||s.created_at,s.sc_distance_km);
+          if (s.sc_pickup_courier===selCourier) _add('Ambil dari '+(s.service_center_name||'SC'),s.sc_picked_up_at||s.created_at,s.scp_distance_km);
+          if (s.assigned_courier===selCourier) _add('Antar balik ke '+(s.customer_name||''),s.returned_at||s.created_at,s.return_distance_km);
+        });
+        var _comb = _ords.concat(_tsks).concat(_pku).concat(_trp).concat(_sis).sort(function(a,b){ return new Date(a.delivered_at||0)-new Date(b.delivered_at||0); });
+        _comb.forEach(function(o,idx){ _rows.push({'Tgl':_bd,'Kurir':selCourier,'No':idx+1,'Nama / Tujuan':o.customer_name||'','Tipe':o._type==='task'?'Tugas':o._type==='pickup'?'Ambil PO':o._type==='trip'?'Kirim Cabang':o._type==='servis'?'Servis':'Order','Jam':o.delivered_at?new Date(o.delivered_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'-','Jarak (km)':o.distance_km||'','Alamat':o.customer_address||''}); });
+      }
+      var _wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(_wb, XLSX.utils.json_to_sheet(_rows.length?_rows:[{'Info':'Tidak ada aktivitas'}]), 'Aktivitas');
+      XLSX.writeFile(_wb, 'history_'+selCourier.replace(/ /g,'_')+'_'+_dFrom+(_dates.length>1?'_sd_'+_dTo:'')+'.xlsx');
+    } catch(e) { alert('Export error: '+e.message); }
+    setExportLoading(false);
   };
 
   var totalKm = history.reduce(function(s, o){ return s + (o.distance_km || 0); }, 0);
@@ -21034,11 +20954,17 @@ function OpsKurirHistory(_ref_okh) {
         onChange: function(e){ setSelDate(e.target.value); },
         style: { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 14 }
       }),
+      React.createElement("span", { style: { fontSize: 13, color: 'var(--text2)', alignSelf: 'center', padding: '0 2px' } }, "s.d."),
+      React.createElement("input", {
+        type: "date", value: selDateTo,
+        onChange: function(e){ setSelDateTo(e.target.value); },
+        style: { padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 14 }
+      }),
       React.createElement("button", {
         onClick: exportExcel,
-        disabled: !history.length,
-        style: { padding: '8px 16px', borderRadius: 8, background: 'var(--green)', color: '#fff', fontWeight: 700, fontSize: 13, border: 'none', cursor: history.length ? 'pointer' : 'not-allowed', opacity: history.length ? 1 : 0.5 }
-      }, "📅 Export Excel"),
+        disabled: exportLoading,
+        style: { padding: '8px 16px', borderRadius: 8, background: 'var(--green)', color: '#fff', fontWeight: 700, fontSize: 13, border: 'none', cursor: exportLoading ? 'not-allowed' : 'pointer', opacity: exportLoading ? 0.6 : 1 }
+      }, exportLoading ? "⏳ Mengunduh..." : "📅 Export Excel"),
       React.createElement("button", {
         onClick: function() {
           var stops = history.filter(function(o){ return o.end_location && (o.end_location.lat || o.end_location.latitude); });
@@ -21050,27 +20976,6 @@ function OpsKurirHistory(_ref_okh) {
         disabled: !history.length,
         style: { padding: '8px 16px', borderRadius: 8, background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 13, border: 'none', cursor: history.length ? 'pointer' : 'not-allowed', opacity: history.length ? 1 : 0.5 }
       }, "🗺 Lihat Rute di Maps")
-    ),
-    React.createElement("div", { style: { background: 'var(--card)', borderRadius: 12, padding: '12px 16px', marginBottom: 16, border: '1px solid var(--border)' } },
-      React.createElement("div", { style: { fontWeight: 700, fontSize: 13, marginBottom: 10, color: 'var(--text2)' } }, "📥 Batch Download"),
-      React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' } },
-        React.createElement("span", { style: { fontSize: 12, color: 'var(--text2)' } }, "Tanggal:"),
-        React.createElement("input", { type: "date", value: batchFrom, onChange: function(e){ setBatchFrom(e.target.value); }, style: { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 13 } }),
-        React.createElement("span", { style: { fontSize: 12, color: 'var(--text2)' } }, "s.d."),
-        React.createElement("input", { type: "date", value: batchTo, onChange: function(e){ setBatchTo(e.target.value); }, style: { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 13 } })
-      ),
-      React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 } },
-        React.createElement("button", { onClick: function(){ var all = {}; couriers.forEach(function(c){ all[c]=true; }); setBatchSel(all); }, style: { fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--accent)', cursor: 'pointer' } }, "Pilih Semua"),
-        React.createElement("button", { onClick: function(){ setBatchSel({}); }, style: { fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text2)', cursor: 'pointer' } }, "Hapus Pilihan"),
-        couriers.map(function(c){ return React.createElement("label", { key: c, style: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer', padding: '4px 10px', borderRadius: 6, border: '1px solid ' + (batchSel[c] ? 'var(--accent)' : 'var(--border)'), background: batchSel[c] ? 'rgba(99,102,241,0.1)' : 'transparent', color: batchSel[c] ? 'var(--accent)' : 'var(--text)' } },
-          React.createElement("input", { type: "checkbox", checked: !!batchSel[c], onChange: function(e){ setBatchSel(function(prev){ var n=Object.assign({},prev); if(e.target.checked) n[c]=true; else delete n[c]; return n; }); }, style: { accentColor: 'var(--accent)' } }), c
-        ); })
-      ),
-      React.createElement("button", {
-        onClick: batchDownload,
-        disabled: batchLoading || !couriers.some(function(c){ return batchSel[c]; }),
-        style: { padding: '8px 18px', borderRadius: 8, background: 'var(--green)', color: '#fff', fontWeight: 700, fontSize: 13, border: 'none', cursor: (!batchLoading && couriers.some(function(c){ return batchSel[c]; })) ? 'pointer' : 'not-allowed', opacity: (!batchLoading && couriers.some(function(c){ return batchSel[c]; })) ? 1 : 0.5 }
-      }, batchLoading ? "⏳ Mengunduh..." : "📥 Download Terpilih")
     ),
     loading ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text2)' } }, "Memuat...") :
     !history.length ? React.createElement("div", { style: { textAlign: 'center', padding: 40, color: 'var(--text3)' } }, "Tidak ada pengiriman untuk kurir ini pada tanggal tersebut.") :
