@@ -65,6 +65,33 @@ export async function onRequestGet(context) {
       const token = env.ACCURATE_TOKEN_ADL;
       const dmy = { startDate: toAccurateDate(startDate), endDate: toAccurateDate(endDate) };
 
+      // Helper: quick probe one report URL
+      async function probeReport(path) {
+        try {
+          const timestamp = Date.now();
+          const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
+          const hdrs = {
+            Authorization: `Bearer ${token}`, 'X-Api-Key': appKey,
+            'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
+            Accept: 'application/json', 'User-Agent': 'DZone-Dashboard/1.0',
+          };
+          const qs = new URLSearchParams({ startDate: dmy.startDate, endDate: dmy.endDate });
+          let r = await fetch(`${ACCURATE_BASE}${path}?${qs}`, { headers: hdrs });
+          if (!r.ok && r.status >= 500) r = await fetch(`${ACCURATE_BASE_ALT}${path}?${qs}`, { headers: hdrs });
+          const json = await r.json();
+          return json.s === false ? `❌ ${json.d}` : `✅ keys=${Object.keys((Array.isArray(json.d)?json.d[0]:json.d)||{}).slice(0,5).join(',')}`;
+        } catch(e) { return `ERR: ${e.message}`; }
+      }
+
+      const probes = {};
+      for (const p of [
+        '/report/salesman-report.do',
+        '/report/sales-by-item.do',
+        '/report/item-report.do',
+        '/report/salesman.do',
+        '/report/sales-report.do',
+      ]) probes[p] = await probeReport(p);
+
       // Test 1: Full profit-loss data
       const plFull = await (async () => {
         try {
@@ -101,7 +128,7 @@ export async function onRequestGet(context) {
         } catch(e) { return { error: e.message }; }
       })();
 
-      return new Response(JSON.stringify({ v: 9, dmy, plFull, salesmanResult }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ v: 10, dmy, probes, plKeys: plFull.d?.[1]?.['profitLoss.description'] }), { headers: corsHeaders });
     }
 
     const [invAdl, invGroup] = await Promise.all([
