@@ -65,40 +65,40 @@ export async function onRequestGet(context) {
       const token = env.ACCURATE_TOKEN_ADL;
       const dmy = { startDate: toAccurateDate(startDate), endDate: toAccurateDate(endDate) };
 
-      // Test 1: POST with JSON body
+      // Test 1: POST with JSON body (with iris fallback)
       const postResult = await (async () => {
         try {
           const timestamp = Date.now();
           const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
-          const headers = {
+          const hdrs = {
             Authorization: `Bearer ${token}`, 'X-Api-Key': appKey,
             'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
             Accept: 'application/json', 'Content-Type': 'application/json',
             'User-Agent': 'DZone-Dashboard/1.0',
           };
-          const resp = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?page=1&pageSize=5&fields=number,transDate,totalAmount`, {
-            method: 'POST', headers,
-            body: JSON.stringify({ filter: dmy }),
-          });
-          const json = await resp.json();
-          return { rowCount: json.sp?.rowCount, firstDate: (json.d||[])[0]?.transDate, keys: Object.keys((json.d||[])[0]||{}), error: json.s===false?json.d:null };
+          const path = '/sales-invoice/list.do?page=1&pageSize=5&fields=number,transDate,totalAmount';
+          let r = await fetch(`${ACCURATE_BASE}${path}`, { method:'POST', headers:hdrs, body:JSON.stringify({filter:dmy}) });
+          if (!r.ok && r.status >= 500) r = await fetch(`${ACCURATE_BASE_ALT}${path}`, { method:'POST', headers:hdrs, body:JSON.stringify({filter:dmy}) });
+          const json = await r.json();
+          return { rowCount: json.sp?.rowCount, firstDate: (json.d||[])[0]?.transDate, error: json.s===false?json.d:null };
         } catch(e) { return { error: e.message }; }
       })();
 
-      // Test 2: profit-loss report endpoint
+      // Test 2: profit-loss report endpoint (with iris fallback)
       const plResult = await (async () => {
         try {
           const timestamp = Date.now();
           const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
-          const headers = {
+          const hdrs = {
             Authorization: `Bearer ${token}`, 'X-Api-Key': appKey,
             'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
             Accept: 'application/json', 'User-Agent': 'DZone-Dashboard/1.0',
           };
-          const params = new URLSearchParams({ startDate: dmy.startDate, endDate: dmy.endDate, asOf: dmy.endDate });
-          const resp = await fetch(`${ACCURATE_BASE}/report/profit-and-loss.do?${params}`, { headers });
-          const json = await resp.json();
-          return { s: json.s, keys: Object.keys(json.d||json||{}), d: json.d || json, error: json.s===false?json.d:null };
+          const qs = new URLSearchParams({ startDate: dmy.startDate, endDate: dmy.endDate, asOf: dmy.endDate });
+          let r = await fetch(`${ACCURATE_BASE}/report/profit-and-loss.do?${qs}`, { headers:hdrs });
+          if (!r.ok && r.status >= 500) r = await fetch(`${ACCURATE_BASE_ALT}/report/profit-and-loss.do?${qs}`, { headers:hdrs });
+          const json = await r.json();
+          return { s: json.s, keys: Object.keys(json.d||json||{}), snippet: JSON.stringify(json).slice(0,400), error: json.s===false?json.d:null };
         } catch(e) { return { error: e.message }; }
       })();
 
