@@ -20902,7 +20902,10 @@ function OpsKurirHistory(_ref_okh) {
     while (_iter <= _end) { _dates.push(_iter.toISOString().slice(0,10)); _iter.setDate(_iter.getDate()+1); }
     if (_dates.length > 31) { alert('Maksimal 31 hari sekaligus!'); return; }
     setExportLoading(true);
-    var _rows = [];
+    var _xls = function(s){ return (s||''). replace(/[\uD800-\uDFFF]|[^ -\uFFFF]/g,'').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'').trim(); };
+    var _cn = function(note){ return _xls((note||'').replace(/\xb7?\s*[\d.]+\s*km\s*$/i,'').replace(/^[\u2705\uD83D\uDCCD\u25B6]\s*/g,'').trim()); };
+    var _tipeLbl = function(o){ if(o._type==='task') return 'Tugas: '+(o.customer_name||'Tugas'); if(o._type==='pickup') return 'Ambil PO'; if(o._type==='trip') return 'Kirim Cabang'; if(o._type==='servis') return 'Servis'; return 'Order'; };
+    var _allRows = [];
     var _bs60 = new Date(); _bs60.setDate(_bs60.getDate()-60);
     var _bs180 = new Date(); _bs180.setDate(_bs180.getDate()-180);
     try {
@@ -20910,31 +20913,52 @@ function OpsKurirHistory(_ref_okh) {
         var _bd = _dates[_di];
         var _bdFrom = _bd + 'T00:00:00+07:00';
         var _bdTo2 = _bd + 'T23:59:59+07:00';
-        var _bmD = (function(dd){ return function(ts){ if (!ts) return false; return new Date(new Date(ts).getTime()+7*3600000).toISOString().slice(0,10)===dd; }; })(_bd);
+        var _bmD = (function(dd){ return function(ts){ if(!ts) return false; return new Date(new Date(ts).getTime()+7*3600000).toISOString().slice(0,10)===dd; }; })(_bd);
         var _res = await Promise.all([
-          db.from('orders').select('id,customer_name,customer_address,delivered_at,distance_km,invoice_number').eq('courier_name',selCourier).eq('status','delivered').gte('delivered_at',_bdFrom).lte('delivered_at',_bdTo2).order('delivered_at',{ascending:true}),
-          db.from('courier_tasks').select('id,task_type,destination,description,assigned_at,created_at,status,distance_km,contact_name').eq('assigned_courier',selCourier).gte('created_at',_bs60.toISOString()).order('created_at',{ascending:true}),
-          db.from('purchase_orders').select('id,supplier_name,supplier_address,pickups,created_at').gte('created_at',_bs60.toISOString()).limit(300),
+          db.from('courier_checkins').select('id,created_at,lat,lng,note').eq('courier_name',selCourier).gte('created_at',_bdFrom).lte('created_at',_bdTo2).order('created_at',{ascending:true}),
+          db.from('orders').select('id,customer_name,delivered_at').eq('courier_name',selCourier).eq('status','delivered').gte('delivered_at',_bdFrom).lte('delivered_at',_bdTo2).order('delivered_at',{ascending:true}),
+          db.from('courier_tasks').select('id,task_type,destination,description,assigned_at,created_at').eq('assigned_courier',selCourier).gte('created_at',_bs60.toISOString()).order('created_at',{ascending:true}),
+          db.from('purchase_orders').select('id,supplier_name,pickups,created_at').gte('created_at',_bs60.toISOString()).limit(300),
           db.from('branch_requests').select('id,branch_name,trips,created_at').gte('created_at',_bs60.toISOString()).limit(300),
-          db.from('service_intakes').select('*').gte('created_at',_bs180.toISOString()).limit(500)
+          db.from('service_intakes').select('courier_name,sc_delivery_courier,sc_pickup_courier,assigned_courier,branch_name,service_center_name,customer_name,delivered_at,sc_delivered_at,sc_picked_up_at,returned_at,created_at').gte('created_at',_bs180.toISOString()).limit(500)
         ]);
-        var _ords = (_res[0].data||[]).map(function(o){ return {_type:'order',customer_name:o.customer_name,customer_address:o.customer_address,delivered_at:o.delivered_at,distance_km:o.distance_km}; });
-        var _tsks = (_res[1].data||[]).filter(function(t){ return _bmD(t.assigned_at||t.created_at); }).map(function(t){ return {_type:'task',customer_name:t.destination||t.description||t.task_type,customer_address:t.contact_name||'',delivered_at:t.assigned_at||t.created_at,distance_km:t.distance_km}; });
-        var _pku = []; (_res[2].data||[]).forEach(function(po){ (po.pickups||[]).forEach(function(p){ if (p.courier===selCourier&&_bmD(p.done_at||po.created_at)) _pku.push({_type:'pickup',customer_name:(po.supplier_name||'').toUpperCase(),customer_address:p.address||po.supplier_address||'',delivered_at:p.done_at||po.created_at,distance_km:p.distance_km}); }); });
-        var _trp = []; (_res[3].data||[]).forEach(function(r){ (r.trips||[]).forEach(function(t){ if (t.courier===selCourier&&_bmD(t.delivered_at||r.created_at)) _trp.push({_type:'trip',customer_name:(r.branch_name||t.branch||'').toUpperCase(),customer_address:'',delivered_at:t.delivered_at||r.created_at,distance_km:t.distance_km}); }); });
-        var _sis = []; (_res[4].data||[]).forEach(function(s){
-          var _add = function(lbl,ts,km){ if (_bmD(ts||s.created_at)) _sis.push({_type:'servis',customer_name:lbl,customer_address:(s.customer_name||'')+(s.unit_type?' \xb7 '+s.unit_type:''),delivered_at:ts||s.created_at,distance_km:km}); };
-          if (s.courier_name===selCourier) _add('Jemput dari '+(s.branch_name||'Cabang'),s.delivered_at||s.created_at,s.pickup_distance_km);
-          if (s.sc_delivery_courier===selCourier) _add('Antar ke '+(s.service_center_name||'SC'),s.sc_delivered_at||s.created_at,s.sc_distance_km);
-          if (s.sc_pickup_courier===selCourier) _add('Ambil dari '+(s.service_center_name||'SC'),s.sc_picked_up_at||s.created_at,s.scp_distance_km);
-          if (s.assigned_courier===selCourier) _add('Antar balik ke '+(s.customer_name||''),s.returned_at||s.created_at,s.return_distance_km);
+        var _gpsOnly = (_res[0].data||[]).filter(function(c){ return !(c.note||'').startsWith('\u25B6'); });
+        if (_gpsOnly.length < 2) continue;
+        var _ords = (_res[1].data||[]).map(function(o){ return {_type:'order',customer_name:o.customer_name,delivered_at:o.delivered_at}; });
+        var _tsks = (_res[2].data||[]).filter(function(t){ return _bmD(t.assigned_at||t.created_at); }).map(function(t){ return {_type:'task',customer_name:t.destination||t.description||t.task_type,delivered_at:t.assigned_at||t.created_at}; });
+        var _pku = []; (_res[3].data||[]).forEach(function(po){ (po.pickups||[]).forEach(function(p){ if(p.courier===selCourier&&_bmD(p.done_at||po.created_at)) _pku.push({_type:'pickup',customer_name:(po.supplier_name||'').toUpperCase(),delivered_at:p.done_at||po.created_at}); }); });
+        var _trp = []; (_res[4].data||[]).forEach(function(r){ (r.trips||[]).forEach(function(t){ if(t.courier===selCourier&&_bmD(t.delivered_at||r.created_at)) _trp.push({_type:'trip',customer_name:(r.branch_name||t.branch||'').toUpperCase(),delivered_at:t.delivered_at||r.created_at}); }); });
+        var _sis = []; (_res[5].data||[]).forEach(function(s){
+          var _add = function(lbl,ts){ if(_bmD(ts||s.created_at)) _sis.push({_type:'servis',customer_name:lbl,delivered_at:ts||s.created_at}); };
+          if(s.courier_name===selCourier) _add('Jemput dari '+(s.branch_name||'Cabang'),s.delivered_at||s.created_at);
+          if(s.sc_delivery_courier===selCourier) _add('Antar ke '+(s.service_center_name||'SC'),s.sc_delivered_at||s.created_at);
+          if(s.sc_pickup_courier===selCourier) _add('Ambil dari '+(s.service_center_name||'SC'),s.sc_picked_up_at||s.created_at);
+          if(s.assigned_courier===selCourier) _add('Antar balik ke '+(s.customer_name||''),s.returned_at||s.created_at);
         });
-        var _comb = _ords.concat(_tsks).concat(_pku).concat(_trp).concat(_sis).sort(function(a,b){ return new Date(a.delivered_at||0)-new Date(b.delivered_at||0); });
-        _comb.forEach(function(o,idx){ _rows.push({'Tgl':_bd,'Kurir':selCourier,'No':idx+1,'Nama / Tujuan':o.customer_name||'','Tipe':o._type==='task'?'Tugas':o._type==='pickup'?'Ambil PO':o._type==='trip'?'Kirim Cabang':o._type==='servis'?'Servis':'Order','Jam':o.delivered_at?new Date(o.delivered_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}):'-','Jarak (km)':o.distance_km||'','Alamat':o.customer_address||''}); });
+        var _actTl = _ords.concat(_tsks).concat(_pku).concat(_trp).concat(_sis).sort(function(a,b){ return new Date(a.delivered_at||0)-new Date(b.delivered_at||0); }).map(function(o){ return {ms:new Date(o.delivered_at).getTime(),label:_xls(o.customer_name+' - '+_tipeLbl(o))}; }).filter(function(a){ return a.ms; });
+        var ACT_WIN = 25*60*1000;
+        var _dayRows = [];
+        for (var _gi = 1; _gi < _gpsOnly.length; _gi++) {
+          var _fa = _gpsOnly[_gi-1], _tb = _gpsOnly[_gi];
+          var _km = 0;
+          if (_fa.lat && _tb.lat) { try { _km = parseFloat(((await getRoadDistanceKm(parseFloat(_fa.lat),parseFloat(_fa.lng),parseFloat(_tb.lat),parseFloat(_tb.lng)))||0).toFixed(2)); } catch(e){} }
+          var _jam = _tb.created_at ? new Date(_tb.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : '-';
+          var _fromLbl = _cn(_fa.note)||'Titik '+_gi;
+          var _toLbl = _cn(_tb.note);
+          if (!_toLbl) {
+            var _tbMs = new Date(_tb.created_at).getTime(); var _best=null,_bestDiff=Infinity;
+            _actTl.forEach(function(a){ var d=Math.abs(a.ms-_tbMs); if(d<_bestDiff){_bestDiff=d;_best=a;} });
+            _toLbl = (_best&&_bestDiff<=ACT_WIN) ? _best.label : 'Titik '+(_gi+1);
+          }
+          _dayRows.push({'Tgl':_bd,'Kurir':selCourier,'Dari':_fromLbl,'Link Dari':_fa.lat?'https://maps.google.com?q='+parseFloat(_fa.lat)+','+parseFloat(_fa.lng):'','Ke':_toLbl,'Link Tujuan':_tb.lat?'https://maps.google.com?q='+parseFloat(_tb.lat)+','+parseFloat(_tb.lng):'','KM Via Jalan (OSRM)':_km,'Tipe':'GPS','Jam Tiba di Tujuan':_jam});
+        }
+        var _daySum = _dayRows.reduce(function(s,r){ return s+(parseFloat(r['KM Via Jalan (OSRM)'])||0); },0);
+        _dayRows.push({'Tgl':'','Kurir':selCourier,'Dari':'','Link Dari':'','Ke':'TOTAL GPS','Link Tujuan':'','KM Via Jalan (OSRM)':parseFloat(_daySum.toFixed(2)),'Tipe':'','Jam Tiba di Tujuan':''});
+        _allRows = _allRows.concat(_dayRows);
       }
       var _wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(_wb, XLSX.utils.json_to_sheet(_rows.length?_rows:[{'Info':'Tidak ada aktivitas'}]), 'Aktivitas');
-      XLSX.writeFile(_wb, 'history_'+selCourier.replace(/ /g,'_')+'_'+_dFrom+(_dates.length>1?'_sd_'+_dTo:'')+'.xlsx');
+      XLSX.utils.book_append_sheet(_wb, XLSX.utils.json_to_sheet(_allRows.length?_allRows:[{'Info':'Tidak ada data GPS'}]), 'Rute GPS');
+      XLSX.writeFile(_wb, 'history_kurir_'+selCourier.replace(/ /g,'_')+'_'+_dFrom+(_dates.length>1?'_sd_'+_dTo:'')+'.xlsx');
     } catch(e) { alert('Export error: '+e.message); }
     setExportLoading(false);
   };
