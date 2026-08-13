@@ -60,22 +60,22 @@ export async function onRequestGet(context) {
     const appKey = env.ACCURATE_APP_KEY || '';
     const sigSecret = env.ACCURATE_SIG_SECRET || '';
 
-    // Debug mode: test invoice-number prefix filter
+    // Debug mode: test wildcard filter on invoice number
     if (debugMode) {
       const token = env.ACCURATE_TOKEN_ADL;
-      // Invoice numbers follow pattern SI.YYYY.MM.NNNNN — filter by month prefix
       const numPrefix = `SI.${year}.${String(month).padStart(2,'0')}`;
-      const byKeyword = await testFetch(token, appKey, sigSecret, {
-        page: '1', pageSize: '5',
-        fields: 'number,transDate,totalAmount',
-        keyword: numPrefix,
-      }, 'keyword');
-      const byFilterNumber = await testFetch(token, appKey, sigSecret, {
-        page: '1', pageSize: '5',
-        fields: 'number,transDate,totalAmount',
-        'filter.number': numPrefix,
-      }, 'filter_number');
-      return new Response(JSON.stringify({ v: 5, numPrefix, byKeyword, byFilterNumber }), { headers: corsHeaders });
+      const withStar  = await testFetch(token, appKey, sigSecret, {
+        page: '1', pageSize: '5', fields: 'number,transDate,totalAmount,branchName,masterSalesmanName',
+        'filter.number': numPrefix + '*',
+      }, 'star');
+      const withPct   = await testFetch(token, appKey, sigSecret, {
+        page: '1', pageSize: '5', fields: 'number,transDate,totalAmount,branchName,masterSalesmanName',
+        'filter.number': numPrefix + '%',
+      }, 'pct');
+      const noFilter  = await testFetch(token, appKey, sigSecret, {
+        page: '1', pageSize: '3', fields: 'number,transDate,totalAmount,branchName,masterSalesmanName',
+      }, 'no_filter_keys');
+      return new Response(JSON.stringify({ v: 6, numPrefix, withStar, withPct, noFilter }), { headers: corsHeaders });
     }
 
     const [invAdl, invGroup] = await Promise.all([
@@ -190,9 +190,9 @@ async function fetchAllInvoices(token, appKey, sigSecret, startDate, endDate) {
     if (!json.s || rows.length === 0) break;
 
     all.push(...rows);
-    // Stop when on last page (use API-returned pageCount, not our requested pageSize)
+    // Hard limit: 20 pages per DB (40 total across 2 DBs = within 50 subrequest limit)
     const totalPages = json.sp?.pageCount || 1;
-    if (rows.length === 0 || page >= totalPages || page >= 50) break;
+    if (rows.length === 0 || page >= totalPages || page >= 20) break;
     page++;
   }
 
