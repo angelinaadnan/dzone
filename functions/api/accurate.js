@@ -96,8 +96,10 @@ export async function onRequestGet(context) {
       const firstId = invAdl.rawFirst?.d?.[0]?.id;
       let detailJson = null;
       if (firstId) {
-        let dr = await fetch(`${ACCURATE_BASE}/sales-invoice/${firstId}.do`, { headers: dbgHeaders });
-        if (!dr.ok) dr = await fetch(`${ACCURATE_BASE_ALT}/sales-invoice/${firstId}.do`, { headers: dbgHeaders });
+        let dr = await fetch(`${ACCURATE_BASE}/sales-invoice/detail.do?id=${firstId}`, { headers: dbgHeaders });
+        if (!dr.ok || (await dr.clone().json().catch(()=>({s:false}))).s === false) {
+          dr = await fetch(`${ACCURATE_BASE_ALT}/sales-invoice/detail.do?id=${firstId}`, { headers: dbgHeaders });
+        }
         detailJson = await dr.json();
       }
       return new Response(JSON.stringify({
