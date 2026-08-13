@@ -121,6 +121,7 @@ async function fetchAllInvoices(token, appKey, sigSecret, startDate, endDate, de
 
   while (true) {
     const params = new URLSearchParams({
+      fields: 'number,transactionDate,customerName,grandTotal,totalAmount,profitAmount,branchName,salesperson,detailItem',
       'filter.startDate': startDate,
       'filter.endDate': endDate,
       page: String(page),
