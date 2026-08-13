@@ -3759,7 +3759,7 @@ function App() {
   var PESAN_BARANG_ALLOWED_SALES = ['Aldi', 'Eliwaty', 'Tio'];
   var canAccessPesanBarang = ['admin', 'ops', 'admin_pembelian', 'admin_online', 'supervisor'].includes(role) || role === 'sales' && PESAN_BARANG_ALLOWED_SALES.includes(userName);
   var SALES_HARIAN_USERS = ['Angel', 'Liana', 'Santo', 'GITA'];
-  var navItems = (role === 'supervisor' && userName === 'Santo' ? [].concat(_toConsumableArray(ROLE_NAV[role]), [{
+  var navItems = (role === 'supervisor' && userName === 'Santo' ? [{ id: 'santo_dashboard', icon: '📊', label: 'Sales Dashboard' }].concat(_toConsumableArray(ROLE_NAV[role]), [{
     id: 'branch_request',
     icon: '📦',
     label: 'Request Barang'
@@ -3976,7 +3976,7 @@ function App() {
   }), role === 'ops' && page === 'op_branch' && /*#__PURE__*/React.createElement(OpsBranchManager, {
     requests: branchRequests,
     onUpdate: updateBranchRequest
-  }), role === 'supervisor' && userName === 'Santo' && page === 'branch_request' && /*#__PURE__*/React.createElement(BranchRequestPage, {
+  }), role === 'supervisor' && userName === 'Santo' && page === 'santo_dashboard' && /*#__PURE__*/React.createElement(SantoDashboard, null), role === 'supervisor' && userName === 'Santo' && page === 'branch_request' && /*#__PURE__*/React.createElement(BranchRequestPage, {
     requests: branchRequests,
     onSave: saveBranchRequest,
     onUpdate: updateBranchRequest,
@@ -46638,6 +46638,164 @@ function OrderDetailModal(_ref278) {
       }
     }, (_t$lat = t.lat) === null || _t$lat === void 0 ? void 0 : _t$lat.toFixed(4), ",", (_t$lng = t.lng) === null || _t$lng === void 0 ? void 0 : _t$lng.toFixed(4)));
   })))));
+}
+
+
+// ─── SANTO DASHBOARD ──────────────────────────────────────────────
+function SantoDashboard() {
+  var _React$useState = React.useState(function() {
+    var now = new Date();
+    return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  });
+  var period = _React$useState[0]; var setPeriod = _React$useState[1];
+  var _React$useState2 = React.useState(null);
+  var data = _React$useState2[0]; var setData = _React$useState2[1];
+  var _React$useState3 = React.useState(false);
+  var loading = _React$useState3[0]; var setLoading = _React$useState3[1];
+  var _React$useState4 = React.useState(null);
+  var error = _React$useState4[0]; var setError = _React$useState4[1];
+
+  var fmtRp = function(v) {
+    if (!v && v !== 0) return '-';
+    if (v >= 1e9) return 'Rp ' + (v/1e9).toFixed(1) + 'M';
+    if (v >= 1e6) return 'Rp ' + Math.round(v/1e6) + 'jt';
+    return 'Rp ' + Math.round(v).toLocaleString('id-ID');
+  };
+  var fmtNum = function(v) { return v ? v.toLocaleString('id-ID') : '0'; };
+
+  React.useEffect(function() {
+    if (!period) return;
+    setLoading(true);
+    setError(null);
+    setData(null);
+    fetch('/api/accurate?period=' + period)
+      .then(function(r) { return r.json(); })
+      .then(function(json) {
+        if (json.error) throw new Error(json.error);
+        setData(json);
+      })
+      .catch(function(e) { setError(e.message); })
+      .finally(function() { setLoading(false); });
+  }, [period]);
+
+  var cardStyle = { background: 'var(--surface)', borderRadius: 12, padding: '16px 20px', border: '1px solid var(--border)' };
+  var labelStyle = { fontSize: 12, color: 'var(--text3)', marginBottom: 4 };
+  var valStyle = { fontSize: 22, fontWeight: 700, fontFamily: 'DM Mono', color: 'var(--text1)' };
+  var sub = { fontSize: 12, color: 'var(--text3)', marginTop: 2 };
+
+  return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 1100, margin: '0 auto' } },
+    // Header
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 } },
+      React.createElement('h2', { style: { fontSize: 20, fontWeight: 700, margin: 0, flex: 1 } }, '📊 Sales Dashboard'),
+      React.createElement('input', {
+        type: 'month', value: period,
+        onChange: function(e) { setPeriod(e.target.value); },
+        style: { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text1)', fontSize: 14 }
+      })
+    ),
+
+    // Loading / error
+    loading && React.createElement('div', { style: { textAlign: 'center', padding: 60, color: 'var(--text3)' } }, '⏳ Memuat data...'),
+    error && React.createElement('div', { style: { textAlign: 'center', padding: 40, color: '#ef4444', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' } },
+      React.createElement('div', { style: { fontSize: 18, marginBottom: 8 } }, '⚠️ Gagal memuat'),
+      React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)' } }, error),
+      React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 8 } }, 'Pastikan token Accurate sudah diset di Cloudflare.')
+    ),
+
+    data && React.createElement(React.Fragment, null,
+      // Summary cards
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 } },
+        React.createElement('div', { style: cardStyle },
+          React.createElement('div', { style: labelStyle }, 'Total Penjualan'),
+          React.createElement('div', { style: valStyle }, fmtRp(data.summary.revenue)),
+          React.createElement('div', { style: sub }, fmtNum(data.summary.transactions) + ' transaksi')
+        ),
+        React.createElement('div', { style: cardStyle },
+          React.createElement('div', { style: labelStyle }, 'Total Profit'),
+          React.createElement('div', { style: Object.assign({}, valStyle, { color: data.summary.profit >= 0 ? '#22c55e' : '#ef4444' }) }, fmtRp(data.summary.profit)),
+          React.createElement('div', { style: sub }, 'Margin: ' + data.summary.profitMargin + '%')
+        ),
+        React.createElement('div', { style: cardStyle },
+          React.createElement('div', { style: labelStyle }, 'Jumlah Transaksi'),
+          React.createElement('div', { style: valStyle }, fmtNum(data.summary.transactions)),
+          React.createElement('div', { style: sub }, 'Invoice bulan ' + period)
+        )
+      ),
+
+      // Sales + Items grid
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 } },
+        // Profit per Salesperson
+        React.createElement('div', { style: cardStyle },
+          React.createElement('div', { style: { fontWeight: 600, marginBottom: 12, fontSize: 14 } }, '👤 Penjualan per Sales'),
+          data.salesList.length === 0
+            ? React.createElement('div', { style: { color: 'var(--text3)', fontSize: 13 } }, 'Tidak ada data')
+            : data.salesList.map(function(s, i) {
+                return React.createElement('div', { key: s.name, style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 } },
+                  React.createElement('div', { style: { width: 20, fontSize: 12, color: 'var(--text3)', textAlign: 'right' } }, '#' + (i+1)),
+                  React.createElement('div', { style: { flex: 1, fontSize: 13, fontWeight: 500 } }, s.name),
+                  React.createElement('div', { style: { fontSize: 13, fontFamily: 'DM Mono', color: 'var(--text2)' } }, fmtRp(s.revenue))
+                );
+              })
+        ),
+
+        // Top 10 Items
+        React.createElement('div', { style: cardStyle },
+          React.createElement('div', { style: { fontWeight: 600, marginBottom: 12, fontSize: 14 } }, '🏆 Barang Terlaris (Top 10)'),
+          data.topItems.length === 0
+            ? React.createElement('div', { style: { color: 'var(--text3)', fontSize: 13 } }, 'Tidak ada data')
+            : data.topItems.map(function(it, i) {
+                return React.createElement('div', { key: it.name, style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 } },
+                  React.createElement('div', { style: { width: 20, fontSize: 12, color: 'var(--text3)', textAlign: 'right' } }, '#' + (i+1)),
+                  React.createElement('div', { style: { flex: 1, fontSize: 12 } }, it.name),
+                  React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', marginLeft: 4 } }, fmtNum(it.qty) + ' pcs')
+                );
+              })
+        )
+      ),
+
+      // Brand + Category grid
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } },
+        // Top Brands
+        React.createElement('div', { style: cardStyle },
+          React.createElement('div', { style: { fontWeight: 600, marginBottom: 12, fontSize: 14 } }, '🏷️ Brand Terlaris'),
+          data.topBrands.length === 0
+            ? React.createElement('div', { style: { color: 'var(--text3)', fontSize: 13 } }, 'Tidak ada data')
+            : data.topBrands.map(function(b, i) {
+                var pct = data.topBrands[0].qty > 0 ? b.qty / data.topBrands[0].qty * 100 : 0;
+                return React.createElement('div', { key: b.name, style: { marginBottom: 8 } },
+                  React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 2 } },
+                    React.createElement('span', null, b.name),
+                    React.createElement('span', { style: { color: 'var(--text3)', fontFamily: 'DM Mono' } }, fmtNum(b.qty) + ' unit')
+                  ),
+                  React.createElement('div', { style: { height: 4, background: 'var(--border)', borderRadius: 2 } },
+                    React.createElement('div', { style: { height: '100%', width: pct + '%', background: '#3b82f6', borderRadius: 2 } })
+                  )
+                );
+              })
+        ),
+
+        // Units by Category
+        React.createElement('div', { style: cardStyle },
+          React.createElement('div', { style: { fontWeight: 600, marginBottom: 12, fontSize: 14 } }, '📦 Unit per Kategori'),
+          data.categoryList.length === 0
+            ? React.createElement('div', { style: { color: 'var(--text3)', fontSize: 13 } }, 'Tidak ada data')
+            : data.categoryList.map(function(c) {
+                var total = data.categoryList.reduce(function(s, x) { return s + x.units; }, 0);
+                var pct = total > 0 ? c.units / total * 100 : 0;
+                return React.createElement('div', { key: c.name, style: { marginBottom: 8 } },
+                  React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 2 } },
+                    React.createElement('span', null, c.name),
+                    React.createElement('span', { style: { color: 'var(--text3)', fontFamily: 'DM Mono' } }, fmtNum(c.units) + ' unit (' + pct.toFixed(0) + '%)')
+                  ),
+                  React.createElement('div', { style: { height: 4, background: 'var(--border)', borderRadius: 2 } },
+                    React.createElement('div', { style: { height: '100%', width: pct + '%', background: '#8b5cf6', borderRadius: 2 } })
+                  )
+                );
+              })
+        )
+      )
+    )
+  );
 }
 
 // ─── BOOT ─────────────────────────────────────────────────────────
