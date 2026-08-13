@@ -46654,141 +46654,186 @@ function SantoDashboard() {
   var loading = _React$useState3[0]; var setLoading = _React$useState3[1];
   var _React$useState4 = React.useState(null);
   var error = _React$useState4[0]; var setError = _React$useState4[1];
+  var _React$useState5 = React.useState('Semua');
+  var activeBranch = _React$useState5[0]; var setActiveBranch = _React$useState5[1];
+
+  var BRANCHES = ['Semua', 'Tangerang', 'Poins', 'Mangga Dua'];
+  var BRANCH_STORES = { Tangerang: 'TC DZ, TC NMC, TC HOI', Poins: 'PS NMC', 'Mangga Dua': 'M2 DZ, M2 BIG, M2 ADL' };
 
   var fmtRp = function(v) {
     if (!v && v !== 0) return '-';
-    if (v >= 1e9) return 'Rp ' + (v/1e9).toFixed(1) + 'M';
-    if (v >= 1e6) return 'Rp ' + Math.round(v/1e6) + 'jt';
+    if (v >= 1e9) return 'Rp ' + (v/1e9).toFixed(2) + 'M';
+    if (v >= 1e6) return 'Rp ' + (v/1e6).toFixed(1) + 'jt';
     return 'Rp ' + Math.round(v).toLocaleString('id-ID');
   };
-  var fmtNum = function(v) { return v ? v.toLocaleString('id-ID') : '0'; };
+  var fmtNum = function(v) { return (v || 0).toLocaleString('id-ID'); };
 
   React.useEffect(function() {
     if (!period) return;
-    setLoading(true);
-    setError(null);
-    setData(null);
+    setLoading(true); setError(null); setData(null); setActiveBranch('Semua');
     fetch('/api/accurate?period=' + period)
       .then(function(r) { return r.json(); })
-      .then(function(json) {
-        if (json.error) throw new Error(json.error);
-        setData(json);
-      })
+      .then(function(json) { if (json.error) throw new Error(json.error); setData(json); })
       .catch(function(e) { setError(e.message); })
       .finally(function() { setLoading(false); });
   }, [period]);
 
-  var cardStyle = { background: 'var(--surface)', borderRadius: 12, padding: '16px 20px', border: '1px solid var(--border)' };
-  var labelStyle = { fontSize: 12, color: 'var(--text3)', marginBottom: 4 };
-  var valStyle = { fontSize: 22, fontWeight: 700, fontFamily: 'DM Mono', color: 'var(--text1)' };
+  var view = React.useMemo(function() {
+    if (!data) return null;
+    if (activeBranch === 'Semua') return { summary: data.summary, salesList: data.salesList, topItems: data.topItems, topBrands: data.topBrands, categoryList: data.categoryList };
+    var b = data.branches && data.branches[activeBranch];
+    if (!b) return { summary: { revenue:0,profit:0,profitMargin:0,transactions:0 }, salesList:[], topItems:[], topBrands:[], categoryList:[] };
+    var bsum = (data.branchSummary||[]).find(function(x){ return x.name===activeBranch; }) || { revenue:0,profit:0,profitMargin:0,transactions:0 };
+    return { summary: bsum, salesList: b.salesList||[], topItems: b.topItems||[], topBrands: b.topBrands||[], categoryList: b.categoryList||[] };
+  }, [data, activeBranch]);
+
+  var cs = { background: 'var(--surface)', borderRadius: 12, padding: '16px 20px', border: '1px solid var(--border)' };
+  var lbl = { fontSize: 12, color: 'var(--text3)', marginBottom: 4 };
+  var val = { fontSize: 22, fontWeight: 700, fontFamily: 'DM Mono', color: 'var(--text1)' };
   var sub = { fontSize: 12, color: 'var(--text3)', marginTop: 2 };
+  var barBg = { height: 4, background: 'var(--border)', borderRadius: 2 };
 
   return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 1100, margin: '0 auto' } },
-    // Header
-    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 } },
-      React.createElement('h2', { style: { fontSize: 20, fontWeight: 700, margin: 0, flex: 1 } }, '📊 Sales Dashboard'),
+
+    // Header row
+    React.createElement('div', { style: { display:'flex', alignItems:'center', gap:12, marginBottom:20 } },
+      React.createElement('h2', { style: { fontSize:20, fontWeight:700, margin:0, flex:1 } }, '📊 Sales Dashboard'),
       React.createElement('input', {
-        type: 'month', value: period,
-        onChange: function(e) { setPeriod(e.target.value); },
-        style: { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text1)', fontSize: 14 }
+        type:'month', value:period,
+        onChange: function(e){ setPeriod(e.target.value); },
+        style:{ padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--surface)', color:'var(--text1)', fontSize:14 }
       })
     ),
 
-    // Loading / error
-    loading && React.createElement('div', { style: { textAlign: 'center', padding: 60, color: 'var(--text3)' } }, '⏳ Memuat data...'),
-    error && React.createElement('div', { style: { textAlign: 'center', padding: 40, color: '#ef4444', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' } },
-      React.createElement('div', { style: { fontSize: 18, marginBottom: 8 } }, '⚠️ Gagal memuat'),
-      React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)' } }, error),
-      React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 8 } }, 'Pastikan token Accurate sudah diset di Cloudflare.')
+    // Branch tabs
+    React.createElement('div', { style:{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' } },
+      BRANCHES.map(function(b) {
+        var active = b === activeBranch;
+        return React.createElement('button', {
+          key:b, onClick:function(){ setActiveBranch(b); },
+          style:{ padding:'6px 14px', borderRadius:20, border:'1px solid '+(active?'#3b82f6':'var(--border)'),
+            background: active?'#3b82f6':'var(--surface)', color: active?'#fff':'var(--text1)',
+            fontWeight: active?600:400, fontSize:13, cursor:'pointer' }
+        },
+          b === 'Semua' ? 'Semua Cabang' : b,
+          b !== 'Semua' && React.createElement('span', { style:{ fontSize:11, opacity:0.8, marginLeft:5 } }, '(', BRANCH_STORES[b], ')')
+        );
+      })
     ),
 
-    data && React.createElement(React.Fragment, null,
+    loading && React.createElement('div', { style:{ textAlign:'center', padding:60, color:'var(--text3)' } }, '⏳ Memuat data...'),
+    error && React.createElement('div', { style:{ textAlign:'center', padding:40, color:'#ef4444', background:'var(--surface)', borderRadius:12, border:'1px solid var(--border)' } },
+      React.createElement('div', { style:{ fontSize:18, marginBottom:8 } }, '⚠️ Gagal memuat'),
+      React.createElement('div', { style:{ fontSize:13, color:'var(--text2)' } }, error),
+      React.createElement('div', { style:{ fontSize:12, color:'var(--text3)', marginTop:8 } }, 'Pastikan token Accurate sudah diset di Cloudflare.')
+    ),
+
+    view && React.createElement(React.Fragment, null,
+
       // Summary cards
-      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 } },
-        React.createElement('div', { style: cardStyle },
-          React.createElement('div', { style: labelStyle }, 'Total Penjualan'),
-          React.createElement('div', { style: valStyle }, fmtRp(data.summary.revenue)),
-          React.createElement('div', { style: sub }, fmtNum(data.summary.transactions) + ' transaksi')
+      React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:12, marginBottom:20 } },
+        React.createElement('div', { style:cs },
+          React.createElement('div', { style:lbl }, 'Total Penjualan'),
+          React.createElement('div', { style:val }, fmtRp(view.summary.revenue)),
+          React.createElement('div', { style:sub }, fmtNum(view.summary.transactions) + ' transaksi')
         ),
-        React.createElement('div', { style: cardStyle },
-          React.createElement('div', { style: labelStyle }, 'Total Profit'),
-          React.createElement('div', { style: Object.assign({}, valStyle, { color: data.summary.profit >= 0 ? '#22c55e' : '#ef4444' }) }, fmtRp(data.summary.profit)),
-          React.createElement('div', { style: sub }, 'Margin: ' + data.summary.profitMargin + '%')
+        React.createElement('div', { style:cs },
+          React.createElement('div', { style:lbl }, 'Total Profit'),
+          React.createElement('div', { style:Object.assign({},val,{ color: view.summary.profit>=0?'#22c55e':'#ef4444' }) }, fmtRp(view.summary.profit)),
+          React.createElement('div', { style:sub }, 'Margin: ' + (view.summary.profitMargin||0) + '%')
         ),
-        React.createElement('div', { style: cardStyle },
-          React.createElement('div', { style: labelStyle }, 'Jumlah Transaksi'),
-          React.createElement('div', { style: valStyle }, fmtNum(data.summary.transactions)),
-          React.createElement('div', { style: sub }, 'Invoice bulan ' + period)
+        React.createElement('div', { style:cs },
+          React.createElement('div', { style:lbl }, 'Jumlah Transaksi'),
+          React.createElement('div', { style:val }, fmtNum(view.summary.transactions)),
+          React.createElement('div', { style:sub }, 'Invoice ' + period)
         )
       ),
 
-      // Sales + Items grid
-      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 } },
-        // Profit per Salesperson
-        React.createElement('div', { style: cardStyle },
-          React.createElement('div', { style: { fontWeight: 600, marginBottom: 12, fontSize: 14 } }, '👤 Penjualan per Sales'),
-          data.salesList.length === 0
-            ? React.createElement('div', { style: { color: 'var(--text3)', fontSize: 13 } }, 'Tidak ada data')
-            : data.salesList.map(function(s, i) {
-                return React.createElement('div', { key: s.name, style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 } },
-                  React.createElement('div', { style: { width: 20, fontSize: 12, color: 'var(--text3)', textAlign: 'right' } }, '#' + (i+1)),
-                  React.createElement('div', { style: { flex: 1, fontSize: 13, fontWeight: 500 } }, s.name),
-                  React.createElement('div', { style: { fontSize: 13, fontFamily: 'DM Mono', color: 'var(--text2)' } }, fmtRp(s.revenue))
+      // Branch breakdown (only on "Semua" tab)
+      activeBranch === 'Semua' && data.branchSummary && data.branchSummary.length > 0 &&
+        React.createElement('div', { style:Object.assign({},cs,{ marginBottom:20 }) },
+          React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:12 } }, '🏪 Breakdown per Cabang'),
+          React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:10 } },
+            data.branchSummary.map(function(b) {
+              var pct = data.summary.revenue > 0 ? b.revenue/data.summary.revenue*100 : 0;
+              return React.createElement('div', { key:b.name, style:{ padding:'12px 14px', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg)' } },
+                React.createElement('div', { style:{ fontWeight:600, fontSize:13, marginBottom:6 } }, b.name,
+                  React.createElement('span', { style:{ fontWeight:400, fontSize:11, color:'var(--text3)', marginLeft:6 } }, BRANCH_STORES[b.name]||'')
+                ),
+                React.createElement('div', { style:{ fontFamily:'DM Mono', fontWeight:700, fontSize:16 } }, fmtRp(b.revenue)),
+                React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2, marginBottom:6 } },
+                  b.transactions + ' transaksi • margin ' + (b.profitMargin||0) + '%'
+                ),
+                React.createElement('div', { style:barBg },
+                  React.createElement('div', { style:{ height:'100%', width: pct.toFixed(1)+'%', background:'#3b82f6', borderRadius:2 } })
+                ),
+                React.createElement('div', { style:{ fontSize:10, color:'var(--text3)', marginTop:3 } }, pct.toFixed(1) + '% dari total')
+              );
+            })
+          )
+        ),
+
+      // Sales + Items
+      React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 } },
+        React.createElement('div', { style:cs },
+          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '👤 Penjualan per Sales'),
+          view.salesList.length === 0
+            ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
+            : view.salesList.map(function(s, i) {
+                return React.createElement('div', { key:s.name, style:{ display:'flex', alignItems:'center', gap:8, marginBottom:8 } },
+                  React.createElement('div', { style:{ width:22, fontSize:11, color:'var(--text3)', textAlign:'right' } }, '#'+(i+1)),
+                  React.createElement('div', { style:{ flex:1, fontSize:13, fontWeight:500 } }, s.name),
+                  React.createElement('div', { style:{ fontSize:13, fontFamily:'DM Mono', color:'var(--text2)' } }, fmtRp(s.revenue))
                 );
               })
         ),
-
-        // Top 10 Items
-        React.createElement('div', { style: cardStyle },
-          React.createElement('div', { style: { fontWeight: 600, marginBottom: 12, fontSize: 14 } }, '🏆 Barang Terlaris (Top 10)'),
-          data.topItems.length === 0
-            ? React.createElement('div', { style: { color: 'var(--text3)', fontSize: 13 } }, 'Tidak ada data')
-            : data.topItems.map(function(it, i) {
-                return React.createElement('div', { key: it.name, style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 } },
-                  React.createElement('div', { style: { width: 20, fontSize: 12, color: 'var(--text3)', textAlign: 'right' } }, '#' + (i+1)),
-                  React.createElement('div', { style: { flex: 1, fontSize: 12 } }, it.name),
-                  React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', marginLeft: 4 } }, fmtNum(it.qty) + ' pcs')
+        React.createElement('div', { style:cs },
+          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '🏆 Barang Terlaris'),
+          view.topItems.length === 0
+            ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
+            : view.topItems.map(function(it, i) {
+                return React.createElement('div', { key:it.name, style:{ display:'flex', alignItems:'center', gap:8, marginBottom:7 } },
+                  React.createElement('div', { style:{ width:22, fontSize:11, color:'var(--text3)', textAlign:'right' } }, '#'+(i+1)),
+                  React.createElement('div', { style:{ flex:1, fontSize:12 } }, it.name),
+                  React.createElement('div', { style:{ fontSize:12, color:'var(--text3)' } }, fmtNum(it.qty)+' pcs')
                 );
               })
         )
       ),
 
-      // Brand + Category grid
-      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } },
-        // Top Brands
-        React.createElement('div', { style: cardStyle },
-          React.createElement('div', { style: { fontWeight: 600, marginBottom: 12, fontSize: 14 } }, '🏷️ Brand Terlaris'),
-          data.topBrands.length === 0
-            ? React.createElement('div', { style: { color: 'var(--text3)', fontSize: 13 } }, 'Tidak ada data')
-            : data.topBrands.map(function(b, i) {
-                var pct = data.topBrands[0].qty > 0 ? b.qty / data.topBrands[0].qty * 100 : 0;
-                return React.createElement('div', { key: b.name, style: { marginBottom: 8 } },
-                  React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 2 } },
+      // Brand + Category
+      React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 } },
+        React.createElement('div', { style:cs },
+          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '🏷️ Brand Terlaris'),
+          view.topBrands.length === 0
+            ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
+            : view.topBrands.map(function(b) {
+                var pct = view.topBrands[0].qty > 0 ? b.qty/view.topBrands[0].qty*100 : 0;
+                return React.createElement('div', { key:b.name, style:{ marginBottom:8 } },
+                  React.createElement('div', { style:{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:2 } },
                     React.createElement('span', null, b.name),
-                    React.createElement('span', { style: { color: 'var(--text3)', fontFamily: 'DM Mono' } }, fmtNum(b.qty) + ' unit')
+                    React.createElement('span', { style:{ color:'var(--text3)', fontFamily:'DM Mono' } }, fmtNum(b.qty)+' unit')
                   ),
-                  React.createElement('div', { style: { height: 4, background: 'var(--border)', borderRadius: 2 } },
-                    React.createElement('div', { style: { height: '100%', width: pct + '%', background: '#3b82f6', borderRadius: 2 } })
+                  React.createElement('div', { style:barBg },
+                    React.createElement('div', { style:{ height:'100%', width:pct+'%', background:'#3b82f6', borderRadius:2 } })
                   )
                 );
               })
         ),
-
-        // Units by Category
-        React.createElement('div', { style: cardStyle },
-          React.createElement('div', { style: { fontWeight: 600, marginBottom: 12, fontSize: 14 } }, '📦 Unit per Kategori'),
-          data.categoryList.length === 0
-            ? React.createElement('div', { style: { color: 'var(--text3)', fontSize: 13 } }, 'Tidak ada data')
-            : data.categoryList.map(function(c) {
-                var total = data.categoryList.reduce(function(s, x) { return s + x.units; }, 0);
-                var pct = total > 0 ? c.units / total * 100 : 0;
-                return React.createElement('div', { key: c.name, style: { marginBottom: 8 } },
-                  React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 2 } },
+        React.createElement('div', { style:cs },
+          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '📦 Unit per Kategori'),
+          view.categoryList.length === 0
+            ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
+            : view.categoryList.map(function(c) {
+                var total = view.categoryList.reduce(function(s,x){ return s+x.units; },0);
+                var pct = total > 0 ? c.units/total*100 : 0;
+                return React.createElement('div', { key:c.name, style:{ marginBottom:8 } },
+                  React.createElement('div', { style:{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:2 } },
                     React.createElement('span', null, c.name),
-                    React.createElement('span', { style: { color: 'var(--text3)', fontFamily: 'DM Mono' } }, fmtNum(c.units) + ' unit (' + pct.toFixed(0) + '%)')
+                    React.createElement('span', { style:{ color:'var(--text3)', fontFamily:'DM Mono' } }, fmtNum(c.units)+' unit ('+pct.toFixed(0)+'%)')
                   ),
-                  React.createElement('div', { style: { height: 4, background: 'var(--border)', borderRadius: 2 } },
-                    React.createElement('div', { style: { height: '100%', width: pct + '%', background: '#8b5cf6', borderRadius: 2 } })
+                  React.createElement('div', { style:barBg },
+                    React.createElement('div', { style:{ height:'100%', width:pct.toFixed(1)+'%', background:'#8b5cf6', borderRadius:2 } })
                   )
                 );
               })

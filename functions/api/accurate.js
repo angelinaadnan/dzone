@@ -1,10 +1,30 @@
 // Cloudflare Pages Function — proxy ke Accurate Online API
-// Secrets yang dibutuhkan (set via Cloudflare Dashboard → Settings → Environment Variables):
-//   ACCURATE_TOKEN_ADL   = API token database PT ANUGERAH DIGITAL LESTARI (PPN)
-//   ACCURATE_TOKEN_GROUP = API token database GROUP (non-PPN)
-//   ACCURATE_API_KEY     = secret key untuk validasi request dari dashboard (bebas isi)
+// Secrets (set via Cloudflare Dashboard → Settings → Environment Variables):
+//   ACCURATE_TOKEN_ADL   = API token DB PT ANUGERAH DIGITAL LESTARI (PPN)
+//   ACCURATE_TOKEN_GROUP = API token DB GROUP (non-PPN)
+//   ACCURATE_API_KEY     = secret key untuk validasi request dari dashboard
 
 const ACCURATE_BASE = 'https://api.accurate.id/accurate/api';
+
+// Branch prefix → display name
+const BRANCH_LABELS = {
+  'TC': 'Tangerang',
+  'PS': 'Poins',
+  'M2': 'Mangga Dua',
+};
+
+// All known branch codes → their prefix
+const BRANCH_CODES = [
+  'TC DZ', 'TC NMC', 'TC HOI',
+  'PS NMC',
+  'M2 DZ', 'M2 BIG', 'M2 ADL',
+];
+
+function getBranchLabel(branchName) {
+  if (!branchName) return 'Lainnya';
+  const prefix = branchName.trim().split(/\s+/)[0].toUpperCase();
+  return BRANCH_LABELS[prefix] || branchName;
+}
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -15,13 +35,13 @@ export async function onRequestGet(context) {
     'Access-Control-Allow-Origin': '*',
   };
 
-  // Validasi API key sederhana
+  // Simple API key guard
   const apiKey = url.searchParams.get('key') || request.headers.get('X-API-Key');
   if (env.ACCURATE_API_KEY && apiKey !== env.ACCURATE_API_KEY) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
   }
 
-  const period = url.searchParams.get('period') || getThisMonth(); // format: "2026-08"
+  const period = url.searchParams.get('period') || getThisMonth();
 
   try {
     const [year, month] = period.split('-').map(Number);
@@ -29,7 +49,6 @@ export async function onRequestGet(context) {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2,'0')}-${lastDay}`;
 
-    // Fetch dari kedua database paralel
     const [invAdl, invGroup] = await Promise.all([
       env.ACCURATE_TOKEN_ADL
         ? fetchAllInvoices(env.ACCURATE_TOKEN_ADL, startDate, endDate)
@@ -58,7 +77,7 @@ export async function onRequestOptions() {
   });
 }
 
-// ─── Fetch semua halaman invoice dari Accurate ───────────────────────────────
+// ─── Fetch all pages of invoices from Accurate ───────────────────────────────
 async function fetchAllInvoices(token, startDate, endDate) {
   const all = [];
   let page = 1;
@@ -68,8 +87,8 @@ async function fetchAllInvoices(token, startDate, endDate) {
     const params = new URLSearchParams({
       fields: [
         'number', 'transactionDate', 'customerName',
-        'grandTotal', 'totalAmount', 'branchName',
-        'salesperson', 'detailItem',
+        'grandTotal', 'totalAmount', 'profitAmount',
+        'branchName', 'salesperson', 'detailItem',
       ].join(','),
       'filter.startDate': startDate,
       'filter.endDate': endDate,
@@ -94,106 +113,128 @@ async function fetchAllInvoices(token, startDate, endDate) {
 
     all.push(...json.d);
 
-    // Stop jika sudah dapat semua atau halaman terakhir
     if (json.d.length < pageSize || all.length >= (json.total || Infinity)) break;
     page++;
-
-    // Safety limit 20 halaman = 2000 invoice
-    if (page > 20) break;
+    if (page > 20) break; // safety: 2000 invoices max
   }
 
   return all;
 }
 
-// ─── Agregasi data untuk dashboard ───────────────────────────────────────────
+// ─── Aggregate into overall + per-branch breakdowns ──────────────────────────
 function aggregateData(invoices, period) {
-  let totalRevenue = 0;
-  let totalProfit = 0;
-  let totalTransactions = invoices.length;
+  // overall accumulators
+  const overall = makeAccumulators();
 
-  const salesMap = {};   // salesperson → { revenue, profit, qty }
-  const itemMap = {};    // itemName → { qty, revenue }
-  const brandMap = {};   // brand (kata pertama item) → { qty }
-  const catMap = {};     // category → { qty }
+  // per-branch accumulators: key = 'Tangerang' | 'Poins' | 'Mangga Dua' | 'Lainnya'
+  const byBranch = {};
 
   for (const inv of invoices) {
+    const branchLabel = getBranchLabel(inv.branchName);
+    if (!byBranch[branchLabel]) byBranch[branchLabel] = makeAccumulators();
+
     const invRevenue = inv.grandTotal || inv.totalAmount || 0;
-    totalRevenue += invRevenue;
-    totalProfit += inv.profitAmount || 0;
+    const invProfit = inv.profitAmount || 0;
+
+    overall.revenue += invRevenue;
+    overall.profit += invProfit;
+    overall.transactions += 1;
+    byBranch[branchLabel].revenue += invRevenue;
+    byBranch[branchLabel].profit += invProfit;
+    byBranch[branchLabel].transactions += 1;
 
     const items = inv.detailItem || [];
-
     for (const item of items) {
-      // Salesperson: di item atau di header invoice
       const sp = (item.salespersonName || item.salesperson?.name
         || inv.salesperson?.name || '').trim() || 'Tidak Ada';
-
-      const amount = item.amount || (item.quantity * item.unitPrice) || 0;
+      const amount = item.amount || (item.quantity * (item.unitPrice || 0)) || 0;
       const qty = item.quantity || 0;
       const profit = item.profitAmount || 0;
-
-      // Per salesperson
-      if (!salesMap[sp]) salesMap[sp] = { revenue: 0, profit: 0, qty: 0 };
-      salesMap[sp].revenue += amount;
-      salesMap[sp].profit += profit;
-      salesMap[sp].qty += qty;
-
-      // Per item
       const itemName = (item.itemName || item.name || '').trim();
-      if (itemName) {
-        if (!itemMap[itemName]) itemMap[itemName] = { qty: 0, revenue: 0 };
-        itemMap[itemName].qty += qty;
-        itemMap[itemName].revenue += amount;
-
-        // Brand = kata pertama dari nama item (misal "LENOVO", "EPSON", dll)
-        const brand = itemName.split(/[\s-]/)[0].toUpperCase();
-        if (!brandMap[brand]) brandMap[brand] = 0;
-        brandMap[brand] += qty;
-      }
-
-      // Per kategori
+      const brand = itemName ? itemName.split(/[\s-]/)[0].toUpperCase() : null;
       const cat = (item.itemCategory?.name || item.categoryName || 'Lainnya').trim();
-      if (!catMap[cat]) catMap[cat] = 0;
-      catMap[cat] += qty;
+
+      accumulate(overall, sp, amount, qty, profit, itemName, brand, cat);
+      accumulate(byBranch[branchLabel], sp, amount, qty, profit, itemName, brand, cat);
     }
   }
 
-  // Sortir
-  const salesList = Object.entries(salesMap)
+  const branchSummary = Object.entries(byBranch)
+    .map(([name, acc]) => ({
+      name,
+      revenue: acc.revenue,
+      profit: acc.profit,
+      profitMargin: acc.revenue > 0 ? parseFloat((acc.profit / acc.revenue * 100).toFixed(1)) : 0,
+      transactions: acc.transactions,
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  return {
+    period,
+    summary: finalizeSummary(overall),
+    branchSummary,
+    branches: Object.fromEntries(
+      Object.entries(byBranch).map(([name, acc]) => [name, finalizeAccumulators(acc)])
+    ),
+    ...finalizeAccumulators(overall),
+  };
+}
+
+function makeAccumulators() {
+  return {
+    revenue: 0, profit: 0, transactions: 0,
+    salesMap: {}, itemMap: {}, brandMap: {}, catMap: {},
+  };
+}
+
+function accumulate(acc, sp, amount, qty, profit, itemName, brand, cat) {
+  if (!acc.salesMap[sp]) acc.salesMap[sp] = { revenue: 0, profit: 0, qty: 0 };
+  acc.salesMap[sp].revenue += amount;
+  acc.salesMap[sp].profit += profit;
+  acc.salesMap[sp].qty += qty;
+
+  if (itemName) {
+    if (!acc.itemMap[itemName]) acc.itemMap[itemName] = { qty: 0, revenue: 0 };
+    acc.itemMap[itemName].qty += qty;
+    acc.itemMap[itemName].revenue += amount;
+
+    if (brand) {
+      acc.brandMap[brand] = (acc.brandMap[brand] || 0) + qty;
+    }
+  }
+
+  acc.catMap[cat] = (acc.catMap[cat] || 0) + qty;
+}
+
+function finalizeSummary(acc) {
+  return {
+    revenue: acc.revenue,
+    profit: acc.profit,
+    profitMargin: acc.revenue > 0 ? parseFloat((acc.profit / acc.revenue * 100).toFixed(1)) : 0,
+    transactions: acc.transactions,
+  };
+}
+
+function finalizeAccumulators(acc) {
+  const salesList = Object.entries(acc.salesMap)
     .map(([name, d]) => ({ name, revenue: d.revenue, profit: d.profit, qty: d.qty }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  const topItems = Object.entries(itemMap)
+  const topItems = Object.entries(acc.itemMap)
     .map(([name, d]) => ({ name, qty: d.qty, revenue: d.revenue }))
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 10);
 
-  const topBrands = Object.entries(brandMap)
+  const topBrands = Object.entries(acc.brandMap)
     .map(([name, qty]) => ({ name, qty }))
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 10);
 
-  const categoryList = Object.entries(catMap)
+  const categoryList = Object.entries(acc.catMap)
     .map(([name, units]) => ({ name, units }))
     .sort((a, b) => b.units - a.units);
 
-  const profitMargin = totalRevenue > 0
-    ? parseFloat((totalProfit / totalRevenue * 100).toFixed(1))
-    : 0;
-
-  return {
-    period,
-    summary: {
-      revenue: totalRevenue,
-      profit: totalProfit,
-      profitMargin,
-      transactions: totalTransactions,
-    },
-    salesList,
-    topItems,
-    topBrands,
-    categoryList,
-  };
+  return { salesList, topItems, topBrands, categoryList };
 }
 
 function getThisMonth() {
