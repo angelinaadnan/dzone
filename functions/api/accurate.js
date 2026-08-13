@@ -60,17 +60,22 @@ export async function onRequestGet(context) {
     const appKey = env.ACCURATE_APP_KEY || '';
     const sigSecret = env.ACCURATE_SIG_SECRET || '';
 
-    // Debug mode: 2 requests only — baseline vs date filter
+    // Debug mode: test invoice-number prefix filter
     if (debugMode) {
       const token = env.ACCURATE_TOKEN_ADL;
-      const dmy = toAccurateDate(startDate) + '_to_' + toAccurateDate(endDate);
-      const baseline = await testFetch(token, appKey, sigSecret, { page: '1', pageSize: '3' }, 'no_filter');
-      const filtered = await testFetch(token, appKey, sigSecret, {
-        page: '1', pageSize: '3',
-        'filter.startDate': toAccurateDate(startDate),
-        'filter.endDate': toAccurateDate(endDate),
-      }, 'filter_dmy');
-      return new Response(JSON.stringify({ v: 4, startDate, endDate, dmy, baseline, filtered }), { headers: corsHeaders });
+      // Invoice numbers follow pattern SI.YYYY.MM.NNNNN — filter by month prefix
+      const numPrefix = `SI.${year}.${String(month).padStart(2,'0')}`;
+      const byKeyword = await testFetch(token, appKey, sigSecret, {
+        page: '1', pageSize: '5',
+        fields: 'number,transDate,totalAmount',
+        keyword: numPrefix,
+      }, 'keyword');
+      const byFilterNumber = await testFetch(token, appKey, sigSecret, {
+        page: '1', pageSize: '5',
+        fields: 'number,transDate,totalAmount',
+        'filter.number': numPrefix,
+      }, 'filter_number');
+      return new Response(JSON.stringify({ v: 5, numPrefix, byKeyword, byFilterNumber }), { headers: corsHeaders });
     }
 
     const [invAdl, invGroup] = await Promise.all([
