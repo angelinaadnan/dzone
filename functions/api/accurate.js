@@ -63,6 +63,17 @@ export async function onRequestGet(context) {
     ]);
 
     const allInvoices = [...invAdl, ...invGroup];
+
+    // Debug mode: ?debug=1 returns raw first invoice to check field names
+    if (url.searchParams.get('debug') === '1') {
+      return new Response(JSON.stringify({
+        totalInvoices: allInvoices.length,
+        firstInvoice: allInvoices[0] || null,
+        firstItem: allInvoices[0]?.detailItem?.[0] || null,
+        period, startDate, endDate,
+      }), { headers: corsHeaders });
+    }
+
     const result = aggregateData(allInvoices, period);
 
     return new Response(JSON.stringify(result), { headers: corsHeaders });
