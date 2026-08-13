@@ -65,6 +65,19 @@ export async function onRequestGet(context) {
       const token = env.ACCURATE_TOKEN_ADL;
       const dmy = { startDate: toAccurateDate(startDate), endDate: toAccurateDate(endDate) };
 
+      // Test 0: filter.transDateFrom / filter.transDateTo
+      const tdResult = await testFetch(token, appKey, sigSecret, {
+        page: '1', pageSize: '3', fields: 'number,transDate,totalAmount',
+        'filter.transDateFrom': dmy.startDate,
+        'filter.transDateTo': dmy.endDate,
+      }, 'transDateFrom');
+
+      // Test 0b: period param
+      const periodResult = await testFetch(token, appKey, sigSecret, {
+        page: '1', pageSize: '3', fields: 'number,transDate,totalAmount',
+        period: `${year}-${String(month).padStart(2,'0')}`,
+      }, 'period');
+
       // Test 1: POST with JSON body (with iris fallback)
       const postResult = await (async () => {
         try {
@@ -95,14 +108,14 @@ export async function onRequestGet(context) {
             Accept: 'application/json', 'User-Agent': 'DZone-Dashboard/1.0',
           };
           const qs = new URLSearchParams({ startDate: dmy.startDate, endDate: dmy.endDate, asOf: dmy.endDate });
-          let r = await fetch(`${ACCURATE_BASE}/report/profit-and-loss.do?${qs}`, { headers:hdrs });
-          if (!r.ok && r.status >= 500) r = await fetch(`${ACCURATE_BASE_ALT}/report/profit-and-loss.do?${qs}`, { headers:hdrs });
+          let r = await fetch(`${ACCURATE_BASE}/report/profit-loss.do?${qs}`, { headers:hdrs });
+          if (!r.ok && r.status >= 500) r = await fetch(`${ACCURATE_BASE_ALT}/report/profit-loss.do?${qs}`, { headers:hdrs });
           const json = await r.json();
           return { s: json.s, keys: Object.keys(json.d||json||{}), snippet: JSON.stringify(json).slice(0,400), error: json.s===false?json.d:null };
         } catch(e) { return { error: e.message }; }
       })();
 
-      return new Response(JSON.stringify({ v: 7, dmy, postResult, plResult }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ v: 8, dmy, tdResult, periodResult, postResult, plResult }), { headers: corsHeaders });
     }
 
     const [invAdl, invGroup] = await Promise.all([
