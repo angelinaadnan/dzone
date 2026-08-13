@@ -82,15 +82,29 @@ export async function onRequestGet(context) {
 
     const allInvoices = [...invAdl.data, ...invGroup.data];
 
-    // Debug mode: show raw Accurate API response
+    // Debug mode: fetch one invoice detail to inspect full field structure
     if (debugMode) {
+      const timestamp = Date.now();
+      const sigSecret = env.ACCURATE_SIG_SECRET || '';
+      const appKey = env.ACCURATE_APP_KEY || '';
+      const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
+      const dbgHeaders = {
+        Authorization: `Bearer ${env.ACCURATE_TOKEN_ADL}`,
+        'X-Api-Key': appKey, 'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
+        Accept: 'application/json',
+      };
+      const firstId = invAdl.rawFirst?.d?.[0]?.id;
+      let detailJson = null;
+      if (firstId) {
+        let dr = await fetch(`${ACCURATE_BASE}/sales-invoice/${firstId}.do`, { headers: dbgHeaders });
+        if (!dr.ok) dr = await fetch(`${ACCURATE_BASE_ALT}/sales-invoice/${firstId}.do`, { headers: dbgHeaders });
+        detailJson = await dr.json();
+      }
       return new Response(JSON.stringify({
         totalInvoices: allInvoices.length,
         startDate, endDate,
-        rawFirstResponseADL: invAdl.rawFirst,
-        rawFirstResponseGROUP: invGroup.rawFirst,
-        firstInvoice: allInvoices[0] || null,
-        firstItem: allInvoices[0]?.detailItem?.[0] || allInvoices[0]?.detail?.[0] || null,
+        paginationADL: invAdl.rawFirst?.sp,
+        invoiceDetail: detailJson,
       }), { headers: corsHeaders });
     }
 
