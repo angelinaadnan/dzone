@@ -46,31 +46,35 @@ export async function onRequestGet(context) {
   };
 
   const period = url.searchParams.get('period') || getThisMonth();
+  const debugMode = url.searchParams.get('debug') === '1';
 
   try {
     const [year, month] = period.split('-').map(Number);
-    const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
     const lastDay = new Date(year, month, 0).getDate();
-    const endDate = `${year}-${String(month).padStart(2,'0')}-${lastDay}`;
+    // Accurate uses dd/MM/yyyy format
+    const startDate = `01/${String(month).padStart(2,'0')}/${year}`;
+    const endDate = `${String(lastDay).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`;
 
     const [invAdl, invGroup] = await Promise.all([
       env.ACCURATE_TOKEN_ADL
-        ? fetchAllInvoices(env.ACCURATE_TOKEN_ADL, startDate, endDate)
-        : Promise.resolve([]),
+        ? fetchAllInvoices(env.ACCURATE_TOKEN_ADL, startDate, endDate, debugMode)
+        : Promise.resolve({ data: [], rawFirst: null }),
       env.ACCURATE_TOKEN_GROUP
-        ? fetchAllInvoices(env.ACCURATE_TOKEN_GROUP, startDate, endDate)
-        : Promise.resolve([]),
+        ? fetchAllInvoices(env.ACCURATE_TOKEN_GROUP, startDate, endDate, debugMode)
+        : Promise.resolve({ data: [], rawFirst: null }),
     ]);
 
-    const allInvoices = [...invAdl, ...invGroup];
+    const allInvoices = [...invAdl.data, ...invGroup.data];
 
-    // Debug mode: ?debug=1 returns raw first invoice to check field names
-    if (url.searchParams.get('debug') === '1') {
+    // Debug mode: show raw Accurate API response
+    if (debugMode) {
       return new Response(JSON.stringify({
         totalInvoices: allInvoices.length,
+        startDate, endDate,
+        rawFirstResponseADL: invAdl.rawFirst,
+        rawFirstResponseGROUP: invGroup.rawFirst,
         firstInvoice: allInvoices[0] || null,
-        firstItem: allInvoices[0]?.detailItem?.[0] || null,
-        period, startDate, endDate,
+        firstItem: allInvoices[0]?.detailItem?.[0] || allInvoices[0]?.detail?.[0] || null,
       }), { headers: corsHeaders });
     }
 
@@ -93,18 +97,18 @@ export async function onRequestOptions() {
 }
 
 // ─── Fetch all invoice pages ──────────────────────────────────────────────────
-async function fetchAllInvoices(token, startDate, endDate) {
+async function fetchAllInvoices(token, startDate, endDate, debugMode = false) {
   const all = [];
+  let rawFirst = null;
   let page = 1;
   const pageSize = 100;
 
   while (true) {
-    // No 'fields' restriction — let API return all fields so we get everything
     const params = new URLSearchParams({
       'filter.startDate': startDate,
       'filter.endDate': endDate,
-      sp: String(page),      // Accurate uses 'sp' for page
-      l: String(pageSize),   // Accurate uses 'l' for limit
+      sp: String(page),
+      l: String(pageSize),
     });
 
     const headers = {
@@ -115,7 +119,6 @@ async function fetchAllInvoices(token, startDate, endDate) {
 
     let resp = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?${params}`, { headers });
 
-    // Fallback ke iris.accurate.id jika api.accurate.id error (Cloudflare 530)
     if (!resp.ok && resp.status >= 500) {
       resp = await fetch(`${ACCURATE_BASE_ALT}/sales-invoice/list.do?${params}`, { headers });
     }
@@ -126,8 +129,8 @@ async function fetchAllInvoices(token, startDate, endDate) {
     }
 
     const json = await resp.json();
+    if (page === 1) rawFirst = json; // capture raw first response for debug
 
-    // Handle both {s, d} and {s, data} response formats
     const rows = json.d || json.data || [];
     if (!json.s || rows.length === 0) break;
 
@@ -137,7 +140,7 @@ async function fetchAllInvoices(token, startDate, endDate) {
     if (page > 20) break;
   }
 
-  return all;
+  return { data: all, rawFirst };
 }
 
 // ─── Aggregate into overall + per-branch + per-store ─────────────────────────
