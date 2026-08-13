@@ -2,7 +2,8 @@
 // Secrets (set via Cloudflare Dashboard → Settings → Environment Variables):
 //   ACCURATE_TOKEN_ADL   = API token DB PT ANUGERAH DIGITAL LESTARI (PPN)
 //   ACCURATE_TOKEN_GROUP = API token DB GROUP (non-PPN)
-//   ACCURATE_API_KEY     = secret key untuk validasi request dari dashboard
+//   ACCURATE_APP_KEY     = App Key dari Accurate Developer Portal
+//   ACCURATE_SIG_SECRET  = Signature Secret dari Accurate Developer Portal
 
 const ACCURATE_BASE = 'https://api.accurate.id/accurate/api';
 const ACCURATE_BASE_ALT = 'https://iris.accurate.id/accurate/api';
@@ -36,6 +37,18 @@ function normalizeWarehouse(name) {
   return name.replace(/\s*-\s*/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
 }
 
+// Generate X-Api-Signature: Base64(HMAC-SHA256(timestamp_ms, signature_secret))
+async function makeSignature(timestamp, sigSecret) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', enc.encode(sigSecret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(String(timestamp)));
+  return btoa(String.fromCharCode(...new Uint8Array(sig)));
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -55,12 +68,15 @@ export async function onRequestGet(context) {
     const startDate = `01/${String(month).padStart(2,'0')}/${year}`;
     const endDate = `${String(lastDay).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`;
 
+    const appKey = env.ACCURATE_APP_KEY || '';
+    const sigSecret = env.ACCURATE_SIG_SECRET || '';
+
     const [invAdl, invGroup] = await Promise.all([
       env.ACCURATE_TOKEN_ADL
-        ? fetchAllInvoices(env.ACCURATE_TOKEN_ADL, startDate, endDate, debugMode)
+        ? fetchAllInvoices(env.ACCURATE_TOKEN_ADL, appKey, sigSecret, startDate, endDate, debugMode)
         : Promise.resolve({ data: [], rawFirst: null }),
       env.ACCURATE_TOKEN_GROUP
-        ? fetchAllInvoices(env.ACCURATE_TOKEN_GROUP, startDate, endDate, debugMode)
+        ? fetchAllInvoices(env.ACCURATE_TOKEN_GROUP, appKey, sigSecret, startDate, endDate, debugMode)
         : Promise.resolve({ data: [], rawFirst: null }),
     ]);
 
@@ -97,7 +113,7 @@ export async function onRequestOptions() {
 }
 
 // ─── Fetch all invoice pages ──────────────────────────────────────────────────
-async function fetchAllInvoices(token, startDate, endDate, debugMode = false) {
+async function fetchAllInvoices(token, appKey, sigSecret, startDate, endDate, debugMode = false) {
   const all = [];
   let rawFirst = null;
   let page = 1;
@@ -111,8 +127,14 @@ async function fetchAllInvoices(token, startDate, endDate, debugMode = false) {
       l: String(pageSize),
     });
 
+    const timestamp = Date.now();
+    const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
+
     const headers = {
       Authorization: `Bearer ${token}`,
+      'X-Api-Key': appKey,
+      'X-Api-Timestamp': String(timestamp),
+      'X-Api-Signature': signature,
       Accept: 'application/json',
       'User-Agent': 'DZone-Dashboard/1.0',
     };
