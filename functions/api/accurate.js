@@ -66,7 +66,7 @@ export async function onRequestGet(context) {
       const dmy = { startDate: toAccurateDate(startDate), endDate: toAccurateDate(endDate) };
 
       // Helper: quick probe one report URL
-      async function probeReport(path) {
+      async function probeReport(path, extraParams = {}) {
         try {
           const timestamp = Date.now();
           const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
@@ -75,22 +75,23 @@ export async function onRequestGet(context) {
             'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
             Accept: 'application/json', 'User-Agent': 'DZone-Dashboard/1.0',
           };
-          const qs = new URLSearchParams({ startDate: dmy.startDate, endDate: dmy.endDate });
+          const qs = new URLSearchParams({ startDate: dmy.startDate, endDate: dmy.endDate, ...extraParams });
           let r = await fetch(`${ACCURATE_BASE}${path}?${qs}`, { headers: hdrs });
           if (!r.ok && r.status >= 500) r = await fetch(`${ACCURATE_BASE_ALT}${path}?${qs}`, { headers: hdrs });
           const json = await r.json();
-          return json.s === false ? `❌ ${json.d}` : `✅ keys=${Object.keys((Array.isArray(json.d)?json.d[0]:json.d)||{}).slice(0,5).join(',')}`;
+          if (json.s === false) return `❌ ${json.d}`;
+          const first = Array.isArray(json.d) ? json.d[0] : json.d;
+          return `✅ len=${Array.isArray(json.d)?json.d.length:'obj'} keys=${Object.keys(first||{}).slice(0,6).join(',')}`;
         } catch(e) { return `ERR: ${e.message}`; }
       }
 
       const probes = {};
-      for (const p of [
-        '/report/salesman-report.do',
-        '/report/sales-by-item.do',
-        '/report/item-report.do',
-        '/report/salesman.do',
-        '/report/sales-report.do',
-      ]) probes[p] = await probeReport(p);
+      for (const [p, extra] of [
+        ['/report/sales-invoice-detail-report.do', {}],
+        ['/memorize-report/execute.do', { id: '55400' }],
+        ['/report/memorize-report.do', { id: '55400' }],
+        ['/report/bg-execute-report.do', { id: '55400', planId: 'SalesInvoiceDetailReport' }],
+      ]) probes[p] = await probeReport(p, extra);
 
       // Test 1: Full profit-loss data
       const plFull = await (async () => {
