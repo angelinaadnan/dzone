@@ -65,6 +65,29 @@ export async function onRequestGet(context) {
       const token = env.ACCURATE_TOKEN_ADL;
       const dmy = { startDate: toAccurateDate(startDate), endDate: toAccurateDate(endDate) };
 
+      // Test: can Bearer token access iris-report.accurate.id directly?
+      const irisReportTest = await (async () => {
+        try {
+          const timestamp = Date.now();
+          const signature = sigSecret ? await makeSignature(timestamp, sigSecret) : '';
+          const hdrs = {
+            Authorization: `Bearer ${token}`, 'X-Api-Key': appKey,
+            'X-Api-Timestamp': String(timestamp), 'X-Api-Signature': signature,
+            Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'DZone-Dashboard/1.0',
+          };
+          const body = new URLSearchParams({
+            id: '55400', planId: 'SalesInvoiceDetailReport', pageIndex: '0',
+            reportInput: JSON.stringify({ param: { startDate: dmy.startDate, endDate: dmy.endDate }, filter: [], subSelection: 0, selection: [] }),
+          });
+          const r = await fetch('https://iris-report.accurate.id/accurate/report/bg-execute-report.do', {
+            method: 'POST', headers: hdrs, body,
+          });
+          const txt = await r.text();
+          return { status: r.status, snippet: txt.slice(0, 200) };
+        } catch(e) { return { error: e.message }; }
+      })();
+
       // Helper: quick probe one report URL
       async function probeReport(path, extraParams = {}) {
         try {
@@ -129,7 +152,7 @@ export async function onRequestGet(context) {
         } catch(e) { return { error: e.message }; }
       })();
 
-      return new Response(JSON.stringify({ v: 10, dmy, probes, plKeys: plFull.d?.[1]?.['profitLoss.description'] }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ v: 12, dmy, irisReportTest, probes }), { headers: corsHeaders });
     }
 
     const [invAdl, invGroup] = await Promise.all([
