@@ -3759,6 +3759,7 @@ function App() {
   var PESAN_BARANG_ALLOWED_SALES = ['Aldi', 'Eliwaty', 'Tio'];
   var canAccessPesanBarang = ['admin', 'ops', 'admin_pembelian', 'admin_online', 'supervisor'].includes(role) || role === 'sales' && PESAN_BARANG_ALLOWED_SALES.includes(userName);
   var SALES_HARIAN_USERS = ['Angel', 'Liana', 'Santo', 'GITA'];
+  var BI_USERS = ['Santo', 'Angel', 'Liana', 'Lukas', 'Jenny'];
   var navItems = (role === 'supervisor' && userName === 'Santo' ? [{ id: 'santo_dashboard', icon: '📊', label: 'Sales Dashboard' }].concat(_toConsumableArray(ROLE_NAV[role]), [{
     id: 'branch_request',
     icon: '📦',
@@ -3768,7 +3769,8 @@ function App() {
   }) : ROLE_NAV[role]).filter(function (n) {
     return n.id !== 'pesan_barang' || canAccessPesanBarang;
   }).concat(SALES_HARIAN_USERS.includes(userName) ? [{ id: 'sales_harian', icon: '📈', label: 'Sales Harian' }] : [])
-  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : []);
+  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
+  .concat(BI_USERS.includes(userName) ? [{ id: 'business_analyst', icon: '💡', label: 'Business Analyst' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -3976,7 +3978,7 @@ function App() {
   }), role === 'ops' && page === 'op_branch' && /*#__PURE__*/React.createElement(OpsBranchManager, {
     requests: branchRequests,
     onUpdate: updateBranchRequest
-  }), role === 'supervisor' && userName === 'Santo' && page === 'santo_dashboard' && /*#__PURE__*/React.createElement(SantoDashboard, null), role === 'supervisor' && userName === 'Santo' && page === 'branch_request' && /*#__PURE__*/React.createElement(BranchRequestPage, {
+  }), role === 'supervisor' && userName === 'Santo' && page === 'santo_dashboard' && /*#__PURE__*/React.createElement(SantoDashboard, null), role === 'supervisor' && BI_USERS.includes(userName) && page === 'business_analyst' && /*#__PURE__*/React.createElement(BusinessAnalystPage, { persona: userName }), role === 'supervisor' && userName === 'Santo' && page === 'branch_request' && /*#__PURE__*/React.createElement(BranchRequestPage, {
     requests: branchRequests,
     onSave: saveBranchRequest,
     onUpdate: updateBranchRequest,
@@ -46862,6 +46864,227 @@ function SantoDashboard() {
         )
       )
     )
+  );
+}
+
+// ─── BUSINESS ANALYST PAGE ─────────────────────────────────────────
+var _BI_DESC = { Santo: 'Retail · Operasional · SDM', Angel: 'Korporat · Pertumbuhan', Liana: 'Keuangan · Revenue · AR', Lukas: 'Produk · Channel · Stok', Jenny: 'Pembelian · Supplier · Servis' };
+function BusinessAnalystPage(_ref_bi) {
+  var persona = _ref_bi.persona;
+  var _now = new Date();
+  var _bs1 = React.useState(_now.getFullYear()); var biYear = _bs1[0]; var setBiYear = _bs1[1];
+  var _bs2 = React.useState(_now.getMonth() + 1); var biMonth = _bs2[0]; var setBiMonth = _bs2[1];
+  var _bs3 = React.useState(null); var biResult = _bs3[0]; var setBiResult = _bs3[1];
+  var _bs4 = React.useState(false); var biLoading = _bs4[0]; var setBiLoading = _bs4[1];
+  var _bs5 = React.useState(null); var biErr = _bs5[0]; var setBiErr = _bs5[1];
+  var _BI_MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  function _fRp(v) {
+    if (v == null) return '—';
+    var n = Math.abs(+v), s = +v < 0 ? '-' : '';
+    if (n >= 1e9) return s + 'Rp ' + (n/1e9).toFixed(2) + 'M';
+    if (n >= 1e6) return s + 'Rp ' + (n/1e6).toFixed(1) + 'jt';
+    return s + 'Rp ' + Math.round(n).toLocaleString('id-ID');
+  }
+  function _fPct(v) { return v == null ? '' : (v > 0 ? '+' : '') + v + '%'; }
+  function _pColor(v) { return v == null ? 'var(--text3)' : v >= 0 ? '#22c55e' : '#ef4444'; }
+  function _fNum(v) { return (v || 0).toLocaleString('id-ID'); }
+  React.useEffect(function() {
+    setBiLoading(true); setBiErr(null); setBiResult(null);
+    fetch('/api/bi?persona=' + encodeURIComponent(persona) + '&year=' + biYear + '&month=' + biMonth)
+      .then(function(r) { return r.json(); })
+      .then(function(j) { if (j.error) throw new Error(j.error); setBiResult(j); })
+      .catch(function(e) { setBiErr(e.message); })
+      .finally(function() { setBiLoading(false); });
+  }, [persona, biYear, biMonth]);
+  var _bd = biResult && biResult.data;
+  var _cs = { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: '1 1 180px', minWidth: 160 };
+  var _lbs = { fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 };
+  var _vbs = { fontSize: 22, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 };
+  function _KC(key, label, value, sub, sc) {
+    return React.createElement('div', { key: key, style: _cs },
+      React.createElement('div', { style: _lbs }, label),
+      React.createElement('div', { style: _vbs }, value),
+      sub != null ? React.createElement('div', { style: { fontSize: 12, color: sc || 'var(--text3)', marginTop: 3 } }, sub) : null
+    );
+  }
+  function _Sec(label, children) {
+    return React.createElement('div', { style: { marginBottom: 20 } },
+      React.createElement('div', { style: { fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.05em' } }, label),
+      children
+    );
+  }
+  function _Row(items) {
+    return React.createElement('div', { style: { display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 } }, items);
+  }
+  function _Tbl(hdrs, rows) {
+    return React.createElement('div', { style: { overflowX: 'auto', marginBottom: 4 } },
+      React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 13 } },
+        React.createElement('thead', null, React.createElement('tr', null,
+          hdrs.map(function(h,i) { return React.createElement('th', { key: i, style: { textAlign: i > 0 ? 'right' : 'left', padding: '6px 10px', borderBottom: '1px solid var(--border)', color: 'var(--text3)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' } }, h); })
+        )),
+        React.createElement('tbody', null,
+          rows.map(function(row, ri) { return React.createElement('tr', { key: ri, style: { borderBottom: '1px solid var(--border)' } },
+            row.map(function(c, ci) { return React.createElement('td', { key: ci, style: { textAlign: ci > 0 ? 'right' : 'left', padding: '8px 10px', color: 'var(--text)' } }, c); })
+          ); })
+        )
+      )
+    );
+  }
+  function _renderLiana() {
+    var acc = _bd && _bd.accurate, ytd = _bd && _bd.ytd;
+    var rev = acc && acc.revenue, col = acc && acc.collection, ar = acc && acc.ar;
+    return React.createElement(React.Fragment, null,
+      !acc && React.createElement('div', { style: { padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text3)', fontSize: 13, marginBottom: 16 } }, 'Data Accurate tidak tersedia saat ini. Hanya data internal yang ditampilkan.'),
+      _Sec('Revenue & Koleksi (Accurate)', _Row([
+        _KC('rev', 'Revenue MTD', _fRp(rev && rev.total), _fPct(rev && rev.mom_pct) + ' MoM', _pColor(rev && rev.mom_pct)),
+        _KC('inv', 'Jumlah Invoice', _fNum(rev && rev.invoice_count), 'MTD'),
+        _KC('col', 'Koleksi MTD', _fRp(col && col.total), col && col.collection_rate != null ? 'Rate ' + col.collection_rate + '%' : null),
+        _KC('ar', 'AR Outstanding', _fRp(ar && ar.total), ar && ar.count ? _fNum(ar.count) + ' invoice' : null),
+      ])),
+      ar && (ar.over_30d > 0 || ar.over_60d > 0 || ar.over_90d > 0) && _Sec('AR Aging (Saldo Tertunggak)', _Row([
+        _KC('a30', 'Overdue >30 Hari', _fRp(ar.over_30d), ar.over_30d_count != null ? _fNum(ar.over_30d_count) + ' invoice' : null, '#f59e0b'),
+        _KC('a60', 'Overdue >60 Hari', _fRp(ar.over_60d), ar.over_60d_count != null ? _fNum(ar.over_60d_count) + ' invoice' : null, '#f97316'),
+        _KC('a90', 'Overdue >90 Hari', _fRp(ar.over_90d), ar.over_90d_count != null ? _fNum(ar.over_90d_count) + ' invoice' : null, '#ef4444'),
+      ])),
+      ytd && _Sec('YTD ' + biYear, _Row([
+        _KC('yr', 'Revenue YTD', _fRp(ytd.revenue_ytd)),
+        _KC('yc', 'Koleksi YTD', _fRp(ytd.collected_ytd)),
+        _KC('yi', 'Invoice YTD', _fNum(ytd.invoice_count_ytd)),
+      ])),
+      acc && acc.channel_split && acc.channel_split.length > 0 && _Sec('Channel Split', _Row(
+        acc.channel_split.map(function(c, i) { return _KC('ch'+i, c.channel === 'b2b' ? 'B2B / Korporat' : 'Online / Marketplace', _fRp(c.revenue), _fNum(c.count) + ' inv · ' + _fNum(c.customers) + ' cust'); })
+      )),
+      acc && acc.top_customers && acc.top_customers.length > 0 && _Sec('Top Customer Bulan Ini', _Tbl(['Customer','Invoice','Revenue'],
+        acc.top_customers.slice(0,8).map(function(c) { return [c.name, _fNum(c.invoices), _fRp(c.revenue)]; })
+      )),
+      _bd && _bd.internal_orders && Object.keys(_bd.internal_orders.payment_breakdown || {}).length > 0 && _Sec('Status Pembayaran (Internal Orders)', _Row(
+        Object.entries(_bd.internal_orders.payment_breakdown).map(function(e, i) { return _KC('pb'+i, e[0], _fNum(e[1].count), _fRp(e[1].value)); })
+      ))
+    );
+  }
+  function _renderAngel() {
+    var pl = _bd && _bd.pipeline, b2b = _bd && _bd.b2b_revenue, mkt = _bd && _bd.marketplace_revenue, nc = _bd && _bd.new_customers;
+    return React.createElement(React.Fragment, null,
+      _Sec('Pipeline Penawaran (Internal)', _Row([
+        _KC('pu', 'Penawaran Aktif', _fNum(pl && pl.total_count), _fRp(pl && pl.total_value)),
+        _KC('cv', 'Converted MTD', _fNum(pl && pl.converted_this_period), pl && pl.conversion_rate != null ? 'Rate ' + pl.conversion_rate + '%' : null),
+      ])),
+      (b2b || mkt) && _Sec('Revenue Channel (Accurate)', _Row([
+        b2b ? _KC('b2b', 'B2B Korporat', _fRp(b2b.revenue), _fPct(b2b.mom_pct) + ' MoM', _pColor(b2b.mom_pct)) : null,
+        mkt ? _KC('mkt', 'Online Marketplace', _fRp(mkt.revenue), _fPct(mkt.mom_pct) + ' MoM', _pColor(mkt.mom_pct)) : null,
+      ].filter(Boolean))),
+      nc && _Sec('Pelanggan (Accurate)', _Row([
+        _KC('nc', 'Customer Baru MTD', _fNum(nc.new_this_period), nc.new_prior_period != null ? 'Bulan lalu: ' + _fNum(nc.new_prior_period) : null),
+        _KC('tc', 'Total Unik MTD', _fNum(nc.total_unique), _fNum(nc.b2b_unique) + ' B2B unik'),
+      ])),
+      _bd && _bd.sales_conversion && _bd.sales_conversion.length > 0 && _Sec('Konversi per Sales', _Tbl(['Sales','Total','Converted','Pipeline','Rate'],
+        _bd.sales_conversion.map(function(s) { return [s.name, _fNum(s.total), _fNum(s.converted), _fNum(s.pipeline), s.rate + '%']; })
+      )),
+      _bd && _bd.top_customers && _bd.top_customers.length > 0 && _Sec('Top Customer B2B (Accurate)', _Tbl(['Customer','Invoice','Revenue'],
+        _bd.top_customers.slice(0,8).map(function(c) { return [c.name, _fNum(c.invoices), _fRp(c.revenue)]; })
+      ))
+    );
+  }
+  function _renderLukas() {
+    var acc = _bd && _bd.accurate, rev = acc && acc.revenue, cs = acc && acc.channel_split;
+    var stk = acc && acc.stock, online = cs && cs.online, b2b = cs && cs.b2b;
+    return React.createElement(React.Fragment, null,
+      !acc && React.createElement('div', { style: { padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text3)', fontSize: 13, marginBottom: 16 } }, 'Data Accurate tidak tersedia. Pastikan connector sedang berjalan.'),
+      _Sec('Revenue Channel (Accurate)', _Row([
+        _KC('tot', 'Total Revenue', _fRp(rev && rev.total), _fPct(rev && rev.mom_pct) + ' MoM', _pColor(rev && rev.mom_pct)),
+        _KC('onl', 'Online / Marketplace', _fRp(online && online.revenue), _fPct(online && online.mom_pct) + ' MoM', _pColor(online && online.mom_pct)),
+        _KC('b2b', 'B2B Korporat', _fRp(b2b && b2b.revenue), _fPct(b2b && b2b.mom_pct) + ' MoM', _pColor(b2b && b2b.mom_pct)),
+      ])),
+      stk && _Sec('Status Stok (Accurate)', _Row([
+        _KC('s0', 'Stockout', _fNum(stk.stockout_count), 'qty ≤ 0', '#ef4444'),
+        _KC('s1', 'Kritis (≤3)', _fNum(stk.critical_count), 'segera restock', '#f97316'),
+        _KC('s2', 'Rendah (≤10)', _fNum(stk.low_count), 'perlu perhatian', '#eab308'),
+        _KC('s3', 'Total Item', _fNum(stk.total_items)),
+      ])),
+      acc && acc.top_items_by_revenue && acc.top_items_by_revenue.length > 0 && _Sec('Top Item — Revenue', _Tbl(['Item','Qty','Revenue','Order'],
+        acc.top_items_by_revenue.slice(0,10).map(function(it) { return [it.name, _fNum(it.qty), _fRp(it.revenue), _fNum(it.orders)]; })
+      )),
+      acc && acc.slow_moving && acc.slow_moving.length > 0 && _Sec('Slow Moving Items', _Tbl(['Item','Stok Sisa','Terjual (bulan ini)','Revenue'],
+        acc.slow_moving.slice(0,8).map(function(it) { return [it.name, _fNum(it.available), _fNum(it.sold_qty), _fRp(it.sold_revenue)]; })
+      ))
+    );
+  }
+  function _renderSanto() {
+    var ret = _bd && _bd.retail, ppl = _bd && _bd.people, br = _bd && _bd.branch, sp = _bd && _bd.sales_performance, ord = _bd && _bd.orders;
+    return React.createElement(React.Fragment, null,
+      _Sec('Retail Sales MTD', _Row([
+        _KC('rv', 'Nilai Penjualan', _fRp(ret && ret.value), _fPct(ret && ret.value_mom) + ' MoM', _pColor(ret && ret.value_mom)),
+        _KC('oc', 'Jumlah Order', _fNum(ret && ret.order_count), _fPct(ret && ret.order_count_mom) + ' MoM', _pColor(ret && ret.order_count_mom)),
+        _KC('at', 'Absensi Unik', _fNum(ppl && ppl.unique_attendance), _fNum(ppl && ppl.total_checkins) + ' check-in'),
+        br ? _KC('br', 'Request Barang', _fNum(br.request_count), 'dari cabang') : null,
+      ].filter(Boolean))),
+      sp && sp.length > 0 && _Sec('Performa Sales', _Tbl(['Sales','Order','Nilai'],
+        sp.slice(0,10).map(function(s) { return [s.name, _fNum(s.count), _fRp(s.value)]; })
+      )),
+      ord && Object.keys(ord.by_status || {}).length > 0 && _Sec('Status Order MTD', _Row(
+        Object.entries(ord.by_status).map(function(e, i) { return _KC('os'+i, e[0], _fNum(e[1])); })
+      )),
+      br && Object.keys(br.by_status || {}).length > 0 && _Sec('Status Request Barang', _Row(
+        Object.entries(br.by_status).map(function(e, i) { return _KC('bs'+i, e[0], _fNum(e[1])); })
+      )),
+      br && br.by_location && br.by_location.length > 0 && _Sec('Performa Cabang', _Tbl(['Cabang','Order','Nilai'],
+        br.by_location.map(function(b) { return [b.location, _fNum(b.count), _fRp(b.value)]; })
+      ))
+    );
+  }
+  function _renderJenny() {
+    var pur = _bd && _bd.purchasing, sup = _bd && _bd.top_suppliers, si = _bd && _bd.service_intakes, stk = _bd && _bd.stock;
+    return React.createElement(React.Fragment, null,
+      _Sec('Purchase Orders MTD', _Row([
+        _KC('pv', 'Nilai PO', _fRp(pur && pur.total_value), _fPct(pur && pur.value_mom) + ' MoM', _pColor(pur && pur.value_mom)),
+        _KC('pc', 'Jumlah PO', _fNum(pur && pur.po_count), _fPct(pur && pur.po_count_mom) + ' MoM', _pColor(pur && pur.po_count_mom)),
+        _KC('pp', 'PO Pending', _fNum(pur && pur.pending_count), _fRp(pur && pur.pending_value)),
+        si ? _KC('si', 'Servis Masuk', _fNum(si.total), 'MTD') : null,
+      ].filter(Boolean))),
+      stk && _Sec('Status Stok (Accurate)', _Row([
+        _KC('s0', 'Stockout', _fNum(stk.stockout_count), null, '#ef4444'),
+        _KC('s1', 'Kritis (≤3)', _fNum(stk.critical_count), null, '#f97316'),
+        _KC('s2', 'Rendah (≤10)', _fNum(stk.low_count)),
+        _KC('s3', 'Total Item', _fNum(stk.total_items)),
+      ])),
+      pur && Object.keys(pur.by_status || {}).length > 0 && _Sec('Status PO', _Row(
+        Object.entries(pur.by_status).map(function(e, i) { return _KC('ps'+i, e[0], _fNum(e[1])); })
+      )),
+      sup && sup.length > 0 && _Sec('Top Supplier MTD', _Tbl(['Supplier','PO','Nilai'],
+        sup.slice(0,10).map(function(s) { return [s.name, _fNum(s.count), _fRp(s.value)]; })
+      ))
+    );
+  }
+  function _renderBI() {
+    if (!_bd) return null;
+    switch (persona) {
+      case 'Liana': return _renderLiana();
+      case 'Angel': return _renderAngel();
+      case 'Lukas': return _renderLukas();
+      case 'Santo': return _renderSanto();
+      case 'Jenny': return _renderJenny();
+      default: return null;
+    }
+  }
+  return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 960, margin: '0 auto' } },
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 } },
+      React.createElement('div', null,
+        React.createElement('div', { style: { fontSize: 20, fontWeight: 700, color: 'var(--text)' } }, '💡 Business Analyst'),
+        React.createElement('div', { style: { fontSize: 13, color: 'var(--text3)', marginTop: 2 } }, _BI_DESC[persona] || persona)
+      ),
+      React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+        React.createElement('select', { value: biMonth, onChange: function(e) { setBiMonth(+e.target.value); }, style: { padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 13 } },
+          _BI_MONTHS.slice(1).map(function(m, i) { return React.createElement('option', { key: i+1, value: i+1 }, m); })
+        ),
+        React.createElement('select', { value: biYear, onChange: function(e) { setBiYear(+e.target.value); }, style: { padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 13 } },
+          [2025, 2026, 2027].map(function(y) { return React.createElement('option', { key: y, value: y }, y); })
+        )
+      )
+    ),
+    biErr && React.createElement('div', { style: { background: 'var(--card)', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 16 } }, 'Error: ' + biErr),
+    biLoading && React.createElement('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--text3)' } }, 'Memuat data…'),
+    !biLoading && _renderBI(),
+    biResult && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)', marginTop: 20, textAlign: 'right' } }, 'Data per ' + new Date(biResult.generated_at).toLocaleString('id-ID'))
   );
 }
 
