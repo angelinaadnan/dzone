@@ -46963,16 +46963,15 @@ function BusinessAnalystPage(_ref_bi) {
     );
   }
   function _renderAngel() {
-    var pl = _bd && _bd.pipeline, b2b = _bd && _bd.b2b_revenue, mkt = _bd && _bd.marketplace_revenue, nc = _bd && _bd.new_customers;
+    var pl = _bd && _bd.pipeline, b2b = _bd && _bd.b2b_revenue, nc = _bd && _bd.new_customers;
     return React.createElement(React.Fragment, null,
       _Sec('Pipeline Penawaran (Internal)', _Row([
         _KC('pu', 'Penawaran Aktif', _fNum(pl && pl.total_count), _fRp(pl && pl.total_value)),
         _KC('cv', 'Converted MTD', _fNum(pl && pl.converted_this_period), pl && pl.conversion_rate != null ? 'Rate ' + pl.conversion_rate + '%' : null),
       ])),
-      (b2b || mkt) && _Sec('Revenue Channel (Accurate)', _Row([
-        b2b ? _KC('b2b', 'B2B Korporat', _fRp(b2b.revenue), _fPct(b2b.mom_pct) + ' MoM', _pColor(b2b.mom_pct)) : null,
-        mkt ? _KC('mkt', 'Online Marketplace', _fRp(mkt.revenue), _fPct(mkt.mom_pct) + ' MoM', _pColor(mkt.mom_pct)) : null,
-      ].filter(Boolean))),
+      b2b && _Sec('Revenue B2B Korporat (Accurate)', _Row([
+        _KC('b2b', 'B2B Korporat', _fRp(b2b.revenue), _fPct(b2b.mom_pct) + ' MoM', _pColor(b2b.mom_pct)),
+      ])),
       nc && _Sec('Pelanggan (Accurate)', _Row([
         _KC('nc', 'Customer Baru MTD', _fNum(nc.new_this_period), nc.new_prior_period != null ? 'Bulan lalu: ' + _fNum(nc.new_prior_period) : null),
         _KC('tc', 'Total Unik MTD', _fNum(nc.total_unique), _fNum(nc.b2b_unique) + ' B2B unik'),
@@ -46986,14 +46985,12 @@ function BusinessAnalystPage(_ref_bi) {
     );
   }
   function _renderLukas() {
-    var acc = _bd && _bd.accurate, rev = acc && acc.revenue, cs = acc && acc.channel_split;
-    var stk = acc && acc.stock, online = cs && cs.online, b2b = cs && cs.b2b;
+    var acc = _bd && _bd.accurate, cs = acc && acc.channel_split;
+    var stk = acc && acc.stock, online = cs && cs.online;
     return React.createElement(React.Fragment, null,
       !acc && React.createElement('div', { style: { padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text3)', fontSize: 13, marginBottom: 16 } }, 'Data Accurate tidak tersedia. Pastikan connector sedang berjalan.'),
-      _Sec('Revenue Channel (Accurate)', _Row([
-        _KC('tot', 'Total Revenue', _fRp(rev && rev.total), _fPct(rev && rev.mom_pct) + ' MoM', _pColor(rev && rev.mom_pct)),
+      online && _Sec('Online / Marketplace MTD (Accurate)', _Row([
         _KC('onl', 'Online / Marketplace', _fRp(online && online.revenue), _fPct(online && online.mom_pct) + ' MoM', _pColor(online && online.mom_pct)),
-        _KC('b2b', 'B2B Korporat', _fRp(b2b && b2b.revenue), _fPct(b2b && b2b.mom_pct) + ' MoM', _pColor(b2b && b2b.mom_pct)),
       ])),
       stk && _Sec('Status Stok (Accurate)', _Row([
         _KC('s0', 'Stockout', _fNum(stk.stockout_count), 'qty ≤ 0', '#ef4444'),

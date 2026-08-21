@@ -227,7 +227,6 @@ async function angelKPIs(year, month, connectorUrl, apiKey) {
     },
     sales_conversion: salesConversion,
     b2b_revenue: accKPIs?.b2b || null,
-    marketplace_revenue: accKPIs?.marketplace || null,
     new_customers: accKPIs?.customers || null,
     top_customers: accKPIs?.top_customers?.slice(0, 10) || [],
     monthly_trend: accKPIs?.monthly_trend || [],
@@ -269,9 +268,15 @@ async function lianaKPIs(year, month, connectorUrl, apiKey) {
 
 async function lukasKPIs(year, month, connectorUrl, apiKey) {
   const accurate = await connectorDashboard('Lukas', year, month, connectorUrl, apiKey);
+  const kpis = accurate?.kpis || null;
   return {
     period: monthRange(year, month),
-    accurate: accurate?.kpis || null,
+    accurate: kpis ? {
+      channel_split:       kpis.channel_split       || null,
+      stock:               kpis.stock               || null,
+      top_items_by_revenue: kpis.top_items_by_revenue || [],
+      slow_moving:         kpis.slow_moving         || [],
+    } : null,
   };
 }
 
@@ -291,7 +296,7 @@ async function jennyKPIs(year, month, connectorUrl, apiKey) {
     sbQuery('service_intakes',
       { 'created_at.gte': `${from}T00:00:00`, 'created_at.lte': `${to}T23:59:59` },
       'status,unit_type,branch_name', 500),
-    connectorDashboard('Lukas', year, month, connectorUrl, apiKey),
+    connectorDashboard('Jenny', year, month, connectorUrl, apiKey),
   ]);
 
   const activePOs  = pos.filter(p => p.status !== 'cancelled');
