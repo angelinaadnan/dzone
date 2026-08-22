@@ -229,7 +229,6 @@ async function angelKPIs(year, month, connectorUrl, apiKey) {
     b2b_revenue: accKPIs?.b2b || null,
     new_customers: accKPIs?.customers || null,
     top_customers: accKPIs?.top_customers?.slice(0, 10) || [],
-    monthly_trend: accKPIs?.monthly_trend || [],
   };
 }
 
