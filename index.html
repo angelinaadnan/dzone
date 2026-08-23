@@ -46877,6 +46877,9 @@ function BusinessAnalystPage(_ref_bi) {
   var _bs3 = React.useState(null); var biResult = _bs3[0]; var setBiResult = _bs3[1];
   var _bs4 = React.useState(false); var biLoading = _bs4[0]; var setBiLoading = _bs4[1];
   var _bs5 = React.useState(null); var biErr = _bs5[0]; var setBiErr = _bs5[1];
+  var _ai1 = React.useState(null);  var _aiInsights = _ai1[0]; var _setAiInsights = _ai1[1];
+  var _ai2 = React.useState(false); var _aiLoading  = _ai2[0]; var _setAiLoading  = _ai2[1];
+  var _ai3 = React.useState(true);  var _aiExpanded = _ai3[0]; var _setAiExpanded = _ai3[1];
   var _BI_MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   function _fRp(v) {
     if (v == null) return '—';
@@ -46896,6 +46899,21 @@ function BusinessAnalystPage(_ref_bi) {
       .catch(function(e) { setBiErr(e.message); })
       .finally(function() { setBiLoading(false); });
   }, [persona, biYear, biMonth]);
+  // Reset AI insights when persona/period changes
+  React.useEffect(function() {
+    _setAiInsights(null); _setAiLoading(false);
+  }, [persona, biYear, biMonth]);
+  // Fetch AI insights after KPI data loads (lazy, non-blocking)
+  React.useEffect(function() {
+    var bd = biResult && biResult.data;
+    if (!bd) return;
+    _setAiInsights(null); _setAiLoading(true);
+    fetch('/api/bi-insights?persona=' + encodeURIComponent(persona) + '&year=' + biYear + '&month=' + biMonth)
+      .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
+      .then(function(d) { if (d.available !== false && d.insights) _setAiInsights(d.insights); })
+      .catch(function() { /* fail silently — dashboard works without AI */ })
+      .finally(function() { _setAiLoading(false); });
+  }, [biResult, persona, biYear, biMonth]);
   var _bd = biResult && biResult.data;
   var _cs = { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: '1 1 180px', minWidth: 160 };
   var _lbs = { fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 };
@@ -46927,6 +46945,49 @@ function BusinessAnalystPage(_ref_bi) {
             row.map(function(c, ci) { return React.createElement('td', { key: ci, style: { textAlign: ci > 0 ? 'right' : 'left', padding: '8px 10px', color: 'var(--text)' } }, c); })
           ); })
         )
+      )
+    );
+  }
+  function _renderAIPanel() {
+    if (!_aiInsights && !_aiLoading) return null;
+    var _pclr = function(p) { return p === 1 ? '#ef4444' : p === 2 ? '#f97316' : '#eab308'; };
+    var _sec = function(label, color, items, bg) {
+      return React.createElement('div', null,
+        React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: color, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' } }, label),
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+          items.map(function(item, i) {
+            var pc = _pclr(item.priority || 2);
+            return React.createElement('div', { key: i, style: { display: 'flex', gap: 10, padding: '8px 12px', background: bg, borderRadius: 7, borderLeft: '3px solid ' + pc } },
+              React.createElement('span', { style: { fontSize: 11, fontWeight: 700, color: pc, flexShrink: 0, marginTop: 2 } }, 'P' + (item.priority || 2)),
+              React.createElement('div', null,
+                React.createElement('div', { style: { fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 } }, item.judul || ''),
+                React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 } }, item.teks || '')
+              )
+            );
+          })
+        )
+      );
+    };
+    return React.createElement('div', { style: { marginBottom: 16, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--card)' } },
+      React.createElement('div', {
+        onClick: function() { _setAiExpanded(!_aiExpanded); },
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', cursor: 'pointer', userSelect: 'none', borderBottom: _aiExpanded ? '1px solid var(--border)' : 'none', background: 'rgba(99,102,241,0.08)' }
+      },
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+          React.createElement('span', { style: { fontSize: 16 } }, '🤖'),
+          React.createElement('span', { style: { fontWeight: 600, fontSize: 14, color: 'var(--text)' } }, 'AI Business Analyst'),
+          _aiLoading && React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)', marginLeft: 6 } }, '· Memuat analisis...')
+        ),
+        !_aiLoading && React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, _aiExpanded ? '▲' : '▼')
+      ),
+      _aiExpanded && _aiLoading && React.createElement('div', { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 } },
+        [85,65,75].map(function(w, i) { return React.createElement('div', { key: i, style: { height: 13, background: 'var(--border)', borderRadius: 6, opacity: 0.5, width: w + '%' } }); })
+      ),
+      _aiExpanded && _aiInsights && React.createElement('div', { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: 14 } },
+        _aiInsights.executive_summary && React.createElement('div', { style: { fontSize: 13, lineHeight: 1.7, color: 'var(--text)', padding: '10px 14px', background: 'rgba(99,102,241,0.06)', borderRadius: 8, borderLeft: '3px solid #6366f1' } }, _aiInsights.executive_summary),
+        _aiInsights.needs_attention && _aiInsights.needs_attention.length > 0 && _sec('⚠️ Perlu Perhatian', '#ef4444', _aiInsights.needs_attention, 'rgba(239,68,68,0.05)'),
+        _aiInsights.what_is_going_well && _aiInsights.what_is_going_well.length > 0 && _sec('✅ Berjalan Baik', '#22c55e', _aiInsights.what_is_going_well, 'rgba(34,197,94,0.05)'),
+        _aiInsights.recommended_actions && _aiInsights.recommended_actions.length > 0 && _sec('💡 Rekomendasi Tindakan', '#3b82f6', _aiInsights.recommended_actions, 'rgba(59,130,246,0.05)')
       )
     );
   }
@@ -46976,6 +47037,7 @@ function BusinessAnalystPage(_ref_bi) {
         dso != null ? _KC('dso', 'DSO', dso + ' hari', 'Days Sales Outstanding') : null,
         yoy && yoy.yoy_pct != null ? _KC('yoy', 'YoY Revenue', _fPct(yoy.yoy_pct), yoy.is_partial ? 'Adj. s/d ' + (yoy.data_through || '').slice(8,10) + ' ' + _BI_MONTHS[parseInt((yoy.data_through || '').split('-')[1])] : 'vs thn lalu (bulan sama)', _pColor(yoy.yoy_pct)) : null,
       ].filter(Boolean))),
+      _renderAIPanel(),
       ar && (ar.over_30d > 0 || ar.over_60d > 0 || ar.over_90d > 0) && _Sec('AR Aging (Saldo Tertunggak)', _Row([
         _KC('a30', 'Overdue >30 Hari', _fRp(ar.over_30d), ar.over_30d_count != null ? _fNum(ar.over_30d_count) + ' invoice' : null, '#f59e0b'),
         _KC('a60', 'Overdue >60 Hari', _fRp(ar.over_60d), ar.over_60d_count != null ? _fNum(ar.over_60d_count) + ' invoice' : null, '#f97316'),
@@ -47052,6 +47114,7 @@ function BusinessAnalystPage(_ref_bi) {
         _KC('cv', 'Converted MTD', _fNum(pl && pl.converted_this_period), pl && pl.conversion_rate != null ? 'Rate ' + pl.conversion_rate + '%' : null),
         pl && pl.rejected_count != null ? _KC('rj', 'Ditolak MTD', _fNum(pl.rejected_count), null, '#ef4444') : null,
       ].filter(Boolean))),
+      _renderAIPanel(),
       pl && funnelStages.length > 0 && _Sec('Funnel Penawaran', React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 480 } },
         funnelStages.map(function(s, i) { return React.createElement('div', { key: i },
           React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 } },
@@ -47110,6 +47173,7 @@ function BusinessAnalystPage(_ref_bi) {
       online && _Sec('Online / Marketplace MTD (Accurate)', _Row([
         _KC('onl', 'Online / Marketplace', _fRp(online && online.revenue), _fPct(online && online.mom_pct) + ' MoM', _pColor(online && online.mom_pct)),
       ])),
+      _renderAIPanel(),
       mktTrend && mktTrend.length > 0 && _Sec('Trend Revenue Marketplace — 12 Bulan', React.createElement('div', { style: { overflowX: 'auto', paddingBottom: 4 } },
         React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 6, minWidth: 0, height: 120 } },
           (function() {
@@ -47157,6 +47221,7 @@ function BusinessAnalystPage(_ref_bi) {
         br ? _KC('br', 'Request Barang', _fNum(br.request_count), 'dari cabang') : null,
         fr != null ? _KC('fl', 'Fulfillment Rate', fr + '%', 'delivered + ao_serah', frColor) : null,
       ].filter(Boolean))),
+      _renderAIPanel(),
       sp && sp.length > 0 && _Sec('Performa Sales', _Tbl(['Sales','Order','Nilai'],
         sp.slice(0,10).map(function(s) { return [s.name, _fNum(s.count), _fRp(s.value)]; })
       )),
@@ -47184,6 +47249,7 @@ function BusinessAnalystPage(_ref_bi) {
         _KC('pp', 'PO Pending', _fNum(pur && pur.pending_count), _fRp(pur && pur.pending_value)),
         si ? _KC('si', 'Servis Masuk', _fNum(si.total), 'MTD') : null,
       ].filter(Boolean))),
+      _renderAIPanel(),
       sc && _Sec('Restock Forecast & Stock Coverage (30 hari)', React.createElement('div', null,
         _Row([
           _KC('rc', 'Kritis (<7 hari)', _fNum(_scBuckets && _scBuckets.critical), 'segera restock', '#ef4444'),
