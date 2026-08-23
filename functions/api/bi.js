@@ -151,6 +151,11 @@ async function santoKPIs(year, month, connectorUrl, apiKey) {
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
 
+  const deliveredCount = activeOrders.filter(o => o.status === 'delivered' || o.status === 'ao_serah').length;
+  const fulfillmentRate = activeOrders.length > 0
+    ? +((deliveredCount / activeOrders.length) * 100).toFixed(1)
+    : null;
+
   return {
     period: { from, to },
     retail: {
@@ -169,6 +174,7 @@ async function santoKPIs(year, month, connectorUrl, apiKey) {
       daily_counts: dailyCounts.slice(-14),
     },
     sales_performance: topSales,
+    fulfillment_rate: fulfillmentRate,
   };
 }
 
@@ -190,6 +196,7 @@ async function angelKPIs(year, month, connectorUrl, apiKey) {
 
   const pipelineStatuses = ['draft', 'sent', 'approved'];
   const pipeline   = quotations.filter(q => pipelineStatuses.includes(q.status));
+  const rejected   = quotations.filter(q => q.status === 'rejected');
   const converted  = quotations.filter(q => q.status === 'converted');
   const convertedP = quotationsP.filter(q => q.status === 'converted');
 
@@ -224,6 +231,7 @@ async function angelKPIs(year, month, connectorUrl, apiKey) {
       conversion_rate: convRate,
       conversion_rate_prior: convRateP,
       by_status: byStatus,
+      rejected_count: rejected.length,
     },
     sales_conversion: salesConversion,
     b2b_revenue: accKPIs?.b2b || null,
@@ -252,14 +260,27 @@ async function lianaKPIs(year, month, connectorUrl, apiKey) {
     pmtBreakdown[p].value += calcGoodsValue(o.goods);
   }
 
+  const acc = accurate?.kpis;
+  const daysInPeriod = new Date(parseInt(year), parseInt(month), 0).getDate();
+  const dso = (acc?.ar?.total && acc?.revenue?.total && acc.revenue.total > 0)
+    ? +((acc.ar.total / (acc.revenue.total / daysInPeriod))).toFixed(1)
+    : null;
+  const arVal = acc?.ar?.total || 0;
+  const arCnt = acc?.ar?.count || 0;
+  let arStatus = 'green';
+  if (arVal >= 500_000_000 || arCnt >= 10) arStatus = 'critical';
+  else if (arVal >= 300_000_000 || arCnt >= 5) arStatus = 'warning';
+
   return {
     period: { from, to },
-    accurate: accurate?.kpis || null,
+    accurate: acc || null,
     ytd: accurate?.ytd || null,
     internal_orders: {
       payment_breakdown: pmtBreakdown,
       total_orders: orders.filter(o => o.status !== 'cancelled').length,
     },
+    dso,
+    ar_alert: { status: arStatus, total: arVal, count: arCnt },
   };
 }
 
@@ -271,10 +292,11 @@ async function lukasKPIs(year, month, connectorUrl, apiKey) {
   return {
     period: monthRange(year, month),
     accurate: kpis ? {
-      channel_split:       kpis.channel_split       || null,
-      stock:               kpis.stock               || null,
+      channel_split:        kpis.channel_split        || null,
+      stock:                kpis.stock                || null,
       top_items_by_revenue: kpis.top_items_by_revenue || [],
-      slow_moving:         kpis.slow_moving         || [],
+      top_items_by_qty:     kpis.top_items_by_qty     || [],
+      slow_moving:          kpis.slow_moving          || [],
     } : null,
   };
 }
@@ -319,6 +341,18 @@ async function jennyKPIs(year, month, connectorUrl, apiKey) {
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
 
+  const bySupplierP = {};
+  for (const po of activePOsP) {
+    const sup = (po.supplier_name || 'Unknown').trim();
+    if (!bySupplierP[sup]) bySupplierP[sup] = { count: 0, value: 0 };
+    bySupplierP[sup].count++;
+    bySupplierP[sup].value += calcGoodsValue(po.items);
+  }
+  const topSuppliersP = Object.entries(bySupplierP)
+    .map(([name, d]) => ({ name, ...d }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+
   const pending      = activePOs.filter(p => p.status !== 'completed');
   const pendingValue = pending.reduce((s, po) => s + calcGoodsValue(po.items), 0);
 
@@ -339,9 +373,11 @@ async function jennyKPIs(year, month, connectorUrl, apiKey) {
       pending_value: pendingValue,
     },
     top_suppliers: topSuppliers,
+    top_suppliers_prior: topSuppliersP,
     service_intakes: { total: intakes.length, by_status: intakeStatus },
     stock: accurate?.kpis?.stock || null,
     slow_moving: accurate?.kpis?.slow_moving || null,
+    top_items_by_qty: accurate?.kpis?.top_items_by_qty || [],
   };
 }
 

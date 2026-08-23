@@ -46932,15 +46932,29 @@ function BusinessAnalystPage(_ref_bi) {
   }
   function _renderLiana() {
     var acc = _bd && _bd.accurate, ytd = _bd && _bd.ytd;
+    var dso = _bd && _bd.dso, arAlert = _bd && _bd.ar_alert;
     var rev = acc && acc.revenue, col = acc && acc.collection, ar = acc && acc.ar;
+    var _alertC = { green: '#22c55e', warning: '#f59e0b', critical: '#ef4444' };
+    var _alertBg = { green: '#f0fdf4', warning: '#fffbeb', critical: '#fef2f2' };
+    var _alertLbl = { green: 'Normal — AR dalam batas aman', warning: 'Perhatian — AR mendekati batas', critical: 'Kritis — AR melebihi batas' };
+    var _alertIcon = { green: '🟢', warning: '🟡', critical: '🔴' };
+    var alertSt = arAlert && arAlert.status || 'green';
     return React.createElement(React.Fragment, null,
       !acc && React.createElement('div', { style: { padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text3)', fontSize: 13, marginBottom: 16 } }, 'Data Accurate tidak tersedia saat ini. Hanya data internal yang ditampilkan.'),
+      arAlert && React.createElement('div', { style: { padding: '10px 14px', marginBottom: 16, borderRadius: 8, border: '1px solid ' + _alertC[alertSt], background: _alertBg[alertSt], display: 'flex', alignItems: 'center', gap: 10 } },
+        React.createElement('span', { style: { fontSize: 16 } }, _alertIcon[alertSt]),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontWeight: 600, color: _alertC[alertSt], fontSize: 13 } }, 'AR Alert: ' + _alertLbl[alertSt]),
+          React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 2 } }, 'Total: ' + _fRp(arAlert.total) + ' · ' + _fNum(arAlert.count) + ' invoice outstanding')
+        )
+      ),
       _Sec('Revenue & Koleksi (Accurate)', _Row([
         _KC('rev', 'Revenue MTD', _fRp(rev && rev.total), _fPct(rev && rev.mom_pct) + ' MoM', _pColor(rev && rev.mom_pct)),
         _KC('inv', 'Jumlah Invoice', _fNum(rev && rev.invoice_count), 'MTD'),
         _KC('col', 'Koleksi MTD', _fRp(col && col.total), col && col.collection_rate != null ? 'Rate ' + col.collection_rate + '%' : null),
         _KC('ar', 'AR Outstanding', _fRp(ar && ar.total), ar && ar.count ? _fNum(ar.count) + ' invoice' : null),
-      ])),
+        dso != null ? _KC('dso', 'DSO', dso + ' hari', 'Days Sales Outstanding') : null,
+      ].filter(Boolean))),
       ar && (ar.over_30d > 0 || ar.over_60d > 0 || ar.over_90d > 0) && _Sec('AR Aging (Saldo Tertunggak)', _Row([
         _KC('a30', 'Overdue >30 Hari', _fRp(ar.over_30d), ar.over_30d_count != null ? _fNum(ar.over_30d_count) + ' invoice' : null, '#f59e0b'),
         _KC('a60', 'Overdue >60 Hari', _fRp(ar.over_60d), ar.over_60d_count != null ? _fNum(ar.over_60d_count) + ' invoice' : null, '#f97316'),
@@ -46964,11 +46978,29 @@ function BusinessAnalystPage(_ref_bi) {
   }
   function _renderAngel() {
     var pl = _bd && _bd.pipeline, b2b = _bd && _bd.b2b_revenue, nc = _bd && _bd.new_customers;
+    var funnelStages = pl ? [
+      { label: 'Aktif (Draft/Sent/Approved)', count: pl.total_count, color: '#3b82f6' },
+      { label: 'Converted', count: pl.converted_this_period, color: '#22c55e' },
+      { label: 'Ditolak', count: pl.rejected_count || 0, color: '#ef4444' },
+    ] : [];
+    var funnelMax = funnelStages.reduce(function(m, s) { return Math.max(m, s.count || 0); }, 1);
     return React.createElement(React.Fragment, null,
       _Sec('Pipeline Penawaran (Internal)', _Row([
         _KC('pu', 'Penawaran Aktif', _fNum(pl && pl.total_count), _fRp(pl && pl.total_value)),
         _KC('cv', 'Converted MTD', _fNum(pl && pl.converted_this_period), pl && pl.conversion_rate != null ? 'Rate ' + pl.conversion_rate + '%' : null),
-      ])),
+        pl && pl.rejected_count != null ? _KC('rj', 'Ditolak MTD', _fNum(pl.rejected_count), null, '#ef4444') : null,
+      ].filter(Boolean))),
+      pl && funnelStages.length > 0 && _Sec('Funnel Penawaran', React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 480 } },
+        funnelStages.map(function(s, i) { return React.createElement('div', { key: i },
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 } },
+            React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', width: 210, flexShrink: 0 } }, s.label),
+            React.createElement('div', { style: { fontSize: 12, fontWeight: 600, color: s.color, width: 32, textAlign: 'right', flexShrink: 0 } }, s.count || 0)
+          ),
+          React.createElement('div', { style: { height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' } },
+            React.createElement('div', { style: { height: '100%', width: (((s.count || 0) / funnelMax) * 100) + '%', background: s.color, borderRadius: 4 } })
+          )
+        ); })
+      )),
       b2b && _Sec('Revenue B2B Korporat (Accurate)', _Row([
         _KC('b2b', 'B2B Korporat', _fRp(b2b.revenue), _fPct(b2b.mom_pct) + ' MoM', _pColor(b2b.mom_pct)),
       ])),
@@ -47001,6 +47033,9 @@ function BusinessAnalystPage(_ref_bi) {
       acc && acc.top_items_by_revenue && acc.top_items_by_revenue.length > 0 && _Sec('Top Item — Revenue', _Tbl(['Item','Qty','Revenue','Order'],
         acc.top_items_by_revenue.slice(0,10).map(function(it) { return [it.name, _fNum(it.qty), _fRp(it.revenue), _fNum(it.orders)]; })
       )),
+      acc && acc.top_items_by_qty && acc.top_items_by_qty.length > 0 && _Sec('Top Item — Quantity Terjual', _Tbl(['Item','Qty','Revenue'],
+        acc.top_items_by_qty.slice(0,10).map(function(it) { return [it.name, _fNum(it.qty), _fRp(it.revenue)]; })
+      )),
       acc && acc.slow_moving && acc.slow_moving.length > 0 && _Sec('Slow Moving Items', _Tbl(['Item','Stok Sisa','Terjual (bulan ini)','Revenue'],
         acc.slow_moving.slice(0,8).map(function(it) { return [it.name, _fNum(it.available), _fNum(it.sold_qty), _fRp(it.sold_revenue)]; })
       ))
@@ -47008,12 +47043,15 @@ function BusinessAnalystPage(_ref_bi) {
   }
   function _renderSanto() {
     var ret = _bd && _bd.retail, ppl = _bd && _bd.people, br = _bd && _bd.branch, sp = _bd && _bd.sales_performance, ord = _bd && _bd.orders;
+    var fr = _bd && _bd.fulfillment_rate;
+    var frColor = fr == null ? 'var(--text3)' : fr >= 80 ? '#22c55e' : fr >= 60 ? '#f59e0b' : '#ef4444';
     return React.createElement(React.Fragment, null,
       _Sec('Retail Sales MTD', _Row([
         _KC('rv', 'Nilai Penjualan', _fRp(ret && ret.value), _fPct(ret && ret.value_mom) + ' MoM', _pColor(ret && ret.value_mom)),
         _KC('oc', 'Jumlah Order', _fNum(ret && ret.order_count), _fPct(ret && ret.order_count_mom) + ' MoM', _pColor(ret && ret.order_count_mom)),
         _KC('at', 'Absensi Unik', _fNum(ppl && ppl.unique_attendance), _fNum(ppl && ppl.total_checkins) + ' check-in'),
         br ? _KC('br', 'Request Barang', _fNum(br.request_count), 'dari cabang') : null,
+        fr != null ? _KC('fl', 'Fulfillment Rate', fr + '%', 'delivered + ao_serah', frColor) : null,
       ].filter(Boolean))),
       sp && sp.length > 0 && _Sec('Performa Sales', _Tbl(['Sales','Order','Nilai'],
         sp.slice(0,10).map(function(s) { return [s.name, _fNum(s.count), _fRp(s.value)]; })
@@ -47031,6 +47069,8 @@ function BusinessAnalystPage(_ref_bi) {
   }
   function _renderJenny() {
     var pur = _bd && _bd.purchasing, sup = _bd && _bd.top_suppliers, si = _bd && _bd.service_intakes, stk = _bd && _bd.stock;
+    var supP = _bd && _bd.top_suppliers_prior, tiq = _bd && _bd.top_items_by_qty;
+    var supMap = {}; if (supP) supP.forEach(function(s) { supMap[s.name] = s.value; });
     return React.createElement(React.Fragment, null,
       _Sec('Purchase Orders MTD', _Row([
         _KC('pv', 'Nilai PO', _fRp(pur && pur.total_value), _fPct(pur && pur.value_mom) + ' MoM', _pColor(pur && pur.value_mom)),
@@ -47049,6 +47089,16 @@ function BusinessAnalystPage(_ref_bi) {
       )),
       sup && sup.length > 0 && _Sec('Top Supplier MTD', _Tbl(['Supplier','PO','Nilai'],
         sup.slice(0,10).map(function(s) { return [s.name, _fNum(s.count), _fRp(s.value)]; })
+      )),
+      sup && supP && supP.length > 0 && _Sec('Supplier Spend MoM', _Tbl(['Supplier','Bulan Ini','Bulan Lalu','MoM'],
+        sup.slice(0,10).map(function(s) {
+          var prev = supMap[s.name] || 0;
+          var chg = prev > 0 ? +((s.value - prev) / prev * 100).toFixed(1) : null;
+          return [s.name, _fRp(s.value), prev > 0 ? _fRp(prev) : '—', chg != null ? (chg > 0 ? '+' : '') + chg + '%' : '—'];
+        })
+      )),
+      tiq && tiq.length > 0 && _Sec('Top Item — Quantity Dibeli', _Tbl(['Item','Qty','Nilai'],
+        tiq.slice(0,10).map(function(it) { return [it.name, _fNum(it.qty), _fRp(it.value != null ? it.value : (it.total_price || 0))]; })
       ))
     );
   }
