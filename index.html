@@ -46965,6 +46965,25 @@ function BusinessAnalystPage(_ref_bi) {
         _KC('yc', 'Koleksi YTD', _fRp(ytd.collected_ytd)),
         _KC('yi', 'Invoice YTD', _fNum(ytd.invoice_count_ytd)),
       ])),
+      acc && acc.monthly_trend && acc.monthly_trend.length > 0 && _Sec('Trend Revenue (Tahun Ini)', React.createElement('div', { style: { overflowX: 'auto', paddingBottom: 4 } },
+        React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 6, minWidth: 0, height: 120 } },
+          (function() {
+            var mt = acc.monthly_trend;
+            var maxRev = mt.reduce(function(m, r) { return Math.max(m, r.revenue || 0); }, 1);
+            var _BI_MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+            return mt.map(function(r, i) {
+              var mNum = parseInt((r.month || '').split('-')[1]) || (i+1);
+              var pct = Math.max(4, ((r.revenue || 0) / maxRev) * 100);
+              var isLast = i === mt.length - 1;
+              return React.createElement('div', { key: r.month, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '1 1 0', minWidth: 28 } },
+                React.createElement('div', { style: { fontSize: 9, color: 'var(--text3)', marginBottom: 3, whiteSpace: 'nowrap' } }, _fRp(r.revenue)),
+                React.createElement('div', { style: { width: '100%', height: pct + '%', background: isLast ? '#3b82f6' : '#3b82f633', borderRadius: '3px 3px 0 0', minHeight: 4 } }),
+                React.createElement('div', { style: { fontSize: 10, color: isLast ? 'var(--text)' : 'var(--text3)', marginTop: 4, fontWeight: isLast ? 600 : 400 } }, _BI_MONTHS[mNum])
+              );
+            });
+          })()
+        )
+      )),
       acc && acc.channel_split && acc.channel_split.length > 0 && _Sec('Channel Split', _Row(
         acc.channel_split.map(function(c, i) { return _KC('ch'+i, c.channel === 'b2b' ? 'B2B / Korporat' : 'Online / Marketplace', _fRp(c.revenue), _fNum(c.count) + ' inv · ' + _fNum(c.customers) + ' cust'); })
       )),

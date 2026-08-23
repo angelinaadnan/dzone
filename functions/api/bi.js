@@ -280,7 +280,7 @@ async function lianaKPIs(year, month, connectorUrl, apiKey) {
       total_orders: orders.filter(o => o.status !== 'cancelled').length,
     },
     dso,
-    ar_alert: { status: arStatus, total: arVal, count: arCnt },
+    ar_alert: acc ? { status: arStatus, total: arVal, count: arCnt } : null,
   };
 }
 
