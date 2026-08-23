@@ -235,6 +235,8 @@ async function angelKPIs(year, month, connectorUrl, apiKey) {
     },
     sales_conversion: salesConversion,
     b2b_revenue: accKPIs?.b2b || null,
+    b2b_revenue_trend: accKPIs?.b2b_revenue_trend || [],
+    customer_retention: accKPIs?.customer_retention || null,
     new_customers: accKPIs?.customers || null,
     top_customers: accKPIs?.top_customers?.slice(0, 10) || [],
   };
@@ -275,6 +277,8 @@ async function lianaKPIs(year, month, connectorUrl, apiKey) {
     period: { from, to },
     accurate: acc || null,
     ytd: accurate?.ytd || null,
+    collection_rate_trend: acc?.collection_rate_trend || [],
+    yoy_revenue: acc?.yoy_revenue || null,
     internal_orders: {
       payment_breakdown: pmtBreakdown,
       total_orders: orders.filter(o => o.status !== 'cancelled').length,
@@ -292,11 +296,12 @@ async function lukasKPIs(year, month, connectorUrl, apiKey) {
   return {
     period: monthRange(year, month),
     accurate: kpis ? {
-      channel_split:        kpis.channel_split        || null,
-      stock:                kpis.stock                || null,
-      top_items_by_revenue: kpis.top_items_by_revenue || [],
-      top_items_by_qty:     kpis.top_items_by_qty     || [],
-      slow_moving:          kpis.slow_moving          || [],
+      channel_split:             kpis.channel_split             || null,
+      stock:                     kpis.stock                     || null,
+      top_items_by_revenue:      kpis.top_items_by_revenue      || [],
+      top_items_by_qty:          kpis.top_items_by_qty          || [],
+      slow_moving:               kpis.slow_moving               || [],
+      marketplace_revenue_trend: kpis.marketplace_revenue_trend || [],
     } : null,
   };
 }
@@ -378,6 +383,7 @@ async function jennyKPIs(year, month, connectorUrl, apiKey) {
     stock: accurate?.kpis?.stock || null,
     slow_moving: accurate?.kpis?.slow_moving || null,
     top_items_by_qty: accurate?.kpis?.top_items_by_qty || [],
+    stock_coverage: accurate?.kpis?.stock_coverage || null,
   };
 }
 
