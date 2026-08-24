@@ -135,8 +135,8 @@ async function fetchPnL(token, appKey, sigSecret, startDate, endDate) {
 
 async function fetchInvoices(token, appKey, sigSecret, startDate, endDate, maxPages = 15) {
   const all = [];
-  let page = 1, totalPages = 1;
-  while (page <= Math.min(totalPages, maxPages)) {
+  let page = 1, totalRecords = 0, fetchedPages = 0;
+  while (page <= maxPages) {
     try {
       const ts  = Date.now();
       const sig = sigSecret ? await makeSignature(ts, sigSecret) : '';
@@ -164,12 +164,14 @@ async function fetchInvoices(token, appKey, sigSecret, startDate, endDate, maxPa
       const rows = json.d || [];
       if (!rows.length) break;
       all.push(...rows);
-      totalPages = json.sp?.pageCount || 1;
-      if (rows.length < 200) break;
+      totalRecords = json.sp?.pageCount || totalRecords;
+      fetchedPages = page;
+      // pageCount is total RECORDS — stop when all collected or on a truly empty next page
+      if (all.length >= totalRecords) break;
       page++;
     } catch { break; }
   }
-  return { invoices: all, totalPages, fetchedPages: page - 1 };
+  return { invoices: all, totalRecords, fetchedPages };
 }
 
 function aggregate(invoices) {
@@ -311,7 +313,7 @@ export async function onRequestGet(context) {
   }
 
   const cache    = caches.default;
-  const cacheKey = new Request(`https://santo-bi-v2/${year}/${month}`);
+  const cacheKey = new Request(`https://santo-bi-v3/${year}/${month}`);
   const cached   = await cache.match(cacheKey);
   if (cached) return cached;
 
@@ -352,7 +354,7 @@ export async function onRequestGet(context) {
         branchList:   aggADL.branchList,
         products:     aggADL.products,
         brands:       aggADL.brands,
-        _pages:       `${invADL.fetchedPages}/${invADL.totalPages}`,
+        _pages:       `${invADL.fetchedPages}/${invADL.totalRecords}`,
       },
       group: {
         label: 'Group (Non-PPN)',
@@ -369,7 +371,7 @@ export async function onRequestGet(context) {
         branchList:   aggGRP.branchList,
         products:     aggGRP.products,
         brands:       aggGRP.brands,
-        _pages:       `${invGRP.fetchedPages}/${invGRP.totalPages}`,
+        _pages:       `${invGRP.fetchedPages}/${invGRP.totalRecords}`,
       },
     };
 
