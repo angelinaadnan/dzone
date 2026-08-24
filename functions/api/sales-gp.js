@@ -32,8 +32,12 @@ export async function onRequestGet(context) {
     const connResp = await fetch(
       `${connUrl}/api/sheet/sales-gp?year=${year}&month=${month}`,
       {
-        headers: { 'X-API-Key': connKey },
-        signal:  AbortSignal.timeout(55000),
+        headers: {
+          'X-API-Key':          connKey,
+          'X-Accurate-App-Key': env.ACCURATE_APP_KEY    || '',
+          'X-Accurate-Sig-Sec': env.ACCURATE_SIG_SECRET || '',
+        },
+        signal: AbortSignal.timeout(55000),
       }
     );
 
