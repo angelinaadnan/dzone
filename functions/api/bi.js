@@ -410,7 +410,19 @@ export async function onRequestGet(context) {
   try {
     let data;
     switch (persona) {
-      case 'Santo': data = await santoKPIs(year, month, connectorUrl, apiKey); break;
+      case 'Santo': {
+        const gpUrl = new URL(`/api/sales-gp?year=${year}&month=${month}`, request.url).toString();
+        const [santoData, gpResp] = await Promise.all([
+          santoKPIs(year, month, connectorUrl, apiKey),
+          fetch(gpUrl, { signal: AbortSignal.timeout(25000) }).catch(() => null),
+        ]);
+        data = santoData;
+        if (gpResp?.ok) {
+          const gpData = await gpResp.json().catch(() => null);
+          if (gpData?.available) data.sales_gp = gpData;
+        }
+        break;
+      }
       case 'Angel': data = await angelKPIs(year, month, connectorUrl, apiKey); break;
       case 'Liana': data = await lianaKPIs(year, month, connectorUrl, apiKey); break;
       case 'Lukas': data = await lukasKPIs(year, month, connectorUrl, apiKey); break;

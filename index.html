@@ -3770,7 +3770,8 @@ function App() {
     return n.id !== 'pesan_barang' || canAccessPesanBarang;
   }).concat(SALES_HARIAN_USERS.includes(userName) ? [{ id: 'sales_harian', icon: '📈', label: 'Sales Harian' }] : [])
   .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
-  .concat(BI_USERS.includes(userName) ? [{ id: 'business_analyst', icon: '💡', label: 'Business Analyst' }] : []);
+  .concat(BI_USERS.includes(userName) ? [{ id: 'business_analyst', icon: '💡', label: 'Business Analyst' }] : [])
+  .concat(['Santo', 'Angel', 'Liana', 'GITA'].includes(userName) ? [{ id: 'tarik_pricelist', icon: '📋', label: 'Tarik Pricelist' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -3978,7 +3979,7 @@ function App() {
   }), role === 'ops' && page === 'op_branch' && /*#__PURE__*/React.createElement(OpsBranchManager, {
     requests: branchRequests,
     onUpdate: updateBranchRequest
-  }), role === 'supervisor' && userName === 'Santo' && page === 'santo_dashboard' && /*#__PURE__*/React.createElement(SantoDashboard, null), role === 'supervisor' && BI_USERS.includes(userName) && page === 'business_analyst' && /*#__PURE__*/React.createElement(BusinessAnalystPage, { persona: userName }), role === 'supervisor' && userName === 'Santo' && page === 'branch_request' && /*#__PURE__*/React.createElement(BranchRequestPage, {
+  }), ['Santo','Angel','Liana','GITA'].includes(userName) && page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(PricelistSyncPage, null), role === 'supervisor' && userName === 'Santo' && page === 'santo_dashboard' && /*#__PURE__*/React.createElement(SantoDashboard, null), role === 'supervisor' && BI_USERS.includes(userName) && page === 'business_analyst' && /*#__PURE__*/React.createElement(BusinessAnalystPage, { persona: userName }), role === 'supervisor' && userName === 'Santo' && page === 'branch_request' && /*#__PURE__*/React.createElement(BranchRequestPage, {
     requests: branchRequests,
     onSave: saveBranchRequest,
     onUpdate: updateBranchRequest,
@@ -46643,6 +46644,79 @@ function OrderDetailModal(_ref278) {
 }
 
 
+// ─── PRICELIST SYNC PAGE ──────────────────────────────────────────
+function PricelistSyncPage() {
+  var _s = React.useState(null); var syncStatus = _s[0]; var setSyncStatus = _s[1];
+  var _l = React.useState(false); var loading = _l[0]; var setLoading = _l[1];
+  var _m = React.useState(null); var msg = _m[0]; var setMsg = _m[1];
+  var _st = React.useState(null); var statusData = _st[0]; var setStatusData = _st[1];
+
+  var CONN = 'https://connectoracc.dzoutlet.co.id';
+  var KEY  = 'dzone-connector-secret-2026';
+
+  React.useEffect(function() {
+    fetch(CONN + '/api/sheet/status', { headers: { 'x-api-key': KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { setStatusData(d.stock_sync); })
+      .catch(function() {});
+  }, []);
+
+  function handleSync() {
+    setLoading(true); setMsg(null);
+    fetch(CONN + '/api/sheet/sync', {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      setMsg(d.message || 'Sync dimulai. Google Sheet akan diperbarui dalam 5-7 menit.');
+      setLoading(false);
+    })
+    .catch(function(e) { setMsg('Error: ' + e.message); setLoading(false); });
+  }
+
+  var cardStyle = { background: 'var(--bg2)', borderRadius: 12, padding: '20px 24px', marginBottom: 16, border: '1px solid var(--border)' };
+  var labelStyle = { fontSize: 12, color: 'var(--text3)', marginBottom: 4 };
+  var valueStyle = { fontSize: 14, fontWeight: 600 };
+
+  return React.createElement('div', { style: { padding: '24px', maxWidth: 560 } },
+    React.createElement('h2', { style: { fontSize: 20, fontWeight: 700, marginBottom: 6 } }, '📋 Tarik Data Pricelist'),
+    React.createElement('p', { style: { color: 'var(--text3)', fontSize: 14, marginBottom: 20 } },
+      'Memperbarui stok dan modal di Google Sheet Pricelist dari data Accurate terkini. Proses berjalan di background (±5 menit).'),
+
+    React.createElement('div', { style: cardStyle },
+      React.createElement('div', { style: { ...labelStyle, marginBottom: 12 } }, 'STATUS SINKRONISASI TERAKHIR'),
+      statusData ? statusData.map(function(s) {
+        return React.createElement('div', { key: s.accurate_db_id, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } },
+          React.createElement('span', { style: valueStyle }, s.db_alias),
+          React.createElement('div', { style: { textAlign: 'right' } },
+            React.createElement('div', { style: { ...valueStyle, color: s.status === 'idle' ? 'var(--green,#22c55e)' : s.status === 'syncing' ? '#f59e0b' : '#ef4444', fontSize: 12 } }, s.status),
+            React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, s.last_sync_at ? new Date(s.last_sync_at).toLocaleString('id-ID') : 'Belum pernah sync'),
+            React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, s.total_items ? s.total_items + ' items' : '')
+          )
+        );
+      }) : React.createElement('div', { style: { color: 'var(--text3)', fontSize: 13 } }, 'Memuat status...')
+    ),
+
+    React.createElement('div', { style: cardStyle },
+      React.createElement('div', { style: { ...labelStyle, marginBottom: 12 } }, 'JADWAL OTOMATIS'),
+      ['09:45', '15:00', '18:30', '21:00'].map(function(t) {
+        return React.createElement('span', { key: t, style: { display: 'inline-block', background: 'var(--bg3,var(--bg1))', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', marginRight: 8, marginBottom: 6, fontSize: 13, fontWeight: 600 } }, t);
+      }),
+      React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 8 } }, 'Jadwal berjalan otomatis setiap hari.')
+    ),
+
+    msg && React.createElement('div', { style: { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 14, color: msg.startsWith('Error') ? '#ef4444' : 'var(--text1)' } }, msg),
+
+    React.createElement('button', {
+      onClick: handleSync,
+      disabled: loading,
+      style: { background: loading ? 'var(--border)' : '#2563eb', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 28px', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', width: '100%' }
+    }, loading ? '⏳ Memproses...' : '🔄 Tarik Data Sekarang')
+  );
+}
+
 // ─── SANTO DASHBOARD ──────────────────────────────────────────────
 function SantoDashboard() {
   var _s1 = React.useState(function() {
@@ -47212,6 +47286,7 @@ function BusinessAnalystPage(_ref_bi) {
   function _renderSanto() {
     var ret = _bd && _bd.retail, ppl = _bd && _bd.people, br = _bd && _bd.branch, sp = _bd && _bd.sales_performance, ord = _bd && _bd.orders;
     var fr = _bd && _bd.fulfillment_rate;
+    var gp = _bd && _bd.sales_gp;
     var frColor = fr == null ? 'var(--text3)' : fr >= 80 ? '#22c55e' : fr >= 60 ? '#f59e0b' : '#ef4444';
     return React.createElement(React.Fragment, null,
       _Sec('Retail Sales MTD', _Row([
@@ -47225,6 +47300,47 @@ function BusinessAnalystPage(_ref_bi) {
       sp && sp.length > 0 && _Sec('Performa Sales', _Tbl(['Sales','Order','Nilai'],
         sp.slice(0,10).map(function(s) { return [s.name, _fNum(s.count), _fRp(s.value)]; })
       )),
+      (function() {
+        if (!gp || !gp.available) return null;
+        var ptMap = {}, grpMap = {};
+        (gp.pt && gp.pt.list || []).forEach(function(s) { ptMap[s.name] = s; });
+        (gp.group && gp.group.list || []).forEach(function(s) { grpMap[s.name] = s; });
+        var names = Array.from(new Set(
+          [(gp.pt && gp.pt.list || []), (gp.group && gp.group.list || [])].reduce(function(a,l){return a.concat(l.map(function(s){return s.name;}));}, [])
+        )).sort(function(a, b) {
+          var ra = ((ptMap[a]||{}).revenue||0) + ((grpMap[a]||{}).revenue||0);
+          var rb = ((ptMap[b]||{}).revenue||0) + ((grpMap[b]||{}).revenue||0);
+          return rb - ra;
+        });
+        if (!names.length) return null;
+        var hasCost = gp.has_cost_data;
+        var fL = function(v) { return v ? _fRp(v) : '—'; };
+        var hdrs = hasCost
+          ? ['Sales', 'Rev PT', 'Laba PT', 'Rev Group', 'Laba Group']
+          : ['Sales', 'Revenue PT', 'Revenue Group', 'Total Rev'];
+        var rows = names.map(function(name) {
+          var pt = ptMap[name]  || { revenue: 0, laba: 0 };
+          var gr = grpMap[name] || { revenue: 0, laba: 0 };
+          return hasCost
+            ? [name, fL(pt.revenue), fL(pt.laba), fL(gr.revenue), fL(gr.laba)]
+            : [name, fL(pt.revenue), fL(gr.revenue), fL(pt.revenue + gr.revenue)];
+        });
+        var totPtRev = (gp.pt && gp.pt.total_revenue) || 0;
+        var totPtLaba = (gp.pt && gp.pt.total_laba) || 0;
+        var totGrRev = (gp.group && gp.group.total_revenue) || 0;
+        var totGrLaba = (gp.group && gp.group.total_laba) || 0;
+        var totRow = hasCost
+          ? ['TOTAL', fL(totPtRev), fL(totPtLaba), fL(totGrRev), fL(totGrLaba)]
+          : ['TOTAL', fL(totPtRev), fL(totGrRev), fL(totPtRev + totGrRev)];
+        var title = hasCost ? 'Revenue & Laba per Sales — Accurate' : 'Revenue per Sales — Accurate (data laba belum tersedia)';
+        return _Sec(title, React.createElement('div', null,
+          _Tbl(hdrs, rows),
+          React.createElement('div', { style: { marginTop: 8, padding: '8px 12px', background: 'rgba(99,102,241,0.07)', borderRadius: 7, display: 'flex', gap: 16, flexWrap: 'wrap' } },
+            React.createElement('span', { style: { fontSize: 12, fontWeight: 700, color: 'var(--text)' } }, 'Total PT: ' + fL(totPtRev) + (hasCost ? ' | Laba: ' + fL(totPtLaba) : '')),
+            React.createElement('span', { style: { fontSize: 12, fontWeight: 700, color: 'var(--text)' } }, 'Total Group: ' + fL(totGrRev) + (hasCost ? ' | Laba: ' + fL(totGrLaba) : ''))
+          )
+        ));
+      })(),
       ord && Object.keys(ord.by_status || {}).length > 0 && _Sec('Status Order MTD', _Row(
         Object.entries(ord.by_status).map(function(e, i) { return _KC('os'+i, e[0], _fNum(e[1])); })
       )),
