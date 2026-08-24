@@ -46992,72 +46992,112 @@ function BusinessAnalystPage(_ref_bi) {
     );
   }
   function _renderSanto() {
-    var ret = _bd && _bd.retail, ppl = _bd && _bd.people, br = _bd && _bd.branch, sp = _bd && _bd.sales_performance, ord = _bd && _bd.orders;
-    var fr = _bd && _bd.fulfillment_rate;
-    var gp = _bd && _bd.sales_gp;
-    var frColor = fr == null ? 'var(--text3)' : fr >= 80 ? '#22c55e' : fr >= 60 ? '#f59e0b' : '#ef4444';
+    if (!_bd || !_bd.available) {
+      return React.createElement('div', { style: { color: 'var(--text3)', padding: 24, fontSize: 14 } }, 'Data Santo tidak tersedia.');
+    }
+    var adl = _bd.adl || {}, grp = _bd.group || {};
+    var adlP = adl.pnl || {}, grpP = grp.pnl || {};
+
+    function _Trend(trend) {
+      if (!Array.isArray(trend) || !trend.length) return null;
+      return _Tbl(['Bulan','Revenue'], trend.map(function(t) { return [t.label, _fRp(t.revenue)]; }));
+    }
+
+    function _ProdTable(list) {
+      if (!Array.isArray(list) || !list.length) return React.createElement('div', { style: { color: 'var(--text3)', fontSize: 12 } }, '—');
+      return _Tbl(['#','Produk','Qty','Revenue'], list.map(function(p, i) {
+        return [i + 1, p.name || p.code, _fNum(p.qty), _fRp(p.revenue)];
+      }));
+    }
+
+    function _BrandTable(list) {
+      if (!Array.isArray(list) || !list.length) return React.createElement('div', { style: { color: 'var(--text3)', fontSize: 12 } }, '—');
+      return _Tbl(['#','Brand','Qty'], list.map(function(b, i) { return [i + 1, b.brand, _fNum(b.qty)]; }));
+    }
+
+    function _SalesTable(list, label) {
+      if (!Array.isArray(list) || !list.length) return null;
+      return _Sec(label, _Tbl(['#','Sales','Revenue','Qty','Cabang'],
+        list.map(function(s, i) { return [i + 1, s.name, _fRp(s.revenue), _fNum(s.qty), (s.branches || []).join(', ') || '—']; })
+      ));
+    }
+
+    function _BranchTable(list, label) {
+      if (!Array.isArray(list) || !list.length) return null;
+      return _Sec(label, _Tbl(['#','Cabang','Revenue','Qty','Sales'],
+        list.map(function(b, i) { return [i + 1, b.name, _fRp(b.revenue), _fNum(b.qty), (b.sales || []).slice(0, 3).join(', ') || '—']; })
+      ));
+    }
+
+    function _CatBlock(title, list) {
+      if (!Array.isArray(list) || !list.length) return null;
+      return React.createElement('div', { style: { marginBottom: 16 } },
+        React.createElement('div', { style: { fontWeight: 600, fontSize: 13, marginBottom: 6, color: 'var(--text)' } }, title),
+        _ProdTable(list)
+      );
+    }
+
+    function _BrandBlock(title, list) {
+      if (!Array.isArray(list) || !list.length) return null;
+      return React.createElement('div', { style: { marginBottom: 16 } },
+        React.createElement('div', { style: { fontWeight: 600, fontSize: 13, marginBottom: 6, color: 'var(--text)' } }, title),
+        _BrandTable(list)
+      );
+    }
+
+    var gmAdl = adlP.grossMargin != null ? adlP.grossMargin + '%' : '—';
+    var gmGrp = grpP.grossMargin != null ? grpP.grossMargin + '%' : '—';
+    var adlProd = adl.products || {}, adlBrand = adl.brands || {};
+
     return React.createElement(React.Fragment, null,
-      _Sec('Retail Sales MTD', _Row([
-        _KC('rv', 'Nilai Penjualan', _fRp(ret && ret.value), _fPct(ret && ret.value_mom) + ' MoM', _pColor(ret && ret.value_mom)),
-        _KC('oc', 'Jumlah Order', _fNum(ret && ret.order_count), _fPct(ret && ret.order_count_mom) + ' MoM', _pColor(ret && ret.order_count_mom)),
-        _KC('at', 'Absensi Unik', _fNum(ppl && ppl.unique_attendance), _fNum(ppl && ppl.total_checkins) + ' check-in'),
-        br ? _KC('br', 'Request Barang', _fNum(br.request_count), 'dari cabang') : null,
-        fr != null ? _KC('fl', 'Fulfillment Rate', fr + '%', 'delivered + ao_serah', frColor) : null,
-      ].filter(Boolean))),
+      // A: PT ADL
+      _Sec('PT Anugerah Digital Lestari — Ringkasan Keuangan', _Row([
+        _KC('ar', 'Revenue ADL', _fRp(adlP.revenue)),
+        _KC('ac', 'COGS ADL', _fRp(adlP.cogs)),
+        _KC('ag', 'Gross Profit ADL', _fRp(adlP.grossProfit), 'GM: ' + gmAdl),
+        _KC('au', 'Unit Terjual ADL', _fNum(adlP.totalUnits)),
+      ])),
+      _Sec('Trend Revenue ADL — 6 Bulan', _Trend(adl.revenueTrend)),
+
+      // B: Group
+      _Sec('Group Non-PPN — Ringkasan Keuangan', _Row([
+        _KC('gr', 'Revenue Group', _fRp(grpP.revenue)),
+        _KC('gc', 'COGS Group', _fRp(grpP.cogs)),
+        _KC('gg', 'Gross Profit Group', _fRp(grpP.grossProfit), 'GM: ' + gmGrp),
+        _KC('gu', 'Unit Terjual Group', _fNum(grpP.totalUnits)),
+      ])),
+      _Sec('Trend Revenue Group — 6 Bulan', _Trend(grp.revenueTrend)),
+
+      // AI Panel
       _renderAIPanel(),
-      sp && sp.length > 0 && _Sec('Performa Sales', _Tbl(['Sales','Order','Nilai'],
-        sp.slice(0,10).map(function(s) { return [s.name, _fNum(s.count), _fRp(s.value)]; })
-      )),
-      (function() {
-        if (!gp || !gp.available) return null;
-        var ptMap = {}, grpMap = {};
-        (gp.pt && gp.pt.list || []).forEach(function(s) { ptMap[s.name] = s; });
-        (gp.group && gp.group.list || []).forEach(function(s) { grpMap[s.name] = s; });
-        var names = Array.from(new Set(
-          [(gp.pt && gp.pt.list || []), (gp.group && gp.group.list || [])].reduce(function(a,l){return a.concat(l.map(function(s){return s.name;}));}, [])
-        )).sort(function(a, b) {
-          var ra = ((ptMap[a]||{}).revenue||0) + ((grpMap[a]||{}).revenue||0);
-          var rb = ((ptMap[b]||{}).revenue||0) + ((grpMap[b]||{}).revenue||0);
-          return rb - ra;
-        });
-        if (!names.length) return null;
-        var hasCost = gp.has_cost_data;
-        var fL = function(v) { return v ? _fRp(v) : '—'; };
-        var hdrs = hasCost
-          ? ['Sales', 'Rev PT', 'Laba PT', 'Rev Group', 'Laba Group']
-          : ['Sales', 'Revenue PT', 'Revenue Group', 'Total Rev'];
-        var rows = names.map(function(name) {
-          var pt = ptMap[name]  || { revenue: 0, laba: 0 };
-          var gr = grpMap[name] || { revenue: 0, laba: 0 };
-          return hasCost
-            ? [name, fL(pt.revenue), fL(pt.laba), fL(gr.revenue), fL(gr.laba)]
-            : [name, fL(pt.revenue), fL(gr.revenue), fL(pt.revenue + gr.revenue)];
-        });
-        var totPtRev = (gp.pt && gp.pt.total_revenue) || 0;
-        var totPtLaba = (gp.pt && gp.pt.total_laba) || 0;
-        var totGrRev = (gp.group && gp.group.total_revenue) || 0;
-        var totGrLaba = (gp.group && gp.group.total_laba) || 0;
-        var totRow = hasCost
-          ? ['TOTAL', fL(totPtRev), fL(totPtLaba), fL(totGrRev), fL(totGrLaba)]
-          : ['TOTAL', fL(totPtRev), fL(totGrRev), fL(totPtRev + totGrRev)];
-        var title = hasCost ? 'Revenue & Laba per Sales — Accurate' : 'Revenue per Sales — Accurate (data laba belum tersedia)';
-        return _Sec(title, React.createElement('div', null,
-          _Tbl(hdrs, rows),
-          React.createElement('div', { style: { marginTop: 8, padding: '8px 12px', background: 'rgba(99,102,241,0.07)', borderRadius: 7, display: 'flex', gap: 16, flexWrap: 'wrap' } },
-            React.createElement('span', { style: { fontSize: 12, fontWeight: 700, color: 'var(--text)' } }, 'Total PT: ' + fL(totPtRev) + (hasCost ? ' | Laba: ' + fL(totPtLaba) : '')),
-            React.createElement('span', { style: { fontSize: 12, fontWeight: 700, color: 'var(--text)' } }, 'Total Group: ' + fL(totGrRev) + (hasCost ? ' | Laba: ' + fL(totGrLaba) : ''))
-          )
-        ));
-      })(),
-      ord && Object.keys(ord.by_status || {}).length > 0 && _Sec('Status Order MTD', _Row(
-        Object.entries(ord.by_status).map(function(e, i) { return _KC('os'+i, e[0], _fNum(e[1])); })
-      )),
-      br && Object.keys(br.by_status || {}).length > 0 && _Sec('Status Request Barang', _Row(
-        Object.entries(br.by_status).map(function(e, i) { return _KC('bs'+i, e[0], _fNum(e[1])); })
-      )),
-      br && br.by_location && br.by_location.length > 0 && _Sec('Performa Cabang', _Tbl(['Cabang','Order','Nilai'],
-        br.by_location.map(function(b) { return [b.location, _fNum(b.count), _fRp(b.value)]; })
-      ))
+
+      // C: Sales
+      _SalesTable(adl.salesList, 'Performa Sales — PT ADL (by Revenue)'),
+      _SalesTable(grp.salesList, 'Performa Sales — Group Non-PPN (by Revenue)'),
+
+      // D: Branch
+      _BranchTable(adl.branchList, 'Performa Cabang — PT ADL'),
+      _BranchTable(grp.branchList, 'Performa Cabang — Group Non-PPN'),
+
+      // E: Product Intelligence (ADL)
+      (adlProd.notebook || adlProd.pc_aio || adlProd.printer || adlProd.monitor || adlProd.projector)
+        ? _Sec('Product Intelligence — PT ADL', React.createElement('div', null,
+            _CatBlock('Notebook — Top 10', adlProd.notebook),
+            _CatBlock('PC / AIO — Top 3', adlProd.pc_aio),
+            _CatBlock('Printer — Top 3', adlProd.printer),
+            _CatBlock('Monitor — Top 3', adlProd.monitor),
+            _CatBlock('Projector — Top 3', adlProd.projector)
+          ))
+        : null,
+
+      // F: Brand Intelligence (ADL)
+      (adlBrand.notebook || adlBrand.printer || adlBrand.monitor)
+        ? _Sec('Brand Intelligence — PT ADL', React.createElement('div', null,
+            _BrandBlock('Notebook — Brand Rank', adlBrand.notebook),
+            _BrandBlock('Printer — Brand Rank', adlBrand.printer),
+            _BrandBlock('Monitor — Brand Rank', adlBrand.monitor)
+          ))
+        : null
     );
   }
   function _renderJenny() {

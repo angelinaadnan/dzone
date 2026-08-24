@@ -39,49 +39,109 @@ function unavail(field) {
 // ── SANTO context — Retail, Branch, People ────────────────────────────────────
 // Domain: Retail operations, branch fulfillment, attendance, sales performance
 // EXCLUDES: Finance/AR/DSO/collection/profit/Accurate revenue
+// ── SANTO context — Accurate BI: ADL + GROUP revenue, sales, branch, product ──
+// Domain: Revenue, qty, sales ranking, branch ranking, product/brand intelligence
+// DATA BOUNDARY:
+//   INCLUDED  : entity-level revenue/COGS/GP/margin (ADL & GROUP separately)
+//               per-sales revenue & qty, per-branch revenue & qty, product top-N, brand top-N
+//   EXCLUDED  : GP per sales, GP per branch (tidak tersedia dari Accurate API)
+//               Liana-domain: AR, DSO, collection, cashflow
 function buildSantoContext(data, year, month) {
-  if (!data) return { tersedia: false, keterangan: 'Data Santo tidak tersedia dari server' };
+  if (!data || !data.available) return { tersedia: false, keterangan: 'Data Santo tidak tersedia' };
   const mLabel = `${ID_MONTHS[parseInt(month)]} ${year}`;
+  const adl = data.adl || {};
+  const grp = data.group || {};
+
+  function fmtPnl(pnl) {
+    if (!pnl) return unavail('data P&L');
+    return {
+      revenue:      fRp(pnl.revenue)     ?? unavail('revenue'),
+      cogs:         fRp(pnl.cogs)        ?? unavail('COGS'),
+      gross_profit: fRp(pnl.grossProfit) ?? unavail('gross profit'),
+      gross_margin: pnl.grossMargin != null ? `${pnl.grossMargin}%` : unavail('gross margin'),
+      total_unit_terjual: pnl.totalUnits ?? unavail('total unit'),
+    };
+  }
+
+  function fmtSalesList(list, top = 5) {
+    if (!Array.isArray(list) || !list.length) return unavail('data performa sales');
+    return list.slice(0, top).map((s, i) => ({
+      rank: i + 1,
+      nama: s.name,
+      revenue: fRp(s.revenue),
+      qty: s.qty,
+      branch: s.branches?.join(', ') || '-',
+    }));
+  }
+
+  function fmtBranchList(list, top = 5) {
+    if (!Array.isArray(list) || !list.length) return unavail('data performa cabang');
+    return list.slice(0, top).map((b, i) => ({
+      rank: i + 1,
+      cabang: b.name,
+      revenue: fRp(b.revenue),
+      qty: b.qty,
+      sales_aktif: b.sales?.slice(0, 3).join(', ') || '-',
+    }));
+  }
+
+  function fmtTopProducts(products, cat, top) {
+    const list = products?.[cat];
+    if (!Array.isArray(list) || !list.length) return unavail(`produk ${cat}`);
+    return list.slice(0, top).map((p, i) => ({
+      rank: i + 1,
+      nama: p.name || p.code,
+      kode: p.code,
+      qty: p.qty,
+      revenue: fRp(p.revenue),
+    }));
+  }
+
+  function fmtBrands(brands, cat, top = 5) {
+    const list = brands?.[cat];
+    if (!Array.isArray(list) || !list.length) return unavail(`brand ${cat}`);
+    return list.slice(0, top).map((b, i) => ({ rank: i + 1, brand: b.brand, qty: b.qty }));
+  }
+
   return {
     persona: 'Santo',
-    domain: 'Retail, Operasional Toko, Cabang, SDM',
+    domain: 'Revenue, Sales, Cabang, Produk, Brand — Accurate Online',
     periode: mLabel,
-    retail_mtd: data.retail ? {
-      jumlah_order: data.retail.order_count ?? unavail('jumlah order'),
-      jumlah_order_bulan_lalu: data.retail.order_count_prior ?? unavail('order bulan lalu'),
-      perubahan_order_mom: fPct(data.retail.order_count_mom) ?? unavail('perubahan order MoM'),
-      nilai_penjualan: fRp(data.retail.value) ?? unavail('nilai penjualan'),
-      nilai_bulan_lalu: fRp(data.retail.value_prior) ?? unavail('nilai bulan lalu'),
-      perubahan_nilai_mom: fPct(data.retail.value_mom) ?? unavail('perubahan nilai MoM'),
-    } : unavail('data retail MTD'),
-    fulfillment_rate: data.fulfillment_rate != null ? `${data.fulfillment_rate}%` : unavail('fulfillment rate'),
-    status_order: data.orders?.by_status ?? unavail('status order'),
-    cabang: data.branch ? {
-      jumlah_order_dari_cabang: data.branch.order_count,
-      jumlah_request_cabang: data.branch.request_count,
-      status_request: data.branch.by_status,
-      lokasi_teratas_5: Array.isArray(data.branch.by_location)
-        ? data.branch.by_location.slice(0, 5).map(b => ({
-            lokasi: b.location,
-            order: b.count,
-            nilai: fRp(b.value),
-          }))
-        : unavail('data lokasi cabang'),
-    } : unavail('data cabang'),
-    kehadiran: data.people ? {
-      karyawan_unik_hadir: data.people.unique_attendance,
-      total_checkin: data.people.total_checkins,
-      tren_7_hari_terakhir: Array.isArray(data.people.daily_counts)
-        ? data.people.daily_counts.slice(-7)
-        : unavail('tren harian kehadiran'),
-    } : unavail('data kehadiran'),
-    top_5_sales: Array.isArray(data.sales_performance)
-      ? data.sales_performance.slice(0, 5).map(s => ({
-          nama: s.name,
-          jumlah_order: s.count,
-          nilai: fRp(s.value),
-        }))
-      : unavail('performa sales'),
+    catatan_data: 'GP/laba per sales dan per cabang TIDAK tersedia dari Accurate API. Jika ditanya, jawab bahwa data tersebut tidak dapat diakses melalui API.',
+
+    pt_adl: {
+      label: 'PT Anugerah Digital Lestari (PPN, DB 74419)',
+      ringkasan_keuangan: fmtPnl(adl.pnl),
+      trend_revenue_6_bulan: Array.isArray(adl.revenueTrend)
+        ? adl.revenueTrend.map(t => ({ bulan: t.label, revenue: fRp(t.revenue) }))
+        : unavail('trend revenue ADL'),
+      top_5_sales_by_revenue: fmtSalesList(adl.salesList),
+      top_5_cabang_by_revenue: fmtBranchList(adl.branchList),
+      top_notebook: fmtTopProducts(adl.products, 'notebook', 5),
+      top_printer: fmtTopProducts(adl.products, 'printer', 3),
+      top_monitor: fmtTopProducts(adl.products, 'monitor', 3),
+      top_pc_aio: fmtTopProducts(adl.products, 'pc_aio', 3),
+      brand_notebook: fmtBrands(adl.brands, 'notebook'),
+      brand_printer: fmtBrands(adl.brands, 'printer'),
+    },
+
+    group_non_ppn: {
+      label: 'Group Non-PPN (DB 131948, aksesori only)',
+      ringkasan_keuangan: fmtPnl(grp.pnl),
+      trend_revenue_6_bulan: Array.isArray(grp.revenueTrend)
+        ? grp.revenueTrend.map(t => ({ bulan: t.label, revenue: fRp(t.revenue) }))
+        : unavail('trend revenue Group'),
+      top_5_sales_by_revenue: fmtSalesList(grp.salesList),
+      top_5_cabang_by_revenue: fmtBranchList(grp.branchList),
+    },
+
+    instruksi_ai: [
+      'Analisis hanya berdasarkan data yang diberikan di konteks ini.',
+      'DILARANG mengarang atau memperkirakan GP/laba per sales atau per cabang.',
+      'Gross Profit yang tersedia adalah level entitas (ADL total dan Group total), bukan per sales.',
+      'Jika user meminta profit per sales, jawab: "Data laba per sales tidak tersedia dari Accurate API."',
+      'ADL dan Group adalah dua entitas terpisah — jangan bandingkan atau hitung kontribusi persen satu terhadap lainnya.',
+    ],
   };
 }
 

@@ -80,102 +80,13 @@ async function connectorDashboard(persona, year, month, connectorUrl, apiKey) {
   } catch { return null; }
 }
 
-// ── Santo: Retail, Branch & People ───────────────────────────────────────────
+// ── Santo: Accurate-based BI (ADL + GROUP) ────────────────────────────────────
 
-async function santoKPIs(year, month, connectorUrl, apiKey) {
-  const { from, to }           = monthRange(year, month);
-  const { from: pFrom, to: pTo } = priorMonthRange(year, month);
-
-  const [orders, ordersP, branchReqs, attendance] = await Promise.all([
-    sbQuery('orders',
-      { 'date.gte': from, 'date.lte': to },
-      'date,sales_name,goods,status,payment_status,source_type,source_branch'),
-    sbQuery('orders',
-      { 'date.gte': pFrom, 'date.lte': pTo },
-      'date,sales_name,goods,status'),
-    sbQuery('branch_requests',
-      { 'created_at.gte': `${from}T00:00:00`, 'created_at.lte': `${to}T23:59:59` },
-      'status,branch_name,created_at,dispatched_at,delivered_at'),
-    sbQuery('attendance',
-      { 'check_in.gte': `${from}T00:00:00`, 'check_in.lte': `${to}T23:59:59` },
-      'user_name,role,date,check_in,check_out'),
-  ]);
-
-  const activeOrders  = orders.filter(o => o.status !== 'cancelled');
-  const activeOrdersP = ordersP.filter(o => o.status !== 'cancelled');
-  const retail  = activeOrders.filter(o => o.source_type !== 'cabang');
-  const retailP = activeOrdersP.filter(o => o.source_type !== 'cabang');
-  const branchOrders = activeOrders.filter(o => o.source_type === 'cabang');
-
-  const retailValue  = retail.reduce((s, o) => s + calcGoodsValue(o.goods), 0);
-  const retailValueP = retailP.reduce((s, o) => s + calcGoodsValue(o.goods), 0);
-
-  const attendees = new Set(attendance.map(a => a.user_name));
-  const byDate = {};
-  for (const a of attendance) {
-    const d = a.date || (a.check_in ? a.check_in.slice(0, 10) : null);
-    if (!d) continue;
-    if (!byDate[d]) byDate[d] = new Set();
-    byDate[d].add(a.user_name);
-  }
-  const dailyCounts = Object.entries(byDate)
-    .sort(([a],[b]) => (a > b ? 1 : -1))
-    .map(([date, s]) => ({ date, count: s.size }));
-
-  const branchStatus = {};
-  for (const r of branchReqs) branchStatus[r.status] = (branchStatus[r.status] || 0) + 1;
-
-  const branchByLoc = {};
-  for (const o of branchOrders) {
-    const loc = (o.source_branch || 'Unknown').trim();
-    if (!branchByLoc[loc]) branchByLoc[loc] = { count: 0, value: 0 };
-    branchByLoc[loc].count++;
-    branchByLoc[loc].value += calcGoodsValue(o.goods);
-  }
-  const branchByLocation = Object.entries(branchByLoc)
-    .map(([location, d]) => ({ location, ...d }))
-    .sort((a, b) => b.value - a.value);
-
-  const orderStatus = {};
-  for (const o of activeOrders) orderStatus[o.status] = (orderStatus[o.status] || 0) + 1;
-
-  const bySales = {};
-  for (const o of activeOrders) {
-    const name = o.sales_name || 'Unknown';
-    if (!bySales[name]) bySales[name] = { count: 0, value: 0 };
-    bySales[name].count++;
-    bySales[name].value += calcGoodsValue(o.goods);
-  }
-  const topSales = Object.entries(bySales)
-    .map(([name, d]) => ({ name, ...d }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
-
-  const deliveredCount = activeOrders.filter(o => o.status === 'delivered' || o.status === 'ao_serah').length;
-  const fulfillmentRate = activeOrders.length > 0
-    ? +((deliveredCount / activeOrders.length) * 100).toFixed(1)
-    : null;
-
-  return {
-    period: { from, to },
-    retail: {
-      order_count: retail.length,
-      order_count_prior: retailP.length,
-      order_count_mom: pctChange(retail.length, retailP.length),
-      value: retailValue,
-      value_prior: retailValueP,
-      value_mom: pctChange(retailValue, retailValueP),
-    },
-    orders: { total: activeOrders.length, by_status: orderStatus },
-    branch: { order_count: branchOrders.length, request_count: branchReqs.length, by_status: branchStatus, by_location: branchByLocation },
-    people: {
-      unique_attendance: attendees.size,
-      total_checkins: attendance.length,
-      daily_counts: dailyCounts.slice(-14),
-    },
-    sales_performance: topSales,
-    fulfillment_rate: fulfillmentRate,
-  };
+async function santoBI(year, month, requestUrl) {
+  const biUrl = new URL(`/api/santo-bi?year=${year}&month=${month}`, requestUrl).toString();
+  const resp  = await fetch(biUrl, { signal: AbortSignal.timeout(55000) });
+  if (!resp.ok) throw new Error(`santo-bi HTTP ${resp.status}`);
+  return resp.json();
 }
 
 // ── Angel: Corporate Sales & Growth ──────────────────────────────────────────
@@ -411,16 +322,7 @@ export async function onRequestGet(context) {
     let data;
     switch (persona) {
       case 'Santo': {
-        const gpUrl = new URL(`/api/sales-gp?year=${year}&month=${month}`, request.url).toString();
-        const [santoData, gpResp] = await Promise.all([
-          santoKPIs(year, month, connectorUrl, apiKey),
-          fetch(gpUrl, { signal: AbortSignal.timeout(25000) }).catch(() => null),
-        ]);
-        data = santoData;
-        if (gpResp?.ok) {
-          const gpData = await gpResp.json().catch(() => null);
-          if (gpData?.available) data.sales_gp = gpData;
-        }
+        data = await santoBI(year, month, request.url);
         break;
       }
       case 'Angel': data = await angelKPIs(year, month, connectorUrl, apiKey); break;
