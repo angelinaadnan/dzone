@@ -11889,7 +11889,7 @@ function CourierDailyMonitor(_ref84) {
       var km = evt._t === 'gps' ? evt.legKm : evt.km;
       var kmStr = fmtKmD(km);
       var bbm = km && parseFloat(km) > 0 ? fmtCurrency(Math.round(parseFloat(km) * FUEL_PER_KM)) : null;
-      var mapsUrl = evt._t === 'gps' && evt.lat ? "https://maps.google.com?q=".concat(evt.lat, ",").concat(evt.lng) : evt._t === 'pickup' && evt.address ? "https://maps.google.com/search?q=".concat(encodeURIComponent(evt.address)) : (_evt$endLoc = evt.endLoc) !== null && _evt$endLoc !== void 0 && _evt$endLoc.lat ? "https://maps.google.com?q=".concat(evt.endLoc.lat, ",").concat(evt.endLoc.lng) : null;
+      var mapsUrl = evt._t === 'gps' && evt.lat ? "https://maps.google.com?q=".concat(evt.lat, ",").concat(evt.lng) : (_evt$endLoc = evt.endLoc) !== null && _evt$endLoc !== void 0 && _evt$endLoc.lat ? "https://maps.google.com?q=".concat(evt.endLoc.lat, ",").concat(evt.endLoc.lng) : null;
       var badge = evt._t === 'task' ? ((_TASK_STATUS$evt$stat = TASK_STATUS[evt.status]) === null || _TASK_STATUS$evt$stat === void 0 ? void 0 : _TASK_STATUS$evt$stat.label) || evt.status : evt._t === 'order' ? STATUS_LABELS[evt.status] || evt.status : null;
       var badgeCls = evt._t === 'task' ? ((_TASK_STATUS$evt$stat2 = TASK_STATUS[evt.status]) === null || _TASK_STATUS$evt$stat2 === void 0 ? void 0 : _TASK_STATUS$evt$stat2.cls) || 'badge-new' : evt._t === 'order' ? STATUS_COLORS[evt.status] || 'badge-new' : 'badge-new';
       return /*#__PURE__*/React.createElement("div", {
@@ -23572,7 +23572,7 @@ function CourierSummary(_ref159) {
         addr: addr,
         lat: loc !== null && loc !== void 0 && loc.lat ? parseFloat(loc.lat) : null,
         lng: loc !== null && loc !== void 0 && loc.lng ? parseFloat(loc.lng) : null,
-        mapsUrl: addr ? "https://maps.google.com/search?q=".concat(encodeURIComponent(addr)) : loc !== null && loc !== void 0 && loc.lat ? "https://maps.google.com?q=".concat(loc.lat, ",").concat(loc.lng) : null,
+        mapsUrl: loc !== null && loc !== void 0 && loc.lat ? "https://maps.google.com?q=".concat(loc.lat, ",").concat(loc.lng) : addr ? "https://maps.google.com/search?q=".concat(encodeURIComponent(addr)) : null,
         photo: p.arrival_photo || null,
         km: p.distance_km || null
       });
@@ -33857,6 +33857,10 @@ function CourierJobTasks(_ref207) {
     _React$useState370 = _slicedToArray(_React$useState369, 2),
     photoMsg = _React$useState370[0],
     setPhotoMsg = _React$useState370[1]; // {key: statusMsg}
+  var _React$useState_sgc = React.useState(null),
+    _React$useState_sgc2 = _slicedToArray(_React$useState_sgc, 2),
+    supGpsConfirm = _React$useState_sgc2[0],
+    setSupGpsConfirm = _React$useState_sgc2[1];
   var setUploadMsg = function setUploadMsg(key) {
     return function (msg) {
       return setPhotoMsg(function (prev) {
@@ -33867,6 +33871,38 @@ function CourierJobTasks(_ref207) {
         }(prev);
       });
     };
+  };
+  // Simpan pickup supplier setelah user konfirmasi GPS
+  var doSaveSupplierPickup = function doSaveSupplierPickup(pk, supPo, supP, startLoc, endLoc) {
+    setSupGpsConfirm(null);
+    setPoKm(function(prev){ return _objectSpread(_objectSpread({}, prev), {}, _defineProperty({}, supPo.id+'_'+supP.no, {loading: true})); });
+    var kmPromise = (startLoc && endLoc)
+      ? getRoadDistanceKm(startLoc.lat, startLoc.lng, endLoc.lat, endLoc.lng)
+      : Promise.resolve(null);
+    kmPromise.then(function(kmTotal) {
+      if (onCheckin && endLoc) onCheckin({ courier_name: courierName, lat: endLoc.lat, lng: endLoc.lng, note: '✅ Tiba jemput supplier: ' + supPo.supplier_name + (kmTotal ? ' \xB7 ' + kmTotal + ' km' : '') });
+      return uploadPhoto(siPhotos[pk], 'supplier', 0, setUploadMsg(pk)).then(function(supPhotoUrl) {
+        var updatedPickups;
+        if (supPhotoUrl) {
+          updatedPickups = (supPo.pickups || []).map(function(t) {
+            return t.no === supP.no ? _objectSpread(_objectSpread({}, t), {}, { status: 'done', arrival_photo: supPhotoUrl, start_location: startLoc, end_location: endLoc, distance_km: kmTotal, done_at: new Date().toISOString() }) : t;
+          });
+          onUpdatePO(supPo.id, { pickups: updatedPickups, pickup: null });
+        } else if (onQueuePhoto) {
+          updatedPickups = (supPo.pickups || []).map(function(t) {
+            return t.no === supP.no ? _objectSpread(_objectSpread({}, t), {}, { status: 'done', arrival_photo: null, start_location: startLoc, end_location: endLoc, distance_km: kmTotal, done_at: new Date().toISOString() }) : t;
+          });
+          onUpdatePO(supPo.id, { pickups: updatedPickups, pickup: null });
+          onQueuePhoto(siPhotos[pk], 'supplier', { type: 'po_pickup_photo', poId: supPo.id, pickupNo: supP.no });
+          setUploadMsg(pk)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+        } else {
+          setUploadMsg(pk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
+        }
+        setPoKm(function(prev){ var n=Object.assign({},prev); n[supPo.id+'_'+supP.no]={loading:false}; return n; });
+      });
+    }).catch(function() {
+      setPoKm(function(prev){ var n=Object.assign({},prev); n[supPo.id+'_'+supP.no]={loading:false}; return n; });
+    });
   };
   // Persist packing check ke localStorage — key per kurir (tanpa tanggal).
   // Check per order/task ID tetap tersimpan sampai order benar-benar terkirim
@@ -35283,133 +35319,59 @@ function CourierJobTasks(_ref207) {
           background: photoMsg['sup_' + po.id + '_' + p.no].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg['sup_' + po.id + '_' + p.no]), /*#__PURE__*/React.createElement("button", {
-        className: "btn-green",
-        style: {
-          width: '100%',
-          padding: '10px',
-          fontWeight: 700
-        },
-        disabled: isGpsLoading || !!photoMsg['sup_' + po.id + '_' + p.no] && !photoMsg['sup_' + po.id + '_' + p.no].startsWith('❌'),
-        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee87() {
-          var supPk, startLoc, endLoc, kmTotal, supPhotoUrl, _updatedPickups2, updatedPickups;
-          return _regeneratorRuntime().wrap(function _callee87$(_context89) {
-            while (1) switch (_context89.prev = _context89.next) {
-              case 0:
-                supPk = 'sup_' + po.id + '_' + p.no;
-                setPhotoMsg(function (prev) {
-                  return function (_ref218) {
-                    var _ = _ref218[supPk],
-                      r = _objectWithoutProperties(_ref218, [supPk].map(_toPropertyKey));
-                    return r;
-                  }(prev);
+      }, photoMsg['sup_' + po.id + '_' + p.no]),
+        supGpsConfirm && supGpsConfirm.pk === 'sup_' + po.id + '_' + p.no
+          ? /*#__PURE__*/React.createElement("div", {
+              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, supGpsConfirm.area),
+              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + supGpsConfirm.endLoc.lat + ',' + supGpsConfirm.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
+                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, po.supplier_name), "?"
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                /*#__PURE__*/React.createElement("button", {
+                  className: "btn-green",
+                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
+                  disabled: !!(poKm[po.id + '_' + p.no] || {}).loading,
+                  onClick: function() { doSaveSupplierPickup('sup_' + po.id + '_' + p.no, po, p, supGpsConfirm.startLoc, supGpsConfirm.endLoc); }
+                }, !!(poKm[po.id + '_' + p.no] || {}).loading ? '\u23F3 Menyimpan...' : '\u2705 Benar, Lanjutkan'),
+                /*#__PURE__*/React.createElement("button", {
+                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+                  onClick: function() { setSupGpsConfirm(null); }
+                }, '\uD83D\uDD04 Refresh GPS')
+              )
+            )
+          : /*#__PURE__*/React.createElement("button", {
+              className: "btn-green",
+              style: { width: '100%', padding: '10px', fontWeight: 700, marginTop: 8 },
+              disabled: isGpsLoading || !!photoMsg['sup_' + po.id + '_' + p.no] && !photoMsg['sup_' + po.id + '_' + p.no].startsWith('\u274C'),
+              onClick: function() {
+                var supPk = 'sup_' + po.id + '_' + p.no;
+                setPhotoMsg(function(prev){ var n = Object.assign({}, prev); delete n[supPk]; return n; });
+                if (!siPhotos[supPk]) { alert('Upload foto bukti tiba di supplier dulu'); return; }
+                setPoKm(function(prev){ return _objectSpread(_objectSpread({}, prev), {}, _defineProperty({}, po.id + '_' + p.no, { loading: true })); });
+                var startLoc = getLastCheckin();
+                getGPS().then(function(endLoc) {
+                  setPoKm(function(prev){ var n = Object.assign({}, prev); n[po.id + '_' + p.no] = { loading: false }; return n; });
+                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
+                  fetch('https://nominatim.openstreetmap.org/reverse?lat=' + endLoc.lat + '&lon=' + endLoc.lng + '&format=json&accept-language=id')
+                    .then(function(r){ return r.json(); })
+                    .then(function(geo) {
+                      var a = geo.address || {};
+                      var area = [a.road || a.pedestrian, a.neighbourhood || a.suburb || a.quarter || a.village, a.city_district || a.district].filter(Boolean).slice(0, 2).join(', ') || (endLoc.lat.toFixed(5) + ', ' + endLoc.lng.toFixed(5));
+                      setSupGpsConfirm({ pk: supPk, po: po, p: p, startLoc: startLoc, endLoc: endLoc, area: area });
+                    })
+                    .catch(function() {
+                      setSupGpsConfirm({ pk: supPk, po: po, p: p, startLoc: startLoc, endLoc: endLoc, area: endLoc.lat.toFixed(5) + ', ' + endLoc.lng.toFixed(5) });
+                    });
+                }).catch(function() {
+                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
+                  setPoKm(function(prev){ var n = Object.assign({}, prev); n[po.id + '_' + p.no] = { loading: false }; return n; });
                 });
-                if (siPhotos[supPk]) {
-                  _context89.next = 5;
-                  break;
-                }
-                alert('Upload foto bukti tiba di supplier dulu');
-                return _context89.abrupt("return");
-              case 5:
-                setPoKm(function (prev) {
-                  return _objectSpread(_objectSpread({}, prev), {}, _defineProperty({}, po.id + '_' + p.no, {
-                    loading: true
-                  }));
-                });
-                startLoc = getLastCheckin();
-                endLoc = null;
-                _context89.prev = 8;
-                _context89.next = 11;
-                return getGPS();
-              case 11:
-                endLoc = _context89.sent;
-                _context89.next = 16;
-                break;
-              case 14:
-                _context89.prev = 14;
-                _context89.t0 = _context89["catch"](8);
-              case 16:
-                if (!endLoc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setPoKm(function(prev){ var n=Object.assign({},prev); n[po.id+'_'+p.no]={loading:false}; return n; }); return _context89.abrupt('return'); }
-                setPoKm(function (prev) {
-                  return _objectSpread(_objectSpread({}, prev), {}, _defineProperty({}, po.id + '_' + p.no, {
-                    loading: false
-                  }));
-                });
-                if (!(startLoc && endLoc)) {
-                  _context89.next = 23;
-                  break;
-                }
-                _context89.next = 20;
-                return getRoadDistanceKm(startLoc.lat, startLoc.lng, endLoc.lat, endLoc.lng);
-              case 20:
-                _context89.t1 = _context89.sent;
-                _context89.next = 24;
-                break;
-              case 23:
-                _context89.t1 = null;
-              case 24:
-                kmTotal = _context89.t1;
-                if (onCheckin && endLoc) onCheckin({
-                  courier_name: courierName,
-                  lat: endLoc.lat,
-                  lng: endLoc.lng,
-                  note: "\u2705 Tiba jemput supplier: ".concat(po.supplier_name).concat(kmTotal ? ' · ' + kmTotal + ' km' : '')
-                });
-                _context89.next = 28;
-                return uploadPhoto(siPhotos[supPk], 'supplier', 0, setUploadMsg(supPk));
-              case 28:
-                supPhotoUrl = _context89.sent;
-                if (supPhotoUrl) {
-                  _context89.next = 32;
-                  break;
-                }
-                if (onQueuePhoto) {
-                  _updatedPickups2 = (po.pickups || []).map(function (t) {
-                    return t.no === p.no ? _objectSpread(_objectSpread({}, t), {}, {
-                      status: 'done',
-                      arrival_photo: null,
-                      start_location: startLoc,
-                      end_location: endLoc,
-                      distance_km: kmTotal,
-                      done_at: new Date().toISOString()
-                    }) : t;
-                  });
-                  onUpdatePO(po.id, {
-                    pickups: _updatedPickups2,
-                    pickup: null
-                  });
-                  onQueuePhoto(siPhotos[supPk], 'supplier', {
-                    type: 'po_pickup_photo',
-                    poId: po.id,
-                    pickupNo: p.no
-                  });
-                  setUploadMsg(supPk)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-                } else {
-                  setUploadMsg(supPk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
-                }
-                return _context89.abrupt("return");
-              case 32:
-                updatedPickups = (po.pickups || []).map(function (t) {
-                  return t.no === p.no ? _objectSpread(_objectSpread({}, t), {}, {
-                    status: 'done',
-                    arrival_photo: supPhotoUrl,
-                    start_location: startLoc,
-                    end_location: endLoc,
-                    distance_km: kmTotal,
-                    done_at: new Date().toISOString()
-                  }) : t;
-                });
-                onUpdatePO(po.id, {
-                  pickups: updatedPickups,
-                  pickup: null
-                });
-              case 34:
-              case "end":
-                return _context89.stop();
-            }
-          }, _callee87, null, [[8, 14]]);
-        }))
-      }, photoMsg['sup_' + po.id + '_' + p.no] && !photoMsg['sup_' + po.id + '_' + p.no].startsWith('❌') ? photoMsg['sup_' + po.id + '_' + p.no] : isGpsLoading ? '📡 GPS...' : '✅ Tiba & Sudah Dijemput dari Supplier'))))));
+              }
+            }, photoMsg['sup_' + po.id + '_' + p.no] && !photoMsg['sup_' + po.id + '_' + p.no].startsWith('\u274C') ? photoMsg['sup_' + po.id + '_' + p.no] : isGpsLoading ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba di Supplier'))))));
     }
 
     // ── BRANCH DELIVERY ──
