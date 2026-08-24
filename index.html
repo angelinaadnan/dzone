@@ -11889,7 +11889,7 @@ function CourierDailyMonitor(_ref84) {
       var km = evt._t === 'gps' ? evt.legKm : evt.km;
       var kmStr = fmtKmD(km);
       var bbm = km && parseFloat(km) > 0 ? fmtCurrency(Math.round(parseFloat(km) * FUEL_PER_KM)) : null;
-      var mapsUrl = evt._t === 'gps' && evt.lat ? "https://maps.google.com?q=".concat(evt.lat, ",").concat(evt.lng) : (_evt$endLoc = evt.endLoc) !== null && _evt$endLoc !== void 0 && _evt$endLoc.lat ? "https://maps.google.com?q=".concat(evt.endLoc.lat, ",").concat(evt.endLoc.lng) : null;
+      var mapsUrl = evt._t === 'gps' && evt.lat ? "https://maps.google.com?q=".concat(evt.lat, ",").concat(evt.lng) : evt._t === 'pickup' && evt.address ? "https://maps.google.com/search?q=".concat(encodeURIComponent(evt.address)) : (_evt$endLoc = evt.endLoc) !== null && _evt$endLoc !== void 0 && _evt$endLoc.lat ? "https://maps.google.com?q=".concat(evt.endLoc.lat, ",").concat(evt.endLoc.lng) : null;
       var badge = evt._t === 'task' ? ((_TASK_STATUS$evt$stat = TASK_STATUS[evt.status]) === null || _TASK_STATUS$evt$stat === void 0 ? void 0 : _TASK_STATUS$evt$stat.label) || evt.status : evt._t === 'order' ? STATUS_LABELS[evt.status] || evt.status : null;
       var badgeCls = evt._t === 'task' ? ((_TASK_STATUS$evt$stat2 = TASK_STATUS[evt.status]) === null || _TASK_STATUS$evt$stat2 === void 0 ? void 0 : _TASK_STATUS$evt$stat2.cls) || 'badge-new' : evt._t === 'order' ? STATUS_COLORS[evt.status] || 'badge-new' : 'badge-new';
       return /*#__PURE__*/React.createElement("div", {
@@ -23572,7 +23572,7 @@ function CourierSummary(_ref159) {
         addr: addr,
         lat: loc !== null && loc !== void 0 && loc.lat ? parseFloat(loc.lat) : null,
         lng: loc !== null && loc !== void 0 && loc.lng ? parseFloat(loc.lng) : null,
-        mapsUrl: loc !== null && loc !== void 0 && loc.lat ? "https://maps.google.com?q=".concat(loc.lat, ",").concat(loc.lng) : addr ? "https://maps.google.com/search?q=".concat(encodeURIComponent(addr)) : null,
+        mapsUrl: addr ? "https://maps.google.com/search?q=".concat(encodeURIComponent(addr)) : loc !== null && loc !== void 0 && loc.lat ? "https://maps.google.com?q=".concat(loc.lat, ",").concat(loc.lng) : null,
         photo: p.arrival_photo || null,
         km: p.distance_km || null
       });
