@@ -33904,6 +33904,97 @@ function CourierJobTasks(_ref207) {
       setPoKm(function(prev){ var n=Object.assign({},prev); n[supPo.id+'_'+supP.no]={loading:false}; return n; });
     });
   };
+  var _React$useState_pgc = React.useState(null),
+    _React$useState_pgc2 = _slicedToArray(_React$useState_pgc, 2),
+    pendingGps = _React$useState_pgc2[0],
+    setPendingGps = _React$useState_pgc2[1];
+  var doSaveBranchDelivery = function doSaveBranchDelivery(bk, brReq, trip, startLoc, endLoc) {
+    setSiPhotos(function(p){ var n=Object.assign({},p); n[bk+'_gps']=true; return n; });
+    var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
+    kmP.then(function(km){
+      if(onCheckin&&endLoc)onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:'\uD83D\uDCCD Tiba di cabang: '+brReq.branch_name+(km?' \xB7 '+km+' km':'')});
+      return uploadPhoto(branchPhotos[bk]||null,'branch',0,setUploadMsg(bk)).then(function(url){
+        if(url){
+          var ut=(brReq.trips||[]).map(function(t){return t.no===trip.no?_objectSpread(_objectSpread({},t),{},{status:'delivered',in_transit:false,delivered_at:new Date().toISOString(),photo:url,start_location:startLoc||null,arrived_location:endLoc,distance_km:km}):t;});
+          onUpdateBranch(brReq.id,{trips:ut,status:ut.every(function(t){return t.status==='delivered';})?'completed':'partial'});
+        } else if(onQueuePhoto){
+          var ut2=(brReq.trips||[]).map(function(t){return t.no===trip.no?_objectSpread(_objectSpread({},t),{},{status:'delivered',in_transit:false,delivered_at:new Date().toISOString(),photo:null,start_location:startLoc||null,arrived_location:endLoc,distance_km:km}):t;});
+          onUpdateBranch(brReq.id,{trips:ut2,status:ut2.every(function(t){return t.status==='delivered';})?'completed':'partial'});
+          onQueuePhoto(branchPhotos[bk],'branch',{type:'branch_trip_photo',reqId:brReq.id,tripNo:trip.no});
+          setUploadMsg(bk)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+        } else { setUploadMsg(bk)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
+        setSiPhotos(function(p){var n=Object.assign({},p);n[bk+'_gps']=false;return n;});
+      });
+    }).catch(function(){setSiPhotos(function(p){var n=Object.assign({},p);n[bk+'_gps']=false;return n;});});
+  };
+  var doSaveCbPickup = function doSaveCbPickup(k, siReq, startLoc, endLoc) {
+    setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=true;return n;});
+    var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
+    kmP.then(function(km){
+      if(onCheckin&&endLoc)onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:'\u2705 Tiba & jemput di cabang: '+siReq.branch_name+(km?' \xB7 '+km+' km':'')});
+      return uploadPhoto(siPhotos[k],'si_pickup',0,setUploadMsg('sip_'+k)).then(function(url){
+        if(url){onUpdateSI(siReq.id,{courier_picked_up:true,courier_picked_up_at:new Date().toISOString(),pickup_arrival_photo:url,pickup_start_location:startLoc||null,pickup_arrived_location:endLoc,pickup_distance_km:km});}
+        else if(onQueuePhoto){
+          onUpdateSI(siReq.id,{courier_picked_up:true,courier_picked_up_at:new Date().toISOString(),pickup_arrival_photo:null,pickup_start_location:startLoc||null,pickup_arrived_location:endLoc,pickup_distance_km:km});
+          onQueuePhoto(siPhotos[k],'si_pickup',{type:'si_photo_only',id:siReq.id,photoField:'pickup_arrival_photo'});
+          setUploadMsg('sip_'+k)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+        } else { setUploadMsg('sip_'+k)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
+        setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});
+      });
+    }).catch(function(){setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});});
+  };
+  var doSaveScDelivery = function doSaveScDelivery(k, siReq, startLoc, endLoc) {
+    setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=true;return n;});
+    var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
+    kmP.then(function(km){
+      if(onCheckin&&endLoc)onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:'\u2705 Tiba di SC: '+siReq.service_center_name+(km?' \xB7 '+km+' km':'')});
+      return uploadPhoto(siPhotos[k],'sc_receipt',0,setUploadMsg('scr_'+k)).then(function(url){
+        if(url){onUpdateSI(siReq.id,{status:'at_service_center',sc_receipt_photo:url,sc_delivered_at:new Date().toISOString(),sc_start_location:startLoc||null,sc_arrived_location:endLoc,sc_distance_km:km});}
+        else if(onQueuePhoto){
+          onUpdateSI(siReq.id,{status:'at_service_center',sc_receipt_photo:null,sc_delivered_at:new Date().toISOString(),sc_start_location:startLoc||null,sc_arrived_location:endLoc,sc_distance_km:km});
+          onQueuePhoto(siPhotos[k],'sc_receipt',{type:'si_photo_only',id:siReq.id,photoField:'sc_receipt_photo'});
+          setUploadMsg('scr_'+k)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+        } else { setUploadMsg('scr_'+k)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
+        setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});
+      });
+    }).catch(function(){setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});});
+  };
+  var doSaveScPickup = function doSaveScPickup(k, siReq, scNm, startLoc, endLoc) {
+    setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=true;return n;});
+    var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
+    kmP.then(function(km){
+      if(onCheckin&&endLoc)onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:'\u2705 Ambil dari SC: '+(scNm||'SC')+(km?' \xB7 '+km+' km':'')});
+      return uploadPhoto(siPhotos[k]||null,'sc_pickup',0,setUploadMsg('scp_'+k)).then(function(url){
+        if(url){onUpdateSI(siReq.id,{status:'back_from_sc',sc_picked_up_at:new Date().toISOString(),sc_pickup_photo:url,scp_distance_km:km||null});}
+        else if(onQueuePhoto){
+          onUpdateSI(siReq.id,{status:'back_from_sc',sc_picked_up_at:new Date().toISOString(),sc_pickup_photo:null,scp_distance_km:km||null});
+          onQueuePhoto(siPhotos[k],'sc_pickup',{type:'si_photo_only',id:siReq.id,photoField:'sc_pickup_photo'});
+          setUploadMsg('scp_'+k)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+        } else { setUploadMsg('scp_'+k)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
+        setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});
+      });
+    }).catch(function(){setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});});
+  };
+  var doSaveReturn = function doSaveReturn(retKey, siReq, startLoc, endLoc) {
+    setRetGps(true);
+    var dest=siReq.source_type==='branch'?siReq.branch_name:siReq.customer_name;
+    var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
+    kmP.then(function(km){
+      if(onCheckin&&endLoc)onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:'\uD83D\uDCCD Serah terima ke '+dest+(km?' \xB7 '+km+' km':'')});
+      return uploadPhoto(siPhotos[retKey],'si_return',0,setUploadMsg('ret_'+retKey)).then(function(url){
+        if(url){
+          onUpdateSI(siReq.id,{return_status:'returned',return_photo:url,returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:endLoc,return_distance_km:km});
+          setRetStep('done');
+        } else if(onQueuePhoto){
+          onUpdateSI(siReq.id,{return_status:'returned',return_photo:null,returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:endLoc,return_distance_km:km});
+          onQueuePhoto(siPhotos[retKey],'si_return',{type:'si_photo_only',id:siReq.id,photoField:'return_photo'});
+          setUploadMsg('ret_'+retKey)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+          setRetStep('done');
+        } else { setUploadMsg('ret_'+retKey)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
+        setRetGps(false);
+      });
+    }).catch(function(){setRetGps(false);});
+  };
   // Persist packing check ke localStorage — key per kurir (tanpa tanggal).
   // Check per order/task ID tetap tersimpan sampai order benar-benar terkirim
   // (order terkirim → hilang dari deliverableSlots secara alami, bukan karena key expired).
@@ -35547,149 +35638,53 @@ function CourierJobTasks(_ref207) {
           background: photoMsg[bk].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg[bk]), /*#__PURE__*/React.createElement("button", {
-        className: "btn-green",
-        style: {
-          width: '100%',
-          padding: '11px',
-          fontWeight: 700
-        },
-        disabled: bGps || !!photoMsg[bk] && !photoMsg[bk].startsWith('❌'),
-        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee89() {
-          var _loc11, _loc12;
-          var startLoc, loc, km, branchPhotoUrl, _updatedTrips2, _allDone, pendingIt, updatedTrips, allDone, pendingItems;
-          return _regeneratorRuntime().wrap(function _callee89$(_context91) {
-            while (1) switch (_context91.prev = _context91.next) {
-              case 0:
-                setPhotoMsg(function (prev) {
-                  return function (_ref221) {
-                    var _ = _ref221[bk],
-                      r = _objectWithoutProperties(_ref221, [bk].map(_toPropertyKey));
-                    return r;
-                  }(prev);
-                });
-                if (branchPhotos[bk]) {
-                  _context91.next = 4;
-                  break;
-                }
-                alert('Upload foto bukti pengiriman ke cabang dulu');
-                return _context91.abrupt("return");
-              case 4:
-                setSiPhotos(function (p) {
-                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, bk + '_gps', true));
-                });
-                startLoc = trip.transit_start_location || getLastCheckin();
-                loc = null;
-                _context91.prev = 7;
-                _context91.next = 10;
-                return getGPS();
-              case 10:
-                loc = _context91.sent;
-                _context91.next = 15;
-                break;
-              case 13:
-                _context91.prev = 13;
-                _context91.t0 = _context91["catch"](7);
-              case 15:
-                setSiPhotos(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, bk + '_gps', false)); });
-                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setSiPhotos(function(p){ return _objectSpread(_objectSpread({},p),{},_defineProperty({},bk+'_gps',false)); }); return _context91.abrupt('return'); }
-                if (!(startLoc && loc)) {
-                  _context91.next = 22;
-                  break;
-                }
-                _context91.next = 19;
-                return getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng);
-              case 19:
-                _context91.t1 = _context91.sent;
-                _context91.next = 23;
-                break;
-              case 22:
-                _context91.t1 = null;
-              case 23:
-                km = _context91.t1;
-                if (onCheckin) onCheckin({
-                  courier_name: courierName,
-                  lat: ((_loc11 = loc) === null || _loc11 === void 0 ? void 0 : _loc11.lat) || null,
-                  lng: ((_loc12 = loc) === null || _loc12 === void 0 ? void 0 : _loc12.lng) || null,
-                  note: "\uD83D\uDCCD Tiba di cabang: ".concat(r.branch_name).concat(km ? ' · ' + km + ' km' : '')
-                });
-                _context91.next = 27;
-                return uploadPhoto(branchPhotos[bk] || null, 'branch', 0, setUploadMsg(bk));
-              case 27:
-                branchPhotoUrl = _context91.sent;
-                if (branchPhotoUrl) {
-                  _context91.next = 31;
-                  break;
-                }
-                if (onQueuePhoto) {
-                  _updatedTrips2 = (r.trips || []).map(function (t) {
-                    return t.no === trip.no ? _objectSpread(_objectSpread({}, t), {}, {
-                      status: 'delivered',
-                      in_transit: false,
-                      delivered_at: new Date().toISOString(),
-                      photo: null,
-                      start_location: startLoc || null,
-                      arrived_location: loc,
-                      distance_km: km
-                    }) : t;
-                  });
-                  _allDone = _updatedTrips2.every(function (t) {
-                    return t.status === 'delivered';
-                  });
-                  pendingIt = (r.items || []).filter(function (it) {
-                    return !_updatedTrips2.find(function (t) {
-                      return t.status === 'delivered' && (t.items || []).find(function (ti) {
-                        return ti.name === it.name;
-                      });
+      }, photoMsg[bk]),
+        pendingGps && pendingGps.pk === 'br_'+bk
+          ? /*#__PURE__*/React.createElement("div", {
+              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, pendingGps.area),
+              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + pendingGps.endLoc.lat + ',' + pendingGps.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
+                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, pendingGps.destName), "?"
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                /*#__PURE__*/React.createElement("button", {
+                  className: "btn-green",
+                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
+                  onClick: function() { var fn = pendingGps.saveFn; setPendingGps(null); fn(); }
+                }, '\u2705 Benar, Lanjutkan'),
+                /*#__PURE__*/React.createElement("button", {
+                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+                  onClick: function() { setPendingGps(null); }
+                }, '\uD83D\uDD04 Refresh GPS')
+              )
+            )
+          : /*#__PURE__*/React.createElement("button", {
+              className: "btn-green",
+              style: { width: '100%', padding: '11px', fontWeight: 700, marginTop: 8 },
+              disabled: bGps || !!photoMsg[bk] && !photoMsg[bk].startsWith('\u274C'),
+              onClick: function() {
+                setPhotoMsg(function(prev){ var n=Object.assign({},prev); delete n[bk]; return n; });
+                if (!branchPhotos[bk]) { alert('Upload foto bukti pengiriman ke cabang dulu'); return; }
+                var startLoc = trip.transit_start_location || getLastCheckin();
+                getGPS().then(function(endLoc) {
+                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
+                  fetch('https://nominatim.openstreetmap.org/reverse?lat='+endLoc.lat+'&lon='+endLoc.lng+'&format=json&accept-language=id')
+                    .then(function(res){ return res.json(); })
+                    .then(function(geo) {
+                      var a = geo.address || {};
+                      var area = [a.road||a.pedestrian,a.neighbourhood||a.suburb||a.quarter||a.village,a.city_district||a.district].filter(Boolean).slice(0,2).join(', ')||(endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5));
+                      setPendingGps({ pk: 'br_'+bk, destName: r.branch_name, area: area, endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveBranchDelivery(bk, r, trip, startLoc, endLoc); } });
+                    }).catch(function() {
+                      setPendingGps({ pk: 'br_'+bk, destName: r.branch_name, area: endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5), endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveBranchDelivery(bk, r, trip, startLoc, endLoc); } });
                     });
-                  });
-                  onUpdateBranch(r.id, {
-                    trips: _updatedTrips2,
-                    status: _allDone && pendingIt.length === 0 ? 'completed' : 'partial'
-                  });
-                  onQueuePhoto(branchPhotos[bk], 'branch', {
-                    type: 'branch_trip_photo',
-                    reqId: r.id,
-                    tripNo: trip.no
-                  });
-                  setUploadMsg(bk)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-                } else {
-                  setUploadMsg(bk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
-                }
-                return _context91.abrupt("return");
-              case 31:
-                updatedTrips = (r.trips || []).map(function (t) {
-                  return t.no === trip.no ? _objectSpread(_objectSpread({}, t), {}, {
-                    status: 'delivered',
-                    in_transit: false,
-                    delivered_at: new Date().toISOString(),
-                    photo: branchPhotoUrl || null,
-                    start_location: startLoc || null,
-                    arrived_location: loc,
-                    distance_km: km
-                  }) : t;
+                }).catch(function() {
+                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
                 });
-                allDone = updatedTrips.every(function (t) {
-                  return t.status === 'delivered';
-                });
-                pendingItems = (r.items || []).filter(function (it) {
-                  return !updatedTrips.find(function (t) {
-                    return t.status === 'delivered' && (t.items || []).find(function (ti) {
-                      return ti.name === it.name;
-                    });
-                  });
-                });
-                onUpdateBranch(r.id, {
-                  trips: updatedTrips,
-                  status: allDone && pendingItems.length === 0 ? 'completed' : 'partial'
-                });
-              case 35:
-              case "end":
-                return _context91.stop();
-            }
-          }, _callee89, null, [[7, 13]]);
-        }))
-      }, photoMsg[bk] && !photoMsg[bk].startsWith('❌') ? photoMsg[bk] : bGps ? '📡 GPS...' : '✅ Tiba & Diserahkan ke Cabang'))))));
+              }
+            }, photoMsg[bk] && !photoMsg[bk].startsWith('\u274C') ? photoMsg[bk] : bGps ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba'))))));
     }
 
     // ── JEMPUT SERVIS dari CABANG ──
@@ -35836,115 +35831,53 @@ function CourierJobTasks(_ref207) {
           background: photoMsg['sip_' + k].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg['sip_' + k]), /*#__PURE__*/React.createElement("button", {
-        className: "btn-green",
-        style: {
-          width: '100%',
-          padding: '11px',
-          fontWeight: 700
-        },
-        disabled: gpsL || !!photoMsg['sip_' + k] && !photoMsg['sip_' + k].startsWith('❌'),
-        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee91() {
-          var _loc15, _loc16;
-          var startLoc, loc, km, pickupPhotoUrl;
-          return _regeneratorRuntime().wrap(function _callee91$(_context93) {
-            while (1) switch (_context93.prev = _context93.next) {
-              case 0:
-                setPhotoMsg(function (prev) {
-                  return function (_ref224) {
-                    var _ = _ref224['sip_' + k],
-                      r = _objectWithoutProperties(_ref224, ['sip_' + k].map(_toPropertyKey));
-                    return r;
-                  }(prev);
+      }, photoMsg['sip_' + k]),
+        pendingGps && pendingGps.pk === 'cb_'+k
+          ? /*#__PURE__*/React.createElement("div", {
+              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, pendingGps.area),
+              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + pendingGps.endLoc.lat + ',' + pendingGps.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
+                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, pendingGps.destName), "?"
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                /*#__PURE__*/React.createElement("button", {
+                  className: "btn-green",
+                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
+                  onClick: function() { var fn = pendingGps.saveFn; setPendingGps(null); fn(); }
+                }, '\u2705 Benar, Lanjutkan'),
+                /*#__PURE__*/React.createElement("button", {
+                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+                  onClick: function() { setPendingGps(null); }
+                }, '\uD83D\uDD04 Refresh GPS')
+              )
+            )
+          : /*#__PURE__*/React.createElement("button", {
+              className: "btn-green",
+              style: { width: '100%', padding: '11px', fontWeight: 700, marginTop: 8 },
+              disabled: gpsL || !!photoMsg['sip_' + k] && !photoMsg['sip_' + k].startsWith('\u274C'),
+              onClick: function() {
+                setPhotoMsg(function(prev){ var n=Object.assign({},prev); delete n['sip_' + k]; return n; });
+                if (!siPhotos[k]) { alert('Upload foto bukti tiba di cabang dulu'); return; }
+                var startLoc = getLastCheckin();
+                getGPS().then(function(endLoc) {
+                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
+                  fetch('https://nominatim.openstreetmap.org/reverse?lat='+endLoc.lat+'&lon='+endLoc.lng+'&format=json&accept-language=id')
+                    .then(function(res){ return res.json(); })
+                    .then(function(geo) {
+                      var a = geo.address || {};
+                      var area = [a.road||a.pedestrian,a.neighbourhood||a.suburb||a.quarter||a.village,a.city_district||a.district].filter(Boolean).slice(0,2).join(', ')||(endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5));
+                      setPendingGps({ pk: 'cb_'+k, destName: s.branch_name, area: area, endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveCbPickup(k, s, startLoc, endLoc); } });
+                    }).catch(function() {
+                      setPendingGps({ pk: 'cb_'+k, destName: s.branch_name, area: endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5), endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveCbPickup(k, s, startLoc, endLoc); } });
+                    });
+                }).catch(function() {
+                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
                 });
-                if (siPhotos[k]) {
-                  _context93.next = 4;
-                  break;
-                }
-                alert('Upload foto bukti tiba di cabang dulu');
-                return _context93.abrupt("return");
-              case 4:
-                setSiPhotos(function (p) {
-                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, k + '_gps', true));
-                });
-                startLoc = s.cb_transit_start_location || getLastCheckin();
-                loc = null;
-                _context93.prev = 7;
-                _context93.next = 10;
-                return getGPS();
-              case 10:
-                loc = _context93.sent;
-                _context93.next = 15;
-                break;
-              case 13:
-                _context93.prev = 13;
-                _context93.t0 = _context93["catch"](7);
-              case 15:
-                setSiPhotos(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, k + '_gps', false)); });
-                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setSiPhotos(function(p){ return _objectSpread(_objectSpread({},p),{},_defineProperty({},k+'_gps',false)); }); return _context93.abrupt('return'); }
-                if (!(startLoc && loc)) {
-                  _context93.next = 22;
-                  break;
-                }
-                _context93.next = 19;
-                return getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng);
-              case 19:
-                _context93.t1 = _context93.sent;
-                _context93.next = 23;
-                break;
-              case 22:
-                _context93.t1 = null;
-              case 23:
-                km = _context93.t1;
-                if (onCheckin) onCheckin({
-                  courier_name: courierName,
-                  lat: ((_loc15 = loc) === null || _loc15 === void 0 ? void 0 : _loc15.lat) || null,
-                  lng: ((_loc16 = loc) === null || _loc16 === void 0 ? void 0 : _loc16.lng) || null,
-                  note: "\u2705 Tiba & jemput di cabang: ".concat(s.branch_name).concat(km ? ' · ' + km + ' km' : '')
-                });
-                _context93.next = 27;
-                return uploadPhoto(siPhotos[k], 'si_pickup', 0, setUploadMsg('sip_' + k));
-              case 27:
-                pickupPhotoUrl = _context93.sent;
-                if (pickupPhotoUrl) {
-                  _context93.next = 31;
-                  break;
-                }
-                if (onQueuePhoto) {
-                  onUpdateSI(s.id, {
-                    courier_picked_up: true,
-                    courier_picked_up_at: new Date().toISOString(),
-                    pickup_arrival_photo: null,
-                    pickup_start_location: startLoc || null,
-                    pickup_arrived_location: loc,
-                    pickup_distance_km: km
-                  });
-                  onQueuePhoto(siPhotos[k], 'si_pickup', {
-                    type: 'si_photo_only',
-                    id: s.id,
-                    photoField: 'pickup_arrival_photo'
-                  });
-                  setUploadMsg('sip_' + k)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-                } else {
-                  setUploadMsg('sip_' + k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
-                }
-                return _context93.abrupt("return");
-              case 31:
-                onUpdateSI(s.id, {
-                  courier_picked_up: true,
-                  courier_picked_up_at: new Date().toISOString(),
-                  pickup_arrival_photo: pickupPhotoUrl,
-                  pickup_start_location: startLoc || null,
-                  pickup_arrived_location: loc,
-                  pickup_distance_km: km
-                });
-              case 32:
-              case "end":
-                return _context93.stop();
-            }
-          }, _callee91, null, [[7, 13]]);
-        }))
-      }, photoMsg['sip_' + k] && !photoMsg['sip_' + k].startsWith('❌') ? photoMsg['sip_' + k] : gpsL ? '📡 GPS...' : '✅ Tiba & Sudah Dijemput dari Cabang')))));
+              }
+            }, photoMsg['sip_' + k] && !photoMsg['sip_' + k].startsWith('\u274C') ? photoMsg['sip_' + k] : gpsL ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba')))));
     }
 
     // ── ANTAR ke SC ──
@@ -36085,117 +36018,53 @@ function CourierJobTasks(_ref207) {
           background: photoMsg['scr_' + _k].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg['scr_' + _k]), /*#__PURE__*/React.createElement("button", {
-        className: "btn-green",
-        style: {
-          width: '100%',
-          padding: '11px',
-          fontWeight: 700
-        },
-        disabled: _gpsL || !!photoMsg['scr_' + _k] && !photoMsg['scr_' + _k].startsWith('❌'),
-        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee93() {
-          var _loc19, _loc20;
-          var startLoc, loc, km, scReceiptPhotoUrl;
-          return _regeneratorRuntime().wrap(function _callee93$(_context95) {
-            while (1) switch (_context95.prev = _context95.next) {
-              case 0:
-                setPhotoMsg(function (prev) {
-                  return function (_ref227) {
-                    var _ = _ref227['scr_' + _k],
-                      r = _objectWithoutProperties(_ref227, ['scr_' + _k].map(_toPropertyKey));
-                    return r;
-                  }(prev);
+      }, photoMsg['scr_' + _k]),
+        pendingGps && pendingGps.pk === 'sc_'+_k
+          ? /*#__PURE__*/React.createElement("div", {
+              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, pendingGps.area),
+              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + pendingGps.endLoc.lat + ',' + pendingGps.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
+                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, pendingGps.destName), "?"
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                /*#__PURE__*/React.createElement("button", {
+                  className: "btn-green",
+                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
+                  onClick: function() { var fn = pendingGps.saveFn; setPendingGps(null); fn(); }
+                }, '\u2705 Benar, Lanjutkan'),
+                /*#__PURE__*/React.createElement("button", {
+                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+                  onClick: function() { setPendingGps(null); }
+                }, '\uD83D\uDD04 Refresh GPS')
+              )
+            )
+          : /*#__PURE__*/React.createElement("button", {
+              className: "btn-green",
+              style: { width: '100%', padding: '11px', fontWeight: 700, marginTop: 8 },
+              disabled: _gpsL || !!photoMsg['scr_' + _k] && !photoMsg['scr_' + _k].startsWith('\u274C'),
+              onClick: function() {
+                setPhotoMsg(function(prev){ var n=Object.assign({},prev); delete n['scr_' + _k]; return n; });
+                if (!siPhotos[_k]) { alert('Upload foto tanda terima SC dulu'); return; }
+                var startLoc = getLastCheckin();
+                getGPS().then(function(endLoc) {
+                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
+                  fetch('https://nominatim.openstreetmap.org/reverse?lat='+endLoc.lat+'&lon='+endLoc.lng+'&format=json&accept-language=id')
+                    .then(function(res){ return res.json(); })
+                    .then(function(geo) {
+                      var a = geo.address || {};
+                      var area = [a.road||a.pedestrian,a.neighbourhood||a.suburb||a.quarter||a.village,a.city_district||a.district].filter(Boolean).slice(0,2).join(', ')||(endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5));
+                      setPendingGps({ pk: 'sc_'+_k, destName: _s4.service_center_name, area: area, endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveScDelivery(_k, _s4, startLoc, endLoc); } });
+                    }).catch(function() {
+                      setPendingGps({ pk: 'sc_'+_k, destName: _s4.service_center_name, area: endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5), endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveScDelivery(_k, _s4, startLoc, endLoc); } });
+                    });
+                }).catch(function() {
+                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
                 });
-                if (siPhotos[_k]) {
-                  _context95.next = 4;
-                  break;
-                }
-                alert('Upload bukti tanda terima dari SC dulu');
-                return _context95.abrupt("return");
-              case 4:
-                setSiPhotos(function (p) {
-                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, _k + '_gps', true));
-                });
-                startLoc = _s4.sc_transit_start_location || getLastCheckin();
-                loc = null;
-                _context95.prev = 7;
-                _context95.next = 10;
-                return getGPS();
-              case 10:
-                loc = _context95.sent;
-                _context95.next = 15;
-                break;
-              case 13:
-                _context95.prev = 13;
-                _context95.t0 = _context95["catch"](7);
-              case 15:
-                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return _context95.abrupt('return'); }
-                setSiPhotos(function (p) {
-                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, _k + '_gps', false));
-                });
-                if (!(startLoc && loc)) {
-                  _context95.next = 22;
-                  break;
-                }
-                _context95.next = 19;
-                return getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng);
-              case 19:
-                _context95.t1 = _context95.sent;
-                _context95.next = 23;
-                break;
-              case 22:
-                _context95.t1 = null;
-              case 23:
-                km = _context95.t1;
-                if (onCheckin) onCheckin({
-                  courier_name: courierName,
-                  lat: ((_loc19 = loc) === null || _loc19 === void 0 ? void 0 : _loc19.lat) || null,
-                  lng: ((_loc20 = loc) === null || _loc20 === void 0 ? void 0 : _loc20.lng) || null,
-                  note: "\u2705 Tiba di SC: ".concat(_s4.service_center_name).concat(km ? ' · ' + km + ' km' : '')
-                });
-                _context95.next = 27;
-                return uploadPhoto(siPhotos[_k], 'sc_receipt', 0, setUploadMsg('scr_' + _k));
-              case 27:
-                scReceiptPhotoUrl = _context95.sent;
-                if (scReceiptPhotoUrl) {
-                  _context95.next = 31;
-                  break;
-                }
-                if (onQueuePhoto) {
-                  onUpdateSI(_s4.id, {
-                    status: 'at_service_center',
-                    sc_receipt_photo: null,
-                    sc_delivered_at: new Date().toISOString(),
-                    sc_start_location: startLoc || null,
-                    sc_arrived_location: loc,
-                    sc_distance_km: km
-                  });
-                  onQueuePhoto(siPhotos[_k], 'sc_receipt', {
-                    type: 'si_photo_only',
-                    id: _s4.id,
-                    photoField: 'sc_receipt_photo'
-                  });
-                  setUploadMsg('scr_' + _k)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-                } else {
-                  setUploadMsg('scr_' + _k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
-                }
-                return _context95.abrupt("return");
-              case 31:
-                onUpdateSI(_s4.id, {
-                  status: 'at_service_center',
-                  sc_receipt_photo: scReceiptPhotoUrl,
-                  sc_delivered_at: new Date().toISOString(),
-                  sc_start_location: startLoc || null,
-                  sc_arrived_location: loc,
-                  sc_distance_km: km
-                });
-              case 32:
-              case "end":
-                return _context95.stop();
-            }
-          }, _callee93, null, [[7, 13]]);
-        }))
-      }, photoMsg['scr_' + _k] && !photoMsg['scr_' + _k].startsWith('❌') ? photoMsg['scr_' + _k] : _gpsL ? '📡 GPS...' : '✅ Tiba & Sudah Diserahkan ke SC')))));
+              }
+            }, photoMsg['scr_' + _k] && !photoMsg['scr_' + _k].startsWith('\u274C') ? photoMsg['scr_' + _k] : _gpsL ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba')))));
     }
 
     // ── ANTAR ke SC — DIBATALKAN OPS saat kurir masih di jalan ──
@@ -36396,113 +36265,53 @@ function CourierJobTasks(_ref207) {
           background: photoMsg['scp_' + _k2].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg['scp_' + _k2]), /*#__PURE__*/React.createElement("button", {
-        className: "btn-green",
-        style: {
-          width: '100%',
-          padding: '11px',
-          fontWeight: 700
-        },
-        disabled: _gpsL2 || !!photoMsg['scp_' + _k2] && !photoMsg['scp_' + _k2].startsWith('❌'),
-        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee95() {
-          var _loc23, _loc24;
-          var startLoc, loc, km, scPickupPhotoUrl;
-          return _regeneratorRuntime().wrap(function _callee95$(_context97) {
-            while (1) switch (_context97.prev = _context97.next) {
-              case 0:
-                setPhotoMsg(function (prev) {
-                  return function (_ref231) {
-                    var _ = _ref231['scp_' + _k2],
-                      r = _objectWithoutProperties(_ref231, ['scp_' + _k2].map(_toPropertyKey));
-                    return r;
-                  }(prev);
+      }, photoMsg['scp_' + _k2]),
+        pendingGps && pendingGps.pk === 'scp_'+_k2
+          ? /*#__PURE__*/React.createElement("div", {
+              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, pendingGps.area),
+              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + pendingGps.endLoc.lat + ',' + pendingGps.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
+                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, pendingGps.destName), "?"
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                /*#__PURE__*/React.createElement("button", {
+                  className: "btn-green",
+                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
+                  onClick: function() { var fn = pendingGps.saveFn; setPendingGps(null); fn(); }
+                }, '\u2705 Benar, Lanjutkan'),
+                /*#__PURE__*/React.createElement("button", {
+                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+                  onClick: function() { setPendingGps(null); }
+                }, '\uD83D\uDD04 Refresh GPS')
+              )
+            )
+          : /*#__PURE__*/React.createElement("button", {
+              className: "btn-green",
+              style: { width: '100%', padding: '11px', fontWeight: 700, marginTop: 8 },
+              disabled: _gpsL2 || !!photoMsg['scp_' + _k2] && !photoMsg['scp_' + _k2].startsWith('\u274C'),
+              onClick: function() {
+                setPhotoMsg(function(prev){ var n=Object.assign({},prev); delete n['scp_' + _k2]; return n; });
+                if (!siPhotos[_k2]) { alert('Upload foto bukti pengambilan dari SC dulu'); return; }
+                var startLoc = getLastCheckin();
+                getGPS().then(function(endLoc) {
+                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
+                  fetch('https://nominatim.openstreetmap.org/reverse?lat='+endLoc.lat+'&lon='+endLoc.lng+'&format=json&accept-language=id')
+                    .then(function(res){ return res.json(); })
+                    .then(function(geo) {
+                      var a = geo.address || {};
+                      var area = [a.road||a.pedestrian,a.neighbourhood||a.suburb||a.quarter||a.village,a.city_district||a.district].filter(Boolean).slice(0,2).join(', ')||(endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5));
+                      setPendingGps({ pk: 'scp_'+_k2, destName: (typeof scName !== 'undefined' ? scName : 'SC'), area: area, endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveScPickup(_k2, _s6, scName, startLoc, endLoc); } });
+                    }).catch(function() {
+                      setPendingGps({ pk: 'scp_'+_k2, destName: (typeof scName !== 'undefined' ? scName : 'SC'), area: endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5), endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveScPickup(_k2, _s6, scName, startLoc, endLoc); } });
+                    });
+                }).catch(function() {
+                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
                 });
-                if (siPhotos[_k2]) {
-                  _context97.next = 4;
-                  break;
-                }
-                alert('Upload foto bukti pengambilan dari SC dulu');
-                return _context97.abrupt("return");
-              case 4:
-                setSiPhotos(function (p) {
-                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, _k2 + '_gps', true));
-                });
-                startLoc = _s6.scp_transit_start_location || siPhotos[_k2 + '_startloc'] || getLastCheckin();
-                loc = null;
-                _context97.prev = 7;
-                _context97.next = 10;
-                return getGPS();
-              case 10:
-                loc = _context97.sent;
-                _context97.next = 15;
-                break;
-              case 13:
-                _context97.prev = 13;
-                _context97.t0 = _context97["catch"](7);
-              case 15:
-                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return _context97.abrupt('return'); }
-                setSiPhotos(function (p) {
-                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, _k2 + '_gps', false));
-                });
-                if (!(startLoc && loc)) {
-                  _context97.next = 22;
-                  break;
-                }
-                _context97.next = 19;
-                return getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng);
-              case 19:
-                _context97.t1 = _context97.sent;
-                _context97.next = 23;
-                break;
-              case 22:
-                _context97.t1 = null;
-              case 23:
-                km = _context97.t1;
-                if (onCheckin) onCheckin({
-                  courier_name: courierName,
-                  lat: ((_loc23 = loc) === null || _loc23 === void 0 ? void 0 : _loc23.lat) || null,
-                  lng: ((_loc24 = loc) === null || _loc24 === void 0 ? void 0 : _loc24.lng) || null,
-                  note: "\u2705 Ambil dari SC: ".concat(scName).concat(km ? ' · ' + km + ' km' : '')
-                });
-                _context97.next = 27;
-                return uploadPhoto(siPhotos[_k2] || null, 'sc_pickup', 0, setUploadMsg('scp_' + _k2));
-              case 27:
-                scPickupPhotoUrl = _context97.sent;
-                if (scPickupPhotoUrl) {
-                  _context97.next = 31;
-                  break;
-                }
-                if (onQueuePhoto) {
-                  onUpdateSI(_s6.id, {
-                    status: 'back_from_sc',
-                    sc_picked_up_at: new Date().toISOString(),
-                    sc_pickup_photo: null,
-                    scp_distance_km: km || null
-                  });
-                  onQueuePhoto(siPhotos[_k2], 'sc_pickup', {
-                    type: 'si_photo_only',
-                    id: _s6.id,
-                    photoField: 'sc_pickup_photo'
-                  });
-                  setUploadMsg('scp_' + _k2)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-                } else {
-                  setUploadMsg('scp_' + _k2)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
-                }
-                return _context97.abrupt("return");
-              case 31:
-                onUpdateSI(_s6.id, {
-                  status: 'back_from_sc',
-                  sc_picked_up_at: new Date().toISOString(),
-                  sc_pickup_photo: scPickupPhotoUrl || null,
-                  scp_distance_km: km || null
-                });
-              case 32:
-              case "end":
-                return _context97.stop();
-            }
-          }, _callee95, null, [[7, 13]]);
-        }))
-      }, photoMsg['scp_' + _k2] && !photoMsg['scp_' + _k2].startsWith('❌') ? photoMsg['scp_' + _k2] : _gpsL2 ? '📡 GPS...' : '✅ Tiba & Sudah Diambil dari SC')))));
+              }
+            }, photoMsg['scp_' + _k2] && !photoMsg['scp_' + _k2].startsWith('\u274C') ? photoMsg['scp_' + _k2] : _gpsL2 ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba')))));
     }
 
     // ── ANTAR BALIK ke Customer ──
@@ -36668,116 +36477,53 @@ function CourierJobTasks(_ref207) {
           background: photoMsg['ret_' + retKey].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg['ret_' + retKey]), /*#__PURE__*/React.createElement("button", {
-        className: "btn-green",
-        style: {
-          width: '100%',
-          padding: '11px',
-          fontWeight: 700
-        },
-        disabled: retGpsLoading || !!photoMsg['ret_' + retKey] && !photoMsg['ret_' + retKey].startsWith('❌'),
-        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee97() {
-          var _loc27, _loc28;
-          var startLoc, loc, rKm, dest2, retPhotoUrl;
-          return _regeneratorRuntime().wrap(function _callee97$(_context99) {
-            while (1) switch (_context99.prev = _context99.next) {
-              case 0:
-                setPhotoMsg(function (prev) {
-                  return function (_ref234) {
-                    var _ = _ref234['ret_' + retKey],
-                      r = _objectWithoutProperties(_ref234, ['ret_' + retKey].map(_toPropertyKey));
-                    return r;
-                  }(prev);
+      }, photoMsg['ret_' + retKey]),
+        pendingGps && pendingGps.pk === 'ret_'+retKey
+          ? /*#__PURE__*/React.createElement("div", {
+              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, pendingGps.area),
+              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + pendingGps.endLoc.lat + ',' + pendingGps.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
+                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, pendingGps.destName), "?"
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                /*#__PURE__*/React.createElement("button", {
+                  className: "btn-green",
+                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
+                  onClick: function() { var fn = pendingGps.saveFn; setPendingGps(null); fn(); }
+                }, '\u2705 Benar, Lanjutkan'),
+                /*#__PURE__*/React.createElement("button", {
+                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
+                  onClick: function() { setPendingGps(null); }
+                }, '\uD83D\uDD04 Refresh GPS')
+              )
+            )
+          : /*#__PURE__*/React.createElement("button", {
+              className: "btn-green",
+              style: { width: '100%', padding: '11px', fontWeight: 700, marginTop: 8 },
+              disabled: retGpsLoading || !!photoMsg['ret_' + retKey] && !photoMsg['ret_' + retKey].startsWith('\u274C'),
+              onClick: function() {
+                setPhotoMsg(function(prev){ var n=Object.assign({},prev); delete n['ret_' + retKey]; return n; });
+                if (!siPhotos[retKey]) { alert('Foto bukti serah terima wajib diupload dulu'); return; }
+                var startLoc = getLastCheckin();
+                getGPS().then(function(endLoc) {
+                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
+                  fetch('https://nominatim.openstreetmap.org/reverse?lat='+endLoc.lat+'&lon='+endLoc.lng+'&format=json&accept-language=id')
+                    .then(function(res){ return res.json(); })
+                    .then(function(geo) {
+                      var a = geo.address || {};
+                      var area = [a.road||a.pedestrian,a.neighbourhood||a.suburb||a.quarter||a.village,a.city_district||a.district].filter(Boolean).slice(0,2).join(', ')||(endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5));
+                      setPendingGps({ pk: 'ret_'+retKey, destName: (_s7.source_type === 'branch' ? _s7.branch_name : _s7.customer_name), area: area, endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveReturn(retKey, _s7, startLoc, endLoc); } });
+                    }).catch(function() {
+                      setPendingGps({ pk: 'ret_'+retKey, destName: (_s7.source_type === 'branch' ? _s7.branch_name : _s7.customer_name), area: endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5), endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveReturn(retKey, _s7, startLoc, endLoc); } });
+                    });
+                }).catch(function() {
+                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
                 });
-                if (siPhotos[retKey]) {
-                  _context99.next = 4;
-                  break;
-                }
-                alert('Foto bukti serah terima wajib diupload dulu');
-                return _context99.abrupt("return");
-              case 4:
-                setRetGps(true);
-                startLoc = _s7.return_transit_start_location || getLastCheckin() || null;
-                loc = null;
-                _context99.prev = 7;
-                _context99.next = 10;
-                return getGPS();
-              case 10:
-                loc = _context99.sent;
-                _context99.next = 15;
-                break;
-              case 13:
-                _context99.prev = 13;
-                _context99.t0 = _context99["catch"](7);
-              case 15:
-                setRetGps(false);
-                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setRetGps(false); return _context99.abrupt('return'); }
-                if (!(startLoc && loc)) {
-                  _context99.next = 22;
-                  break;
-                }
-                _context99.next = 19;
-                return getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng);
-              case 19:
-                _context99.t1 = _context99.sent;
-                _context99.next = 23;
-                break;
-              case 22:
-                _context99.t1 = null;
-              case 23:
-                rKm = _context99.t1;
-                dest2 = _s7.source_type === 'branch' ? _s7.branch_name : _s7.customer_name;
-                if (onCheckin) onCheckin({
-                  courier_name: courierName,
-                  lat: ((_loc27 = loc) === null || _loc27 === void 0 ? void 0 : _loc27.lat) || null,
-                  lng: ((_loc28 = loc) === null || _loc28 === void 0 ? void 0 : _loc28.lng) || null,
-                  note: "\uD83D\uDCCD Serah terima ke ".concat(dest2).concat(rKm ? ' · ' + rKm + ' km' : '')
-                });
-                _context99.next = 28;
-                return uploadPhoto(siPhotos[retKey], 'si_return', 0, setUploadMsg('ret_' + retKey));
-              case 28:
-                retPhotoUrl = _context99.sent;
-                if (retPhotoUrl) {
-                  _context99.next = 32;
-                  break;
-                }
-                if (onQueuePhoto) {
-                  onUpdateSI(_s7.id, {
-                    return_status: 'returned',
-                    return_photo: null,
-                    returned_at: new Date().toISOString(),
-                    return_start_location: startLoc || null,
-                    return_arrived_location: loc,
-                    return_distance_km: rKm
-                  });
-                  onQueuePhoto(siPhotos[retKey], 'si_return', {
-                    type: 'si_photo_only',
-                    id: _s7.id,
-                    photoField: 'return_photo'
-                  });
-                  setUploadMsg('ret_' + retKey)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-                  setRetStep('done');
-                } else {
-                  setUploadMsg('ret_' + retKey)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
-                }
-                return _context99.abrupt("return");
-              case 32:
-                onUpdateSI(_s7.id, {
-                  return_status: 'returned',
-                  return_photo: retPhotoUrl,
-                  returned_at: new Date().toISOString(),
-                  return_start_location: startLoc || null,
-                  return_arrived_location: loc,
-                  return_distance_km: rKm
-                });
-                setRetStep('done');
-              case 34:
-              case "end":
-                return _context99.stop();
-            }
-          }, _callee97, null, [[7, 13]]);
-        }))
-      }, photoMsg['ret_' + retKey] && !photoMsg['ret_' + retKey].startsWith('❌') ? photoMsg['ret_' + retKey] : retGpsLoading ? '📡 GPS...' : _s7.source_type === 'branch' ? "\u2705 Sudah Diserahkan ke Cabang ".concat(_s7.branch_name || '') : '✅ Konfirmasi Sudah Diserahkan ke Customer'))))));
+              }
+            }, photoMsg['ret_' + retKey] && !photoMsg['ret_' + retKey].startsWith('\u274C') ? photoMsg['ret_' + retKey] : retGpsLoading ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba'))))));
     }
     return null;
   }), filter === 'active' && totalActive === 0 && /*#__PURE__*/React.createElement("div", {
