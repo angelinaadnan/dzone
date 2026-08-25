@@ -325,10 +325,18 @@ export async function onRequestGet(context) {
         'filter.startDate': invStart, 'filter.endDate': invEnd,
         page: '1', pageSize: '3',
       });
-      const r       = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?${params}`, {
+      let r = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?${params}`, {
         headers: authHeaders(tokADL, appKey, sig, ts),
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(10000),
       });
+      const usedHost = (!r.ok && r.status >= 500) ? ACCURATE_BASE_ALT : ACCURATE_BASE;
+      if (!r.ok && r.status >= 500) {
+        const ts2 = Date.now(), sig2 = sigSec ? await makeSignature(ts2, sigSec) : '';
+        r = await fetch(`${ACCURATE_BASE_ALT}/sales-invoice/list.do?${params}`, {
+          headers: authHeaders(tokADL, appKey, sig2, ts2),
+          signal: AbortSignal.timeout(10000),
+        });
+      }
       const raw = await r.text();
       let j = {};
       try { j = JSON.parse(raw); } catch {}
@@ -343,7 +351,7 @@ export async function onRequestGet(context) {
         firstItem:           (inv.detailItem || [])[0],
         allKeys:             Object.keys(inv),
       }));
-      return new Response(JSON.stringify({ httpStatus: r.status, s: j.s, sp: j.sp, rows, rawPreview: raw.slice(0, 500) }), { headers: CORS });
+      return new Response(JSON.stringify({ httpStatus: r.status, usedHost, s: j.s, sp: j.sp, rows, rawPreview: raw.slice(0, 500) }), { headers: CORS });
     } catch (e) {
       return new Response(JSON.stringify({ debugError: e.message, stack: e.stack?.slice(0,500) }), { headers: CORS });
     }
