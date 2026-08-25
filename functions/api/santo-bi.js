@@ -312,6 +312,119 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ available: false, reason: 'not_configured' }), { headers: CORS });
   }
 
+  // ── DIAGNOSTIC MODE (?diag=1) — temporary, remove after root cause confirmed ──
+  if (url.searchParams.get('diag') === '1') {
+    try {
+      const lastDay  = new Date(year, month, 0).getDate();
+      const pad      = n => String(n).padStart(2, '0');
+      const isoStart = `${year}-${pad(month)}-01`;
+      const isoEnd   = `${year}-${pad(month)}-${pad(lastDay)}`;
+      const dmyStart = `01/${pad(month)}/${year}`;
+      const dmyEnd   = `${pad(lastDay)}/${pad(month)}/${year}`;
+
+      const fetchPage = async (host, start, end, pg, ps = 5) => {
+        const ts  = Date.now();
+        const sig = sigSec ? await makeSignature(ts, sigSec) : '';
+        const q   = new URLSearchParams({
+          fields: 'number,transDate,totalAmount,branchName,masterSalesmanName,detailItem',
+          'filter.startDate': start, 'filter.endDate': end,
+          page: String(pg), pageSize: String(ps),
+        });
+        try {
+          const r   = await fetch(`${host}/sales-invoice/list.do?${q}`, {
+            headers: authHeaders(tokADL, appKey, sig, ts),
+            signal: AbortSignal.timeout(12000),
+          });
+          const raw = await r.text();
+          let j = {};
+          try { j = JSON.parse(raw); } catch {}
+          return { httpStatus: r.status, s: j.s ?? null, sp: j.sp ?? null, rows: j.d || [], error: null };
+        } catch (e) { return { httpStatus: null, s: null, sp: null, rows: [], error: e.message }; }
+      };
+
+      // D. Host detection — try api.accurate.id first, record result, fall to iris if needed
+      const apiResult = await fetchPage(ACCURATE_BASE, isoStart, isoEnd, 1);
+      const apiReachable = !apiResult.error && (apiResult.httpStatus ?? 999) < 500;
+      const hostTest = {
+        api_accurate_id: { httpStatus: apiResult.httpStatus, s: apiResult.s, reachable: apiReachable, error: apiResult.error },
+      };
+      let usedHost = apiReachable ? ACCURATE_BASE : ACCURATE_BASE_ALT;
+      if (!apiReachable) {
+        const irisResult = await fetchPage(ACCURATE_BASE_ALT, isoStart, isoEnd, 1);
+        hostTest.iris_accurate_id = {
+          httpStatus: irisResult.httpStatus, s: irisResult.s,
+          reachable: !irisResult.error && (irisResult.httpStatus ?? 999) < 500,
+          error: irisResult.error,
+        };
+      }
+
+      // B. Date format test — test yyyy-MM-dd vs dd/MM/yyyy on usedHost, page 1
+      const [isoP1, dmyP1] = await Promise.all([
+        fetchPage(usedHost, isoStart, isoEnd, 1),
+        fetchPage(usedHost, dmyStart, dmyEnd, 1),
+      ]);
+      const isoWorks = isoP1.s === true && (isoP1.rows.length > 0 || (isoP1.sp?.rowCount ?? 0) > 0);
+      const dateFormatTest = {
+        iso: { range: `${isoStart} to ${isoEnd}`, httpStatus: isoP1.httpStatus, s: isoP1.s, sp: isoP1.sp, rowsReturned: isoP1.rows.length, error: isoP1.error },
+        dmy: { range: `${dmyStart} to ${dmyEnd}`, httpStatus: dmyP1.httpStatus, s: dmyP1.s, sp: dmyP1.sp, rowsReturned: dmyP1.rows.length, error: dmyP1.error },
+      };
+
+      // A. Pagination test — fetch page 1 AND page 2 with working format, no early stop
+      const wStart = isoWorks ? isoStart : dmyStart;
+      const wEnd   = isoWorks ? isoEnd   : dmyEnd;
+      const [pg1, pg2] = await Promise.all([
+        fetchPage(usedHost, wStart, wEnd, 1),
+        fetchPage(usedHost, wStart, wEnd, 2),
+      ]);
+      const pg1sp = pg1.sp ?? {};
+      const paginationTest = {
+        usedHost, workingFormat: isoWorks ? 'iso' : 'dmy',
+        dateRange: `${wStart} to ${wEnd}`,
+        page1: { sp: pg1.sp, rowsReturned: pg1.rows.length },
+        page2: { sp: pg2.sp, rowsReturned: pg2.rows.length },
+        cumulativeRows: pg1.rows.length + pg2.rows.length,
+        stopConditionCheck: `after page1: all.length(${pg1.rows.length}) >= sp.pageCount(${pg1sp.pageCount}) → ${pg1.rows.length >= (pg1sp.pageCount ?? Infinity)}`,
+      };
+
+      // C. Field inspection — first 3 invoices, safe structure only (no PII, no amounts)
+      const src = pg1.rows.length > 0 ? pg1.rows : (isoP1.rows.length > 0 ? isoP1.rows : dmyP1.rows);
+      const fieldInspection = src.slice(0, 3).map((inv, i) => {
+        const hasProp = k => Object.prototype.hasOwnProperty.call(inv, k);
+        const fi = Array.isArray(inv.detailItem) ? inv.detailItem[0] : null;
+        return {
+          idx: i,
+          topLevelFields: Object.keys(inv).sort(),
+          salesman: {
+            masterSalesmanName: hasProp('masterSalesmanName') ? (inv.masterSalesmanName ?? '(null)') : '(field not returned)',
+            masterSalesman_name: hasProp('masterSalesman') ? (inv.masterSalesman?.name ?? '(null)') : '(masterSalesman not returned)',
+          },
+          branch: {
+            branchName: hasProp('branchName') ? (inv.branchName ?? '(null)') : '(field not returned)',
+            branch_name: hasProp('branch') ? (inv.branch?.name ?? '(null)') : '(branch not returned)',
+          },
+          detailItem: Array.isArray(inv.detailItem)
+            ? {
+              count: inv.detailItem.length,
+              firstItemFields: fi ? Object.keys(fi).sort() : [],
+              firstItem: fi ? {
+                quantity:      fi.quantity    ?? '(absent)',
+                salesmanName:  fi.salesmanName ?? '(absent)',
+                salesman_name: fi.salesman?.name ?? '(absent)',
+                item_no:       fi.item?.no ?? fi.no ?? '(absent)',
+                item_name:     fi.item?.name ?? fi.detailName ?? fi.itemName ?? '(absent)',
+              } : null,
+            }
+            : { returned: false, type: typeof inv.detailItem },
+        };
+      });
+
+      return new Response(JSON.stringify({ diag: true, year, month, hostTest, usedHost, dateFormatTest, paginationTest, fieldInspection }, null, 2), { headers: CORS });
+    } catch (e) {
+      return new Response(JSON.stringify({ diagError: e.message, stack: e.stack?.slice(0, 500) }), { headers: CORS });
+    }
+  }
+  // ── END DIAGNOSTIC ────────────────────────────────────────────────────────────
+
   const cache    = caches.default;
   const cacheKey = new Request(`https://santo-bi-v4/${year}/${month}`);
   const cached   = await cache.match(cacheKey);
