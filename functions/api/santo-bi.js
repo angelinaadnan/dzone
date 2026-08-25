@@ -312,6 +312,33 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ available: false, reason: 'not_configured' }), { headers: CORS });
   }
 
+  // Debug mode: return raw first invoice to diagnose field names
+  if (url.searchParams.get('debug') === '1') {
+    const lastDay = new Date(year, month, 0).getDate();
+    const invStart = `${year}-${String(month).padStart(2,'0')}-01`;
+    const invEnd   = `${year}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+    const ts = Date.now(), sig = await makeSignature(ts, sigSec);
+    const params = new URLSearchParams({
+      fields: 'number,transDate,totalAmount,branchName,masterSalesmanName,detailItem',
+      'filter.startDate': invStart, 'filter.endDate': invEnd,
+      page: '1', pageSize: '3',
+    });
+    const r = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?${params}`, {
+      headers: authHeaders(tokADL, appKey, sig, ts),
+    });
+    const j = await r.json();
+    const rows = (j.d || []).map(inv => ({
+      number: inv.number, totalAmount: inv.totalAmount,
+      masterSalesmanName: inv.masterSalesmanName,
+      masterSalesman: inv.masterSalesman,
+      branchName: inv.branchName, branch: inv.branch,
+      detailItemCount: (inv.detailItem || []).length,
+      firstItem: (inv.detailItem || [])[0],
+      allKeys: Object.keys(inv),
+    }));
+    return new Response(JSON.stringify({ s: j.s, sp: j.sp, rows }), { headers: CORS });
+  }
+
   const cache    = caches.default;
   const cacheKey = new Request(`https://santo-bi-v4/${year}/${month}`);
   const cached   = await cache.match(cacheKey);
