@@ -182,8 +182,8 @@ function aggregate(invoices) {
   let   totalUnits = 0;
 
   for (const inv of invoices) {
-    const invSp     = normalizeName(inv.masterSalesmanName);
-    const invBranch = (inv.branchName || '').trim() || null;
+    const invSp     = normalizeName(inv.masterSalesmanName || inv.masterSalesman?.name);
+    const invBranch = (inv.branchName || inv.branch?.name || '').trim() || null;
     const items     = inv.detailItem || [];
 
     if (!items.length) {
@@ -201,12 +201,12 @@ function aggregate(invoices) {
     }
 
     for (const it of items) {
-      const sp     = normalizeName(it.salesmanName) || invSp;
+      const sp     = normalizeName(it.salesmanName || it.salesman?.name) || invSp;
       const branch = invBranch;
       const qty    = parseFloat(it.quantity)   || 0;
       const rev    = parseFloat(it.totalPrice) || (qty * (parseFloat(it.unitPrice) || 0));
-      const no     = (it.item?.no   || '').trim();
-      const nm     = (it.detailName || it.item?.name || '').trim();
+      const no     = (it.item?.no || it.no || '').trim();
+      const nm     = (it.detailName || it.item?.name || it.itemName || '').trim();
       const cat    = extractCat(no);
       const brand  = extractBrand(no);
 
@@ -313,19 +313,23 @@ export async function onRequestGet(context) {
   }
 
   const cache    = caches.default;
-  const cacheKey = new Request(`https://santo-bi-v3/${year}/${month}`);
+  const cacheKey = new Request(`https://santo-bi-v4/${year}/${month}`);
   const cached   = await cache.match(cacheKey);
   if (cached) return cached;
 
   try {
     const months    = priorMonths(year, month, 6);
     const curMonth  = months[5];
+    // Invoice API requires yyyy-MM-dd; P&L requires dd/MM/yyyy (different endpoints)
+    const lastDay    = new Date(year, month, 0).getDate();
+    const invStart   = `${year}-${String(month).padStart(2,'0')}-01`;
+    const invEnd     = `${year}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
 
     const [adlPnlArr, grpPnlArr, invADL, invGRP] = await Promise.all([
       Promise.all(months.map(m => fetchPnL(tokADL, appKey, sigSec, m.start, m.end))),
       Promise.all(months.map(m => fetchPnL(tokGRP, appKey, sigSec, m.start, m.end))),
-      fetchInvoices(tokADL, appKey, sigSec, curMonth.start, curMonth.end),
-      fetchInvoices(tokGRP, appKey, sigSec, curMonth.start, curMonth.end),
+      fetchInvoices(tokADL, appKey, sigSec, invStart, invEnd),
+      fetchInvoices(tokGRP, appKey, sigSec, invStart, invEnd),
     ]);
 
     const adlPnl = adlPnlArr[5];
