@@ -312,51 +312,6 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ available: false, reason: 'not_configured' }), { headers: CORS });
   }
 
-  // Debug mode: return raw first invoice to diagnose field names
-  if (url.searchParams.get('debug') === '1') {
-    try {
-      const lastDay  = new Date(year, month, 0).getDate();
-      const invStart = `${year}-${String(month).padStart(2,'0')}-01`;
-      const invEnd   = `${year}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
-      const ts  = Date.now();
-      const sig = sigSec ? await makeSignature(ts, sigSec) : '';
-      const params = new URLSearchParams({
-        fields: 'number,transDate,totalAmount,branchName,masterSalesmanName,detailItem',
-        'filter.startDate': invStart, 'filter.endDate': invEnd,
-        page: '1', pageSize: '3',
-      });
-      let r = await fetch(`${ACCURATE_BASE}/sales-invoice/list.do?${params}`, {
-        headers: authHeaders(tokADL, appKey, sig, ts),
-        signal: AbortSignal.timeout(10000),
-      });
-      const usedHost = (!r.ok && r.status >= 500) ? ACCURATE_BASE_ALT : ACCURATE_BASE;
-      if (!r.ok && r.status >= 500) {
-        const ts2 = Date.now(), sig2 = sigSec ? await makeSignature(ts2, sigSec) : '';
-        r = await fetch(`${ACCURATE_BASE_ALT}/sales-invoice/list.do?${params}`, {
-          headers: authHeaders(tokADL, appKey, sig2, ts2),
-          signal: AbortSignal.timeout(10000),
-        });
-      }
-      const raw = await r.text();
-      let j = {};
-      try { j = JSON.parse(raw); } catch {}
-      const rows = (j.d || []).map(inv => ({
-        number:              inv.number,
-        totalAmount:         inv.totalAmount,
-        masterSalesmanName:  inv.masterSalesmanName,
-        masterSalesman:      inv.masterSalesman,
-        branchName:          inv.branchName,
-        branch:              inv.branch,
-        detailItemCount:     (inv.detailItem || []).length,
-        firstItem:           (inv.detailItem || [])[0],
-        allKeys:             Object.keys(inv),
-      }));
-      return new Response(JSON.stringify({ httpStatus: r.status, usedHost, s: j.s, sp: j.sp, rows, rawPreview: raw.slice(0, 500) }), { headers: CORS });
-    } catch (e) {
-      return new Response(JSON.stringify({ debugError: e.message, stack: e.stack?.slice(0,500) }), { headers: CORS });
-    }
-  }
-
   const cache    = caches.default;
   const cacheKey = new Request(`https://santo-bi-v4/${year}/${month}`);
   const cached   = await cache.match(cacheKey);
