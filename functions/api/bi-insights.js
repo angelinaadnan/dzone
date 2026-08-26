@@ -36,111 +36,108 @@ function unavail(field) {
   return `[${field}: data tidak tersedia]`;
 }
 
-// ── SANTO context — Retail, Branch, People ────────────────────────────────────
-// Domain: Retail operations, branch fulfillment, attendance, sales performance
-// EXCLUDES: Finance/AR/DSO/collection/profit/Accurate revenue
 // ── SANTO context — Accurate BI: ADL + GROUP revenue, sales, branch, product ──
-// Domain: Revenue, qty, sales ranking, branch ranking, product/brand intelligence
+// Domain: Revenue, qty, sales ranking, branch ranking, product intelligence
+// DATA SOURCE: connector /api/analytics/santo → sales_facts table
 // DATA BOUNDARY:
-//   INCLUDED  : entity-level revenue/COGS/GP/margin (ADL & GROUP separately)
-//               per-sales revenue & qty, per-branch revenue & qty, product top-N, brand top-N
-//   EXCLUDED  : GP per sales, GP per branch (tidak tersedia dari Accurate API)
+//   INCLUDED  : entity-level revenue_gross & total_qty (ADL & GROUP separately)
+//               per-sales revenue_gross & qty, per-branch revenue_gross & qty
+//               product top-N by category (line_subtotal based)
+//   EXCLUDED  : GP/COGS/margin per sales, GP/COGS/margin per branch (tidak tersedia)
+//               brand intelligence (not derivable from item_no prefix)
 //               Liana-domain: AR, DSO, collection, cashflow
 function buildSantoContext(data, year, month) {
-  if (!data || !data.available) return { tersedia: false, keterangan: 'Data Santo tidak tersedia' };
+  if (!data || !data.adl) return { tersedia: false, keterangan: 'Data Santo tidak tersedia' };
   const mLabel = `${ID_MONTHS[parseInt(month)]} ${year}`;
   const adl = data.adl || {};
   const grp = data.group || {};
 
-  function fmtPnl(pnl) {
-    if (!pnl) return unavail('data P&L');
+  function fmtEntitySummary(entity) {
+    const s = entity.entity_summary;
+    if (!s) return unavail('ringkasan entitas');
     return {
-      revenue:      fRp(pnl.revenue)     ?? unavail('revenue'),
-      cogs:         fRp(pnl.cogs)        ?? unavail('COGS'),
-      gross_profit: fRp(pnl.grossProfit) ?? unavail('gross profit'),
-      gross_margin: pnl.grossMargin != null ? `${pnl.grossMargin}%` : unavail('gross margin'),
-      total_unit_terjual: pnl.totalUnits ?? unavail('total unit'),
+      omzet_gross: fRp(s.revenue_gross) ?? unavail('revenue'),
+      jumlah_invoice: s.invoice_count ?? unavail('invoice count'),
+      total_qty: s.total_qty ?? unavail('total qty'),
     };
   }
 
-  function fmtSalesList(list, top = 5) {
+  function fmtRevenueTrend(trend) {
+    if (!Array.isArray(trend) || !trend.length) return unavail('trend revenue');
+    return trend.map(t => ({ bulan: t.month, omzet: fRp(t.revenue_gross), invoice: t.invoice_count }));
+  }
+
+  function fmtSalesRanking(list, top = 5) {
     if (!Array.isArray(list) || !list.length) return unavail('data performa sales');
     return list.slice(0, top).map((s, i) => ({
       rank: i + 1,
-      nama: s.name,
-      revenue: fRp(s.revenue),
-      qty: s.qty,
-      branch: s.branches?.join(', ') || '-',
+      nama: s.sales,
+      omzet: fRp(s.revenue_gross),
+      qty: s.total_qty,
+      invoice: s.invoice_count,
     }));
   }
 
-  function fmtBranchList(list, top = 5) {
+  function fmtBranchRanking(list, top = 5) {
     if (!Array.isArray(list) || !list.length) return unavail('data performa cabang');
     return list.slice(0, top).map((b, i) => ({
       rank: i + 1,
-      cabang: b.name,
-      revenue: fRp(b.revenue),
-      qty: b.qty,
-      sales_aktif: b.sales?.slice(0, 3).join(', ') || '-',
+      cabang: b.branch,
+      omzet: fRp(b.revenue_gross),
+      qty: b.total_qty,
+      invoice: b.invoice_count,
     }));
   }
 
-  function fmtTopProducts(products, cat, top) {
-    const list = products?.[cat];
+  function fmtProductCategory(intel, cat, top) {
+    const list = intel?.[cat];
     if (!Array.isArray(list) || !list.length) return unavail(`produk ${cat}`);
     return list.slice(0, top).map((p, i) => ({
       rank: i + 1,
-      nama: p.name || p.code,
-      kode: p.code,
-      qty: p.qty,
-      revenue: fRp(p.revenue),
+      nama: p.item_name || p.item_no,
+      kode: p.item_no,
+      qty: p.total_qty,
+      revenue: fRp(p.line_revenue),
     }));
-  }
-
-  function fmtBrands(brands, cat, top = 5) {
-    const list = brands?.[cat];
-    if (!Array.isArray(list) || !list.length) return unavail(`brand ${cat}`);
-    return list.slice(0, top).map((b, i) => ({ rank: i + 1, brand: b.brand, qty: b.qty }));
   }
 
   return {
     persona: 'Santo',
-    domain: 'Revenue, Sales, Cabang, Produk, Brand — Accurate Online',
+    domain: 'Revenue, Sales, Cabang, Produk — Accurate Online (sales_facts)',
     periode: mLabel,
-    catatan_data: 'GP/laba per sales dan per cabang TIDAK tersedia dari Accurate API. Jika ditanya, jawab bahwa data tersebut tidak dapat diakses melalui API.',
+    catatan_data: [
+      'Revenue yang ditampilkan adalah revenue_gross (incl PPN) dari tabel sales_facts.',
+      'GP/laba per sales dan per cabang TIDAK tersedia. Jika ditanya, jawab tidak dapat diakses.',
+      'Brand data tidak tersedia — item_no prefix hanya menunjukkan kategori produk, bukan brand.',
+      'ADL dan Group adalah dua entitas terpisah — jangan bandingkan atau hitung kontribusi persen.',
+    ],
 
     pt_adl: {
       label: 'PT Anugerah Digital Lestari (PPN, DB 74419)',
-      ringkasan_keuangan: fmtPnl(adl.pnl),
-      trend_revenue_6_bulan: Array.isArray(adl.revenueTrend)
-        ? adl.revenueTrend.map(t => ({ bulan: t.label, revenue: fRp(t.revenue) }))
-        : unavail('trend revenue ADL'),
-      top_5_sales_by_revenue: fmtSalesList(adl.salesList),
-      top_5_cabang_by_revenue: fmtBranchList(adl.branchList),
-      top_notebook: fmtTopProducts(adl.products, 'notebook', 5),
-      top_printer: fmtTopProducts(adl.products, 'printer', 3),
-      top_monitor: fmtTopProducts(adl.products, 'monitor', 3),
-      top_pc_aio: fmtTopProducts(adl.products, 'pc_aio', 3),
-      brand_notebook: fmtBrands(adl.brands, 'notebook'),
-      brand_printer: fmtBrands(adl.brands, 'printer'),
+      ringkasan: fmtEntitySummary(adl),
+      trend_revenue_6_bulan: fmtRevenueTrend(adl.revenue_trend),
+      top_5_sales_by_omzet: fmtSalesRanking(adl.sales_ranking),
+      top_5_cabang_by_omzet: fmtBranchRanking(adl.branch_ranking),
+      produk_notebook_top5: fmtProductCategory(adl.product_intelligence, 'notebook', 5),
+      produk_printer_top3: fmtProductCategory(adl.product_intelligence, 'printer', 3),
+      produk_monitor_top3: fmtProductCategory(adl.product_intelligence, 'monitor', 3),
+      produk_pc_aio_top3: fmtProductCategory(adl.product_intelligence, 'pc_aio', 3),
     },
 
     group_non_ppn: {
-      label: 'Group Non-PPN (DB 131948, aksesori only)',
-      ringkasan_keuangan: fmtPnl(grp.pnl),
-      trend_revenue_6_bulan: Array.isArray(grp.revenueTrend)
-        ? grp.revenueTrend.map(t => ({ bulan: t.label, revenue: fRp(t.revenue) }))
-        : unavail('trend revenue Group'),
-      top_5_sales_by_revenue: fmtSalesList(grp.salesList),
-      top_5_cabang_by_revenue: fmtBranchList(grp.branchList),
+      label: 'Group Non-PPN (DB 131948)',
+      ringkasan: fmtEntitySummary(grp),
+      trend_revenue_6_bulan: fmtRevenueTrend(grp.revenue_trend),
+      top_5_sales_by_omzet: fmtSalesRanking(grp.sales_ranking),
+      top_5_cabang_by_omzet: fmtBranchRanking(grp.branch_ranking),
     },
 
     instruksi_ai: [
       'Analisis hanya berdasarkan data yang diberikan di konteks ini.',
       'DILARANG mengarang atau memperkirakan GP/laba per sales atau per cabang.',
-      'Gross Profit yang tersedia adalah level entitas (ADL total dan Group total), bukan per sales.',
-      'Jika user meminta profit per sales, jawab: "Data laba per sales tidak tersedia dari Accurate API."',
+      'Jika user meminta profit per sales, jawab: "Data laba per sales tidak tersedia."',
       'ADL dan Group adalah dua entitas terpisah — jangan bandingkan atau hitung kontribusi persen satu terhadap lainnya.',
+      'Brand data tidak tersedia — jangan sebut atau perkirakan brand dari kode produk.',
     ],
   };
 }
@@ -382,12 +379,18 @@ function buildJennyContext(data, year, month) {
 const SYSTEM_PROMPTS = {
   Santo: `Kamu adalah AI Business Analyst untuk persona Santo di internal dashboard PT Anugerah Digital Lestari (Digitalzone Group).
 
-SCOPE domain kamu: Retail sales, operasional toko, performa cabang, kehadiran karyawan, performa sales. Jangan membahas atau menyimpulkan tentang keuangan perusahaan, Accounts Receivable, DSO, collection rate, profit, atau data dari sistem Accurate.
+SCOPE domain kamu: Revenue, omzet, performa sales, performa cabang, dan product intelligence berdasarkan data Accurate (sales_facts). Data mencakup PT ADL dan Group Non-PPN secara terpisah.
+
+BATASAN KETAT:
+- DILARANG menyebutkan atau memperkirakan GP/laba per sales atau per cabang — data ini tidak tersedia.
+- DILARANG menyebutkan atau memperkirakan brand produk dari kode item — brand tidak dapat diidentifikasi.
+- DILARANG membahas Accounts Receivable, DSO, collection rate, atau keuangan perusahaan keseluruhan.
+- ADL dan Group adalah dua entitas terpisah — jangan bandingkan atau hitung kontribusi persen satu terhadap lainnya.
 
 INSTRUKSI ANALISIS:
-1. Hanya buat pernyataan berdasarkan angka yang ada di data KPI yang disediakan. Jangan menginventarisir target, pelanggan spesifik, atau penyebab yang tidak ada dalam data.
-2. Jika data bernilai null, "[...tidak tersedia]", atau tidak ada, sebutkan secara eksplisit bahwa data tersebut tidak tersedia. JANGAN menginterpretasikan null/zero sebagai kondisi bisnis yang sehat.
-3. Bahasa: Bahasa Indonesia. Istilah bisnis/IT seperti MoM, fulfillment rate, conversion rate, stock, KPI, dan lainnya boleh dalam bahasa Inggris.
+1. Hanya buat pernyataan berdasarkan angka yang ada di data KPI yang disediakan.
+2. Jika data bernilai null, "[...tidak tersedia]", atau tidak ada, sebutkan secara eksplisit. JANGAN menginterpretasikan null/zero sebagai kondisi bisnis yang sehat.
+3. Bahasa: Bahasa Indonesia. Istilah bisnis/IT seperti MoM, omzet, revenue, sales ranking boleh dalam bahasa Inggris.
 4. Output HARUS berupa JSON valid. Jangan tambahkan teks, markdown, atau komentar di luar JSON.
 
 FORMAT OUTPUT JSON YANG WAJIB DIIKUTI:

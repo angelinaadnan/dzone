@@ -46992,41 +46992,53 @@ function BusinessAnalystPage(_ref_bi) {
     );
   }
   function _renderSanto() {
-    if (!_bd || !_bd.available) {
+    if (!_bd || !_bd.adl) {
       return React.createElement('div', { style: { color: 'var(--text3)', padding: 24, fontSize: 14 } }, 'Data Santo tidak tersedia.');
     }
     var adl = _bd.adl || {}, grp = _bd.group || {};
-    var adlP = adl.pnl || {}, grpP = grp.pnl || {};
+    var adlS = adl.entity_summary || {}, grpS = grp.entity_summary || {};
+    var adlIntel = adl.product_intelligence || {}, grpIntel = grp.product_intelligence || {};
 
-    function _Trend(trend) {
+    // Revenue trend bar chart
+    function _TrendBars(trend, color) {
       if (!Array.isArray(trend) || !trend.length) return null;
-      return _Tbl(['Bulan','Revenue'], trend.map(function(t) { return [t.label, _fRp(t.revenue)]; }));
-    }
-
-    function _ProdTable(list) {
-      if (!Array.isArray(list) || !list.length) return React.createElement('div', { style: { color: 'var(--text3)', fontSize: 12 } }, '—');
-      return _Tbl(['#','Produk','Qty','Revenue'], list.map(function(p, i) {
-        return [i + 1, p.name || p.code, _fNum(p.qty), _fRp(p.revenue)];
-      }));
-    }
-
-    function _BrandTable(list) {
-      if (!Array.isArray(list) || !list.length) return React.createElement('div', { style: { color: 'var(--text3)', fontSize: 12 } }, '—');
-      return _Tbl(['#','Brand','Qty'], list.map(function(b, i) { return [i + 1, b.brand, _fNum(b.qty)]; }));
+      var maxRev = trend.reduce(function(m, r) { return Math.max(m, r.revenue_gross || 0); }, 1);
+      return React.createElement('div', { style: { overflowX: 'auto', paddingBottom: 4 } },
+        React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 6, minWidth: 0, height: 120 } },
+          trend.map(function(r, i) {
+            var p = (r.month || '').split('-');
+            var label = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][parseInt(p[1])] + ' ' + (p[0] || '').slice(2);
+            var pct = Math.max(4, ((r.revenue_gross || 0) / maxRev) * 100);
+            var isLast = i === trend.length - 1;
+            return React.createElement('div', { key: r.month, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '1 1 0', minWidth: 36 } },
+              React.createElement('div', { style: { fontSize: 9, color: 'var(--text3)', marginBottom: 3, whiteSpace: 'nowrap' } }, _fRp(r.revenue_gross)),
+              React.createElement('div', { style: { width: '100%', height: pct + '%', background: isLast ? color : color + '33', borderRadius: '3px 3px 0 0', minHeight: 4 } }),
+              React.createElement('div', { style: { fontSize: 9, color: isLast ? 'var(--text)' : 'var(--text3)', marginTop: 4, fontWeight: isLast ? 600 : 400, whiteSpace: 'nowrap' } }, label)
+            );
+          })
+        )
+      );
     }
 
     function _SalesTable(list, label) {
       if (!Array.isArray(list) || !list.length) return null;
-      return _Sec(label, _Tbl(['#','Sales','Revenue','Qty','Cabang'],
-        list.map(function(s, i) { return [i + 1, s.name, _fRp(s.revenue), _fNum(s.qty), (s.branches || []).join(', ') || '—']; })
+      return _Sec(label, _Tbl(['#','Sales','Omzet (Gross)','Qty','Invoice'],
+        list.map(function(s, i) { return [i + 1, s.sales, _fRp(s.revenue_gross), _fNum(s.total_qty), _fNum(s.invoice_count)]; })
       ));
     }
 
     function _BranchTable(list, label) {
       if (!Array.isArray(list) || !list.length) return null;
-      return _Sec(label, _Tbl(['#','Cabang','Revenue','Qty','Sales'],
-        list.map(function(b, i) { return [i + 1, b.name, _fRp(b.revenue), _fNum(b.qty), (b.sales || []).slice(0, 3).join(', ') || '—']; })
+      return _Sec(label, _Tbl(['#','Cabang','Omzet (Gross)','Qty','Invoice'],
+        list.map(function(b, i) { return [i + 1, b.branch, _fRp(b.revenue_gross), _fNum(b.total_qty), _fNum(b.invoice_count)]; })
       ));
+    }
+
+    function _ProdTable(list) {
+      if (!Array.isArray(list) || !list.length) return React.createElement('div', { style: { color: 'var(--text3)', fontSize: 12 } }, '—');
+      return _Tbl(['#','Produk','Kode','Qty','Revenue'], list.map(function(p, i) {
+        return [i + 1, p.item_name || p.item_no, p.item_no, _fNum(p.total_qty), _fRp(p.line_revenue)];
+      }));
     }
 
     function _CatBlock(title, list) {
@@ -47037,65 +47049,40 @@ function BusinessAnalystPage(_ref_bi) {
       );
     }
 
-    function _BrandBlock(title, list) {
-      if (!Array.isArray(list) || !list.length) return null;
-      return React.createElement('div', { style: { marginBottom: 16 } },
-        React.createElement('div', { style: { fontWeight: 600, fontSize: 13, marginBottom: 6, color: 'var(--text)' } }, title),
-        _BrandTable(list)
-      );
-    }
-
-    var gmAdl = adlP.grossMargin != null ? adlP.grossMargin + '%' : '—';
-    var gmGrp = grpP.grossMargin != null ? grpP.grossMargin + '%' : '—';
-    var adlProd = adl.products || {}, adlBrand = adl.brands || {};
-
     return React.createElement(React.Fragment, null,
-      // A: PT ADL
-      _Sec('PT Anugerah Digital Lestari — Ringkasan Keuangan', _Row([
-        _KC('ar', 'Revenue ADL', _fRp(adlP.revenue)),
-        _KC('ac', 'COGS ADL', _fRp(adlP.cogs)),
-        _KC('ag', 'Gross Profit ADL', _fRp(adlP.grossProfit), 'GM: ' + gmAdl),
-        _KC('au', 'Unit Terjual ADL', _fNum(adlP.totalUnits)),
+      // A: PT ADL summary
+      _Sec('PT Anugerah Digital Lestari — Ringkasan', _Row([
+        _KC('ar', 'Omzet Gross ADL', _fRp(adlS.revenue_gross), _fNum(adlS.invoice_count) + ' invoice'),
+        _KC('au', 'Total Qty ADL', _fNum(adlS.total_qty), 'unit terjual'),
       ])),
-      _Sec('Trend Revenue ADL — 6 Bulan', _Trend(adl.revenueTrend)),
+      _Sec('Trend Revenue ADL — 6 Bulan', _TrendBars(adl.revenue_trend, '#6c63ff')),
 
-      // B: Group
-      _Sec('Group Non-PPN — Ringkasan Keuangan', _Row([
-        _KC('gr', 'Revenue Group', _fRp(grpP.revenue)),
-        _KC('gc', 'COGS Group', _fRp(grpP.cogs)),
-        _KC('gg', 'Gross Profit Group', _fRp(grpP.grossProfit), 'GM: ' + gmGrp),
-        _KC('gu', 'Unit Terjual Group', _fNum(grpP.totalUnits)),
+      // B: Group summary
+      _Sec('Group Non-PPN — Ringkasan', _Row([
+        _KC('gr', 'Omzet Gross Group', _fRp(grpS.revenue_gross), _fNum(grpS.invoice_count) + ' invoice'),
+        _KC('gu', 'Total Qty Group', _fNum(grpS.total_qty), 'unit terjual'),
       ])),
-      _Sec('Trend Revenue Group — 6 Bulan', _Trend(grp.revenueTrend)),
+      _Sec('Trend Revenue Group — 6 Bulan', _TrendBars(grp.revenue_trend, '#14b8a6')),
 
       // AI Panel
       _renderAIPanel(),
 
-      // C: Sales
-      _SalesTable(adl.salesList, 'Performa Sales — PT ADL (by Revenue)'),
-      _SalesTable(grp.salesList, 'Performa Sales — Group Non-PPN (by Revenue)'),
+      // C: Sales ranking
+      _SalesTable(adl.sales_ranking, 'Performa Sales — PT ADL (by Omzet)'),
+      _SalesTable(grp.sales_ranking, 'Performa Sales — Group Non-PPN (by Omzet)'),
 
-      // D: Branch
-      _BranchTable(adl.branchList, 'Performa Cabang — PT ADL'),
-      _BranchTable(grp.branchList, 'Performa Cabang — Group Non-PPN'),
+      // D: Branch ranking
+      _BranchTable(adl.branch_ranking, 'Performa Cabang — PT ADL'),
+      _BranchTable(grp.branch_ranking, 'Performa Cabang — Group Non-PPN'),
 
-      // E: Product Intelligence (ADL)
-      (adlProd.notebook || adlProd.pc_aio || adlProd.printer || adlProd.monitor || adlProd.projector)
+      // E: Product Intelligence (ADL only — GROUP is accessories, no category prefix)
+      (adlIntel.notebook || adlIntel.pc_aio || adlIntel.printer || adlIntel.monitor || adlIntel.projector)
         ? _Sec('Product Intelligence — PT ADL', React.createElement('div', null,
-            _CatBlock('Notebook — Top 10', adlProd.notebook),
-            _CatBlock('PC / AIO — Top 3', adlProd.pc_aio),
-            _CatBlock('Printer — Top 3', adlProd.printer),
-            _CatBlock('Monitor — Top 3', adlProd.monitor),
-            _CatBlock('Projector — Top 3', adlProd.projector)
-          ))
-        : null,
-
-      // F: Brand Intelligence (ADL)
-      (adlBrand.notebook || adlBrand.printer || adlBrand.monitor)
-        ? _Sec('Brand Intelligence — PT ADL', React.createElement('div', null,
-            _BrandBlock('Notebook — Brand Rank', adlBrand.notebook),
-            _BrandBlock('Printer — Brand Rank', adlBrand.printer),
-            _BrandBlock('Monitor — Brand Rank', adlBrand.monitor)
+            _CatBlock('Notebook — Top 10', adlIntel.notebook),
+            _CatBlock('PC / AIO — Top 3', adlIntel.pc_aio),
+            _CatBlock('Printer — Top 3', adlIntel.printer),
+            _CatBlock('Monitor — Top 3', adlIntel.monitor),
+            _CatBlock('Projector — Top 3', adlIntel.projector)
           ))
         : null
     );
