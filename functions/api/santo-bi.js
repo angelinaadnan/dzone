@@ -425,6 +425,126 @@ export async function onRequestGet(context) {
   }
   // ── END DIAGNOSTIC ────────────────────────────────────────────────────────────
 
+  // ── AUDIT MODE (?audit=1) — test Accurate report endpoints, read-only ─────────
+  if (url.searchParams.get('audit') === '1') {
+    try {
+      const pad  = n => String(n).padStart(2, '0');
+      const dmyS = `01/${pad(month)}/${year}`;
+      const dmyE = `${pad(new Date(year, month, 0).getDate())}/${pad(month)}/${year}`;
+      const isoS = `${year}-${pad(month)}-01`;
+      const isoE = `${year}-${pad(month)}-${pad(new Date(year, month, 0).getDate())}`;
+
+      // probe: one request, pageSize=5, return structured safe result
+      const probe = async (endpoint, params) => {
+        const ts  = Date.now();
+        const sig = sigSec ? await makeSignature(ts, sigSec) : '';
+        const q   = new URLSearchParams({ ...params, page: '1', pageSize: '5' });
+        try {
+          const r   = await fetch(`${ACCURATE_BASE_ALT}/${endpoint}?${q}`, {
+            headers: authHeaders(tokADL, appKey, sig, ts),
+            signal: AbortSignal.timeout(12000),
+          });
+          const raw = await r.text();
+          let j = {};
+          try { j = JSON.parse(raw); } catch {}
+          const rows = j.d || j.data || j.result || [];
+          const first3 = rows.slice(0, 3).map(row => {
+            // return only structural/non-PII fields: keys + safe values
+            const safe = {};
+            for (const [k, v] of Object.entries(row)) {
+              if (/password|token|secret|key/i.test(k)) continue; // skip anything sensitive
+              if (typeof v === 'object' && v !== null) {
+                safe[k] = Array.isArray(v) ? `[array:${v.length}]` : { _keys: Object.keys(v).sort() };
+              } else if (typeof v === 'number') {
+                safe[k] = v; // numbers are safe
+              } else if (typeof v === 'string' && v.length > 60) {
+                safe[k] = v.slice(0, 40) + '…';
+              } else {
+                safe[k] = v;
+              }
+            }
+            return safe;
+          });
+          return {
+            httpStatus: r.status,
+            s: j.s ?? null,
+            sp: j.sp ?? null,
+            rowsOnPage: rows.length,
+            firstRowKeys: rows[0] ? Object.keys(rows[0]).sort() : [],
+            sample: first3,
+            error: null,
+          };
+        } catch (e) {
+          return { httpStatus: null, s: null, sp: null, rowsOnPage: 0, firstRowKeys: [], sample: [], error: e.message };
+        }
+      };
+
+      // Date param variants to try for each endpoint
+      const dmyParams  = { startDate: dmyS, endDate: dmyE };       // dd/MM/yyyy (P&L pattern)
+      const isoParams  = { 'filter.startDate': isoS, 'filter.endDate': isoE }; // yyyy-MM-dd (list pattern)
+
+      // Run all probes in parallel (well within 50-subrequest limit)
+      const [
+        // Control: P&L (known working)
+        plDmy,
+        // Salesman reports
+        salesBySpDmy, salesBySpIso,
+        // Item / product reports
+        salesByItemDmy, salesByItemIso,
+        itemMoveDmy, itemMoveIso,
+        // Branch reports
+        salesByBranchDmy, salesByBranchIso,
+        // Summary / catchall
+        salesSummDmy, salesSummIso,
+        salesInvRepDmy, salesInvRepIso,
+      ] = await Promise.all([
+        probe('report/profit-loss.do',          dmyParams),
+
+        probe('report/sales-by-salesman.do',     dmyParams),
+        probe('report/sales-by-salesman.do',     isoParams),
+
+        probe('report/sales-by-item.do',         dmyParams),
+        probe('report/sales-by-item.do',         isoParams),
+
+        probe('report/item-movement.do',         dmyParams),
+        probe('report/item-movement.do',         isoParams),
+
+        probe('report/sales-by-branch.do',       dmyParams),
+        probe('report/sales-by-branch.do',       isoParams),
+
+        probe('report/sales-summary.do',         dmyParams),
+        probe('report/sales-summary.do',         isoParams),
+
+        probe('report/sales-invoice.do',         dmyParams),
+        probe('report/sales-invoice.do',         isoParams),
+      ]);
+
+      return new Response(JSON.stringify({
+        audit: true, year, month,
+        host: ACCURATE_BASE_ALT,
+        dateRanges: { dmy: `${dmyS} to ${dmyE}`, iso: `${isoS} to ${isoE}` },
+        results: {
+          'report/profit-loss.do [dmy=control]':      plDmy,
+          'report/sales-by-salesman.do [dmy]':        salesBySpDmy,
+          'report/sales-by-salesman.do [iso]':        salesBySpIso,
+          'report/sales-by-item.do [dmy]':            salesByItemDmy,
+          'report/sales-by-item.do [iso]':            salesByItemIso,
+          'report/item-movement.do [dmy]':            itemMoveDmy,
+          'report/item-movement.do [iso]':            itemMoveIso,
+          'report/sales-by-branch.do [dmy]':          salesByBranchDmy,
+          'report/sales-by-branch.do [iso]':          salesByBranchIso,
+          'report/sales-summary.do [dmy]':            salesSummDmy,
+          'report/sales-summary.do [iso]':            salesSummIso,
+          'report/sales-invoice.do [dmy]':            salesInvRepDmy,
+          'report/sales-invoice.do [iso]':            salesInvRepIso,
+        },
+      }, null, 2), { headers: CORS });
+    } catch (e) {
+      return new Response(JSON.stringify({ auditError: e.message, stack: e.stack?.slice(0, 500) }), { headers: CORS });
+    }
+  }
+  // ── END AUDIT ─────────────────────────────────────────────────────────────────
+
   const cache    = caches.default;
   const cacheKey = new Request(`https://santo-bi-v4/${year}/${month}`);
   const cached   = await cache.match(cacheKey);
