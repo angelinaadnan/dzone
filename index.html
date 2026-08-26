@@ -33976,7 +33976,7 @@ function CourierJobTasks(_ref207) {
     }).catch(function(){setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});});
   };
   var doSaveReturn = function doSaveReturn(retKey, siReq, startLoc, endLoc) {
-    setRetGps(true);
+    setSiPhotos(function(p){return _objectSpread(_objectSpread({},p),{},_defineProperty({},retKey+'_gpsloading',true));});
     var dest=siReq.source_type==='branch'?siReq.branch_name:siReq.customer_name;
     var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
     kmP.then(function(km){
@@ -33984,16 +33984,16 @@ function CourierJobTasks(_ref207) {
       return uploadPhoto(siPhotos[retKey],'si_return',0,setUploadMsg('ret_'+retKey)).then(function(url){
         if(url){
           onUpdateSI(siReq.id,{return_status:'returned',return_photo:url,returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:endLoc,return_distance_km:km});
-          setRetStep('done');
+          setSiPhotos(function(p){return _objectSpread(_objectSpread({},p),{},_defineProperty({},retKey+'_step','done'));});
         } else if(onQueuePhoto){
           onUpdateSI(siReq.id,{return_status:'returned',return_photo:null,returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:endLoc,return_distance_km:km});
           onQueuePhoto(siPhotos[retKey],'si_return',{type:'si_photo_only',id:siReq.id,photoField:'return_photo'});
           setUploadMsg('ret_'+retKey)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-          setRetStep('done');
+          setSiPhotos(function(p){return _objectSpread(_objectSpread({},p),{},_defineProperty({},retKey+'_step','done'));});
         } else { setUploadMsg('ret_'+retKey)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
-        setRetGps(false);
+        setSiPhotos(function(p){return _objectSpread(_objectSpread({},p),{},_defineProperty({},retKey+'_gpsloading',false));});
       });
-    }).catch(function(){setRetGps(false);});
+    }).catch(function(){setSiPhotos(function(p){return _objectSpread(_objectSpread({},p),{},_defineProperty({},retKey+'_gpsloading',false));});});
   };
   // Persist packing check ke localStorage — key per kurir (tanpa tanggal).
   // Check per order/task ID tetap tersimpan sampai order benar-benar terkirim
