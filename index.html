@@ -46434,6 +46434,10 @@ function SantoDashboard() {
   var _s3 = React.useState(false); var loading = _s3[0]; var setLoading = _s3[1];
   var _s4 = React.useState(null); var error = _s4[0]; var setError = _s4[1];
   var _s5 = React.useState('Semua'); var activeBranch = _s5[0]; var setActiveBranch = _s5[1];
+  var _s6 = React.useState(null); var gpData = _s6[0]; var setGpData = _s6[1];
+
+  var SD_WHITELIST = new Set(['APRIL','ULIN','RIA','FAJAR','ARYA','MONA','GUSTI','RIZAL','DEFA','SANDI','DARTIK','TITI','ADE','LILI']);
+  var normFirst = function(n) { return (n||'').trim().toUpperCase().split(/[\s_]/)[0]; };
 
   var BRANCHES = ['Semua', 'Tangerang', 'Poins', 'Mangga Dua'];
   var BRANCH_STORES = { Tangerang: 'TC DZ · TC NMC · TC HOI', Poins: 'PS NMC', 'Mangga Dua': 'M2 DZ · M2 BIG · M2 ADL' };
@@ -46448,10 +46452,18 @@ function SantoDashboard() {
 
   React.useEffect(function() {
     if (!period) return;
-    setLoading(true); setError(null); setData(null); setActiveBranch('Semua');
-    fetch('/api/accurate?period=' + period)
-      .then(function(r) { return r.json(); })
-      .then(function(json) { if (json.error) throw new Error(json.error); setData(json); })
+    var parts = period.split('-'); var yr = parts[0]; var mo = parseInt(parts[1], 10);
+    setLoading(true); setError(null); setData(null); setGpData(null); setActiveBranch('Semua');
+    Promise.all([
+      fetch('/api/accurate?period=' + period).then(function(r){ return r.json(); }),
+      fetch('/api/sales-gp?year=' + yr + '&month=' + mo).then(function(r){ return r.json(); }).catch(function(){ return null; })
+    ])
+      .then(function(results) {
+        var json = results[0]; var gp = results[1];
+        if (json.error) throw new Error(json.error);
+        setData(json);
+        if (gp && gp.available) setGpData(gp);
+      })
       .catch(function(e) { setError(e.message); })
       .finally(function() { setLoading(false); });
   }, [period]);
@@ -46583,19 +46595,81 @@ function SantoDashboard() {
           )
         ),
 
-      // Sales list — full width
+      // Sales list — full width, with laba from sales-gp if available
       React.createElement('div', { style:Object.assign({}, cs, { marginBottom:16 }) },
         React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '👤 Penjualan per Sales'),
         view.salesList.length === 0
           ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
-          : view.salesList.map(function(s, i) {
-              return React.createElement('div', { key:s.name, style:{ display:'flex', alignItems:'center', gap:8, marginBottom:8 } },
-                React.createElement('div', { style:{ width:22, fontSize:11, color:'var(--text3)', textAlign:'right' } }, '#'+(i+1)),
-                React.createElement('div', { style:{ flex:1, fontSize:13, fontWeight:500 } }, s.name),
-                React.createElement('div', { style:{ fontSize:13, fontFamily:'DM Mono', color:'var(--text2)' } }, fmtRp(s.revenue))
-              );
-            })
+          : React.createElement('div', null,
+              // Header row when laba data exists
+              gpData && React.createElement('div', { style:{ display:'flex', gap:8, marginBottom:4, paddingBottom:6, borderBottom:'1px solid var(--border)' } },
+                React.createElement('div', { style:{ width:22 } }, ''),
+                React.createElement('div', { style:{ flex:1, fontSize:10, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.06em' } }, 'Sales'),
+                React.createElement('div', { style:{ width:100, fontSize:10, color:'var(--text3)', textAlign:'right', textTransform:'uppercase', letterSpacing:'.06em' } }, 'Omzet'),
+                React.createElement('div', { style:{ width:90, fontSize:10, color:'var(--text3)', textAlign:'right', textTransform:'uppercase', letterSpacing:'.06em' } }, 'Laba'),
+                React.createElement('div', { style:{ width:52, fontSize:10, color:'var(--text3)', textAlign:'right', textTransform:'uppercase', letterSpacing:'.06em' } }, 'Margin')
+              ),
+              view.salesList.map(function(s, i) {
+                var labaEntry = gpData ? (gpData.combined.list||[]).find(function(g){ return normFirst(g.name) === normFirst(s.name); }) : null;
+                var laba   = labaEntry ? labaEntry.laba    : null;
+                var margin = (laba != null && s.revenue > 0) ? (laba / s.revenue * 100).toFixed(1) : null;
+                return React.createElement('div', { key:s.name, style:{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderTop: i===0?'none':'1px solid var(--border)' } },
+                  React.createElement('div', { style:{ width:22, fontSize:11, color:'var(--text3)', textAlign:'right', flexShrink:0 } }, '#'+(i+1)),
+                  React.createElement('div', { style:{ flex:1, fontSize:13, fontWeight:500 } }, s.name),
+                  React.createElement('div', { style:{ width:100, fontSize:13, fontFamily:'DM Mono', color:'var(--text2)', textAlign:'right', flexShrink:0 } }, fmtRp(s.revenue)),
+                  gpData && React.createElement('div', { style:{ width:90, fontSize:13, fontFamily:'DM Mono', textAlign:'right', flexShrink:0, color: laba == null ? 'var(--text3)' : laba >= 0 ? '#22c55e' : '#ef4444' } },
+                    laba == null ? '—' : fmtRp(laba)
+                  ),
+                  gpData && React.createElement('div', { style:{ width:52, fontSize:12, fontFamily:'DM Mono', textAlign:'right', flexShrink:0, color: margin == null ? 'var(--text3)' : Number(margin)>=10?'#22c55e':Number(margin)>=5?'#f59e0b':'var(--text2)' } },
+                    margin == null ? '—' : margin + '%'
+                  )
+                );
+              })
+            )
       ),
+
+      // Qty per Kategori per Sales (NB/PC/Monitor/Printer/Projector) — Semua only, from DB
+      activeBranch === 'Semua' && data.catPerSales && data.catPerSales.length > 0 &&
+        React.createElement('div', { style:Object.assign({}, cs, { marginBottom:16, overflowX:'auto' }) },
+          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '📦 Unit per Kategori per Sales'),
+          React.createElement('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:12, fontFamily:'DM Mono, monospace' } },
+            React.createElement('thead', null,
+              React.createElement('tr', null,
+                ['Sales','Notebook','PC/AIO','Monitor','Printer','Projector','Total'].map(function(h, hi) {
+                  return React.createElement('th', { key:h, style:{ padding:'6px 8px', textAlign: hi===0?'left':'right', fontSize:10, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.06em', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' } }, h);
+                })
+              )
+            ),
+            React.createElement('tbody', null,
+              data.catPerSales.filter(function(r){ return SD_WHITELIST.has(normFirst(r.name)); }).map(function(r, i) {
+                var total = r.nb + r.pc + r.monitor + r.printer + r.projector;
+                return React.createElement('tr', { key:r.name, style:{ background: i%2===0?'transparent':'var(--border)' } },
+                  React.createElement('td', { style:{ padding:'5px 8px', fontWeight:500, fontFamily:'inherit', fontSize:13, color:'var(--text1)', whiteSpace:'nowrap' } }, r.name),
+                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', color: r.nb>0?'var(--text1)':'var(--text3)' } }, r.nb>0 ? r.nb : '—'),
+                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', color: r.pc>0?'var(--text1)':'var(--text3)' } }, r.pc>0 ? r.pc : '—'),
+                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', color: r.monitor>0?'var(--text1)':'var(--text3)' } }, r.monitor>0 ? r.monitor : '—'),
+                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', color: r.printer>0?'var(--text1)':'var(--text3)' } }, r.printer>0 ? r.printer : '—'),
+                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', color: r.projector>0?'var(--text1)':'var(--text3)' } }, r.projector>0 ? r.projector : '—'),
+                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', fontWeight:600, color:'var(--text1)' } }, total>0 ? total : '—')
+                );
+              }),
+              // Totals row
+              React.createElement('tr', { style:{ borderTop:'2px solid var(--border)', fontWeight:700 } },
+                React.createElement('td', { style:{ padding:'7px 8px', fontSize:12, color:'var(--text2)' } }, 'Total'),
+                (function() {
+                  var wl = data.catPerSales.filter(function(r){ return SD_WHITELIST.has(normFirst(r.name)); });
+                  var sum = function(f){ return wl.reduce(function(s,r){ return s+r[f]; },0); };
+                  var cols = ['nb','pc','monitor','printer','projector'];
+                  var totals = cols.map(sum);
+                  var grand = totals.reduce(function(s,v){ return s+v; },0);
+                  return cols.map(function(f,fi){
+                    return React.createElement('td', { key:f, style:{ padding:'7px 8px', textAlign:'right', color: totals[fi]>0?'var(--text1)':'var(--text3)' } }, totals[fi]>0 ? totals[fi] : '—');
+                  }).concat([React.createElement('td', { key:'grand', style:{ padding:'7px 8px', textAlign:'right' } }, grand)]);
+                })()
+              )
+            )
+          )
+        ),
 
       // Brand + Category
       React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 } },
