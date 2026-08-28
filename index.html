@@ -47067,9 +47067,61 @@ function BusinessAnalystPage(_ref_bi) {
       // AI Panel
       _renderAIPanel(),
 
-      // C: Sales ranking
-      _SalesTable(adl.sales_ranking, 'Performa Sales — PT ADL (by Omzet)'),
-      _SalesTable(grp.sales_ranking, 'Performa Sales — Group Non-PPN (by Omzet)'),
+      // C: Sales ranking — PT ADL & Group side by side
+      (function() {
+        var adlList = Array.isArray(adl.sales_ranking) ? adl.sales_ranking : [];
+        var grpList = Array.isArray(grp.sales_ranking) ? grp.sales_ranking : [];
+        if (!adlList.length && !grpList.length) return null;
+        var allNames = [];
+        adlList.forEach(function(s) { if (allNames.indexOf(s.sales) < 0) allNames.push(s.sales); });
+        grpList.forEach(function(s) { if (allNames.indexOf(s.sales) < 0) allNames.push(s.sales); });
+        var adlMap = {}, grpMap = {};
+        adlList.forEach(function(s) { adlMap[s.sales] = s; });
+        grpList.forEach(function(s) { grpMap[s.sales] = s; });
+        allNames.sort(function(a, b) {
+          var ra = adlMap[a] ? adlMap[a].revenue_gross : 0;
+          var rb = adlMap[b] ? adlMap[b].revenue_gross : 0;
+          return rb - ra;
+        });
+        var dash = React.createElement('span', { style: { color: 'var(--text3)' } }, '—');
+        var thStyle = { padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' };
+        var thR = Object.assign({}, thStyle, { textAlign: 'right' });
+        var tdStyle = { padding: '7px 10px', fontSize: 13, borderTop: '1px solid var(--border)', whiteSpace: 'nowrap' };
+        var tdR = Object.assign({}, tdStyle, { textAlign: 'right', fontFamily: 'DM Mono, monospace' });
+        var divider = React.createElement('th', { style: Object.assign({}, thStyle, { borderLeft: '2px solid var(--border)', paddingLeft: 16 }) }, 'Omzet Group (Gross)');
+        var rows = allNames.map(function(name, i) {
+          var a = adlMap[name], g = grpMap[name];
+          return React.createElement('tr', { key: name },
+            React.createElement('td', { style: tdStyle }, i + 1),
+            React.createElement('td', { style: Object.assign({}, tdStyle, { fontWeight: 500 }) }, name),
+            React.createElement('td', { style: tdR }, a ? _fRp(a.revenue_gross) : dash),
+            React.createElement('td', { style: tdR }, a ? _fNum(a.total_qty) : dash),
+            React.createElement('td', { style: tdR }, a ? _fNum(a.invoice_count) : dash),
+            React.createElement('td', { style: Object.assign({}, tdR, { borderLeft: '2px solid var(--border)', paddingLeft: 16 }) }, g ? _fRp(g.revenue_gross) : dash),
+            React.createElement('td', { style: tdR }, g ? _fNum(g.total_qty) : dash),
+            React.createElement('td', { style: tdR }, g ? _fNum(g.invoice_count) : dash)
+          );
+        });
+        return _Sec('Performa Sales — PT ADL & Group (by Omzet)',
+          React.createElement('div', { style: { overflowX: 'auto' } },
+            React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } },
+              React.createElement('thead', null,
+                React.createElement('tr', null,
+                  React.createElement('th', { style: thStyle }, '#'),
+                  React.createElement('th', { style: thStyle }, 'Sales'),
+                  React.createElement('th', { style: thR }, 'Omzet PT (Gross)'),
+                  React.createElement('th', { style: thR }, 'Qty'),
+                  React.createElement('th', { style: thR }, 'Invoice'),
+                  React.createElement('th', { style: Object.assign({}, thR, { borderLeft: '2px solid var(--border)', paddingLeft: 16 }) }, 'Omzet Group (Gross)'),
+                  React.createElement('th', { style: thR }, 'Qty'),
+                  React.createElement('th', { style: thR }, 'Invoice')
+                )
+              ),
+              React.createElement('tbody', null, rows)
+            )
+          )
+        );
+      })(),
 
       // D: Branch ranking
       _BranchTable(adl.branch_ranking, 'Performa Cabang — PT ADL'),
