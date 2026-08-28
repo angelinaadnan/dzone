@@ -46583,32 +46583,18 @@ function SantoDashboard() {
           )
         ),
 
-      // Sales + Items
-      React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 } },
-        React.createElement('div', { style:cs },
-          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '👤 Penjualan per Sales'),
-          view.salesList.length === 0
-            ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
-            : view.salesList.map(function(s, i) {
-                return React.createElement('div', { key:s.name, style:{ display:'flex', alignItems:'center', gap:8, marginBottom:8 } },
-                  React.createElement('div', { style:{ width:22, fontSize:11, color:'var(--text3)', textAlign:'right' } }, '#'+(i+1)),
-                  React.createElement('div', { style:{ flex:1, fontSize:13, fontWeight:500 } }, s.name),
-                  React.createElement('div', { style:{ fontSize:13, fontFamily:'DM Mono', color:'var(--text2)' } }, fmtRp(s.revenue))
-                );
-              })
-        ),
-        React.createElement('div', { style:cs },
-          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '🏆 Barang Terlaris (Top 10)'),
-          view.topItems.length === 0
-            ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
-            : view.topItems.map(function(it, i) {
-                return React.createElement('div', { key:it.name, style:{ display:'flex', alignItems:'center', gap:8, marginBottom:7 } },
-                  React.createElement('div', { style:{ width:22, fontSize:11, color:'var(--text3)', textAlign:'right' } }, '#'+(i+1)),
-                  React.createElement('div', { style:{ flex:1, fontSize:12 } }, it.name),
-                  React.createElement('div', { style:{ fontSize:12, color:'var(--text3)' } }, fmtNum(it.qty)+' pcs')
-                );
-              })
-        )
+      // Sales list — full width
+      React.createElement('div', { style:Object.assign({}, cs, { marginBottom:16 }) },
+        React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '👤 Penjualan per Sales'),
+        view.salesList.length === 0
+          ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
+          : view.salesList.map(function(s, i) {
+              return React.createElement('div', { key:s.name, style:{ display:'flex', alignItems:'center', gap:8, marginBottom:8 } },
+                React.createElement('div', { style:{ width:22, fontSize:11, color:'var(--text3)', textAlign:'right' } }, '#'+(i+1)),
+                React.createElement('div', { style:{ flex:1, fontSize:13, fontWeight:500 } }, s.name),
+                React.createElement('div', { style:{ fontSize:13, fontFamily:'DM Mono', color:'var(--text2)' } }, fmtRp(s.revenue))
+              );
+            })
       ),
 
       // Brand + Category
@@ -47036,8 +47022,18 @@ function BusinessAnalystPage(_ref_bi) {
 
     function _ProdTable(list) {
       if (!Array.isArray(list) || !list.length) return React.createElement('div', { style: { color: 'var(--text3)', fontSize: 12 } }, '—');
-      return _Tbl(['#','Produk','Kode','Qty','Revenue'], list.map(function(p, i) {
-        return [i + 1, p.item_name || p.item_no, p.item_no, _fNum(p.total_qty), _fRp(p.line_revenue)];
+      return React.createElement('div', null, list.map(function(p, i) {
+        return React.createElement('div', { key: p.item_no || i, style: { display: 'flex', alignItems: 'baseline', gap: 8, padding: '7px 0', borderTop: i === 0 ? 'none' : '1px solid var(--border)' } },
+          React.createElement('div', { style: { width: 20, fontSize: 11, color: 'var(--text3)', textAlign: 'right', flexShrink: 0 } }, i + 1),
+          React.createElement('div', { style: { flex: 1, fontSize: 12, lineHeight: 1.4 } },
+            React.createElement('div', null, p.item_name || p.item_no),
+            React.createElement('div', { style: { fontSize: 10, color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginTop: 1 } }, p.item_no)
+          ),
+          React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', fontFamily: 'DM Mono, monospace', flexShrink: 0, textAlign: 'right' } },
+            React.createElement('div', null, _fNum(p.total_qty) + ' pcs'),
+            React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, _fRp(p.line_revenue))
+          )
+        );
       }));
     }
 
