@@ -33,9 +33,11 @@ export async function onRequestGet(context) {
       `${connUrl}/api/sheet/sales-gp?year=${year}&month=${month}`,
       {
         headers: {
-          'X-API-Key':          connKey,
-          'X-Accurate-App-Key': env.ACCURATE_APP_KEY    || '',
-          'X-Accurate-Sig-Sec': env.ACCURATE_SIG_SECRET || '',
+          'X-API-Key':            connKey,
+          'X-Accurate-App-Key':   env.ACCURATE_APP_KEY    || '',
+          'X-Accurate-Sig-Sec':   env.ACCURATE_SIG_SECRET || '',
+          'X-Accurate-Token-ADL': env.ACCURATE_TOKEN_ADL  || '',
+          'X-Accurate-Token-GRP': env.ACCURATE_TOKEN_GROUP|| '',
         },
         signal: AbortSignal.timeout(55000),
       }
