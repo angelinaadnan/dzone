@@ -2184,7 +2184,7 @@ function App() {
             since60 = new Date();
             since60.setDate(since60.getDate() - 60);
             _context11.next = 7;
-            return db.from('branch_requests').select('*').gte('created_at', since60.toISOString()).order('created_at', {
+            return db.from('branch_requests').select('*').or('created_at.gte.' + since60.toISOString() + ',status.eq.cancel_requested').order('created_at', {
               ascending: false
             }).limit(300);
           case 7:
