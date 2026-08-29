@@ -1805,12 +1805,19 @@ function App() {
             orderColsNew = ',upgrade_items,downgrade_items,has_component_change,extra_couriers';
             buildOrderQ = function buildOrderQ(cols) {
               var useExtraCourier = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+              if (['admin', 'ops', 'supervisor'].includes(role)) {
+                var q1 = db.from('orders').select(cols).order('created_at', {ascending: false}).range(0, 999);
+                var q2 = db.from('orders').select(cols).order('created_at', {ascending: false}).range(1000, 1999);
+                return Promise.all([q1, q2]).then(function(results) {
+                  var r1 = results[0], r2 = results[1];
+                  return { data: [].concat(r1.data || [], r2.data || []), error: r1.error || r2.error };
+                });
+              }
               var q = db.from('orders').select(cols).gte('created_at', since.toISOString()).order('created_at', {
                 ascending: false
-              }).limit(1500);
+              }).limit(1000);
               if (role === 'technician') q = q.eq('tech_name', userName);else if (role === 'courier') {
                 if (useExtraCourier) {
-                  // Load orders where courier is primary OR in extra_couriers array
                   q = q.or("courier_name.eq.".concat(userName, ",extra_couriers.cs.[\"").concat(userName, "\"]"));
                 } else {
                   q = q.eq('courier_name', userName);
