@@ -1807,7 +1807,7 @@ function App() {
               var useExtraCourier = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
               var q = db.from('orders').select(cols).gte('created_at', since.toISOString()).order('created_at', {
                 ascending: false
-              }).limit(500);
+              }).limit(1500);
               if (role === 'technician') q = q.eq('tech_name', userName);else if (role === 'courier') {
                 if (useExtraCourier) {
                   // Load orders where courier is primary OR in extra_couriers array
