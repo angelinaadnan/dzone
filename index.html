@@ -2182,7 +2182,7 @@ function App() {
             return _context11.abrupt("return");
           case 3:
             since60 = new Date();
-            since60.setDate(since60.getDate() - 60);
+            since60.setDate(since60.getDate() - 120);
             _context11.next = 7;
             return db.from('branch_requests').select('*').or('created_at.gte.' + since60.toISOString() + ',status.eq.cancel_requested').order('created_at', {
               ascending: false
