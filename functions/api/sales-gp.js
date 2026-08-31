@@ -53,11 +53,11 @@ export async function onRequestGet(context) {
     }
 
     const data = await connResp.json();
+    const hasData = data.available && (data.combined?.list?.length > 0 || data.pt?.list?.length > 0);
 
     const resp = new Response(JSON.stringify(data), {
-      headers: { ...CORS, 'Cache-Control': 's-maxage=3600' },
+      headers: { ...CORS, 'Cache-Control': hasData ? 's-maxage=3600' : 'no-store' },
     });
-    const hasData = data.available && (data.combined?.list?.length > 0 || data.pt?.list?.length > 0);
     if (hasData) context.waitUntil(cache.put(cacheKey, resp.clone()));
     return resp;
 
