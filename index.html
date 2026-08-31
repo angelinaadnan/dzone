@@ -1177,6 +1177,10 @@ function App() {
     _useState36 = _slicedToArray(_useState35, 2),
     pendingCheckins = _useState36[0],
     setPendingCheckins = _useState36[1];
+  var _useState37 = useState(false),
+    _useState38 = _slicedToArray(_useState37, 2),
+    accurateOpen = _useState38[0],
+    setAccurateOpen = _useState38[1];
   var purchaseOrdersRef = React.useRef(purchaseOrders);
   React.useEffect(function () {
     purchaseOrdersRef.current = purchaseOrders;
@@ -3762,9 +3766,9 @@ function App() {
   var ACCURATE_USERS = ['Angel', 'Liana', 'Santo', 'GITA'];
   var accurateSection = ACCURATE_USERS.includes(userName) ? [
     { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
-    { id: 'sales_harian', icon: '📈', label: 'Sales Harian' },
-    { id: 'tarik_pricelist', icon: '🗒️', label: 'Tarik Pricelist' },
-    { id: 'revisi_kode_pelanggan', icon: '🔧', label: 'Revisi Kode Pelanggan' },
+    { id: 'sales_harian', icon: '📈', label: 'Sales Harian', _inSection: 'accurate' },
+    { id: 'tarik_pricelist', icon: '🗒️', label: 'Tarik Pricelist', _inSection: 'accurate' },
+    { id: 'revisi_kode_pelanggan', icon: '🔧', label: 'Revisi Kode Pelanggan', _inSection: 'accurate' },
   ] : [];
   var navItems = (role === 'supervisor' && userName === 'Santo' ? [{ id: 'santo_dashboard', icon: '📊', label: 'Sales Dashboard' }].concat(_toConsumableArray(ROLE_NAV[role]), [{
     id: 'branch_request',
@@ -3834,12 +3838,18 @@ function App() {
       padding: '12px 0',
       flex: 1
     }
-  }, navItems.map(function (n) {
+  }, navItems.filter(function(n) {
+    if (n._inSection === 'accurate') return accurateOpen;
+    return true;
+  }).map(function (n) {
     if (n._section) {
+      var isOpen = n.id === '_section_accurate' ? accurateOpen : true;
+      var toggleFn = n.id === '_section_accurate' ? function() { setAccurateOpen(function(v) { return !v; }); } : null;
       return /*#__PURE__*/React.createElement("div", {
         key: n.id,
-        style: { padding: '10px 18px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.08em', marginTop: 4, borderTop: '1px solid var(--border)' }
-      }, n.label);
+        onClick: toggleFn,
+        style: { padding: '10px 18px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text2)', letterSpacing: '0.08em', marginTop: 4, borderTop: '1px solid var(--border)', cursor: toggleFn ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between', userSelect: 'none' }
+      }, n.label, toggleFn && /*#__PURE__*/React.createElement("span", { style: { fontSize: 9, marginRight: 4, transition: 'transform 0.2s', display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' } }, '▶'));
     }
     return /*#__PURE__*/React.createElement("div", {
       key: n.id,
