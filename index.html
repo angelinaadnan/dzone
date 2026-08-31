@@ -1805,19 +1805,12 @@ function App() {
             orderColsNew = ',upgrade_items,downgrade_items,has_component_change,extra_couriers';
             buildOrderQ = function buildOrderQ(cols) {
               var useExtraCourier = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
-              if (['admin', 'ops', 'supervisor'].includes(role)) {
-                var q1 = db.from('orders').select(cols).order('created_at', {ascending: false}).range(0, 999);
-                var q2 = db.from('orders').select(cols).order('created_at', {ascending: false}).range(1000, 1999);
-                return Promise.all([q1, q2]).then(function(results) {
-                  var r1 = results[0], r2 = results[1];
-                  return { data: [].concat(r1.data || [], r2.data || []), error: r1.error || r2.error };
-                });
-              }
               var q = db.from('orders').select(cols).gte('created_at', since.toISOString()).order('created_at', {
                 ascending: false
-              }).limit(1000);
+              }).limit(500);
               if (role === 'technician') q = q.eq('tech_name', userName);else if (role === 'courier') {
                 if (useExtraCourier) {
+                  // Load orders where courier is primary OR in extra_couriers array
                   q = q.or("courier_name.eq.".concat(userName, ",extra_couriers.cs.[\"").concat(userName, "\"]"));
                 } else {
                   q = q.eq('courier_name', userName);
@@ -2189,9 +2182,9 @@ function App() {
             return _context11.abrupt("return");
           case 3:
             since60 = new Date();
-            since60.setDate(since60.getDate() - 120);
+            since60.setDate(since60.getDate() - 60);
             _context11.next = 7;
-            return db.from('branch_requests').select('*').or('created_at.gte.' + since60.toISOString() + ',status.eq.cancel_requested').order('created_at', {
+            return db.from('branch_requests').select('*').gte('created_at', since60.toISOString()).order('created_at', {
               ascending: false
             }).limit(300);
           case 7:
@@ -3766,19 +3759,27 @@ function App() {
   var PESAN_BARANG_ALLOWED_SALES = ['Aldi', 'Eliwaty', 'Tio'];
   var canAccessPesanBarang = ['admin', 'ops', 'admin_pembelian', 'admin_online', 'supervisor'].includes(role) || role === 'sales' && PESAN_BARANG_ALLOWED_SALES.includes(userName);
   var SALES_HARIAN_USERS = ['Angel', 'Liana', 'Santo', 'GITA'];
-  var BI_USERS = ['Santo', 'Angel', 'Liana', 'Lukas', 'Jenny'];
+  var ACCURATE_USERS = ['Angel', 'Liana', 'Santo', 'GITA'];
+  var accurateSection = ACCURATE_USERS.includes(userName) ? [
+    { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
+    { id: 'sales_harian', icon: '📈', label: 'Sales Harian' },
+    { id: 'tarik_pricelist', icon: '🗒️', label: 'Tarik Pricelist' },
+    { id: 'revisi_kode_pelanggan', icon: '🔧', label: 'Revisi Kode Pelanggan' },
+  ] : [];
   var navItems = (role === 'supervisor' && userName === 'Santo' ? [{ id: 'santo_dashboard', icon: '📊', label: 'Sales Dashboard' }].concat(_toConsumableArray(ROLE_NAV[role]), [{
     id: 'branch_request',
     icon: '📦',
     label: 'Request Barang'
+  }, {
+    id: 'business_analyst',
+    icon: '🧠',
+    label: 'Business Analyst'
   }]) : role === 'cabang' ? ROLE_NAV[role].filter(function (n) {
     return n.id !== 'branch_request' || BRANCH_REQUEST_ALLOWED.includes(userName);
   }) : ROLE_NAV[role]).filter(function (n) {
     return n.id !== 'pesan_barang' || canAccessPesanBarang;
-  }).concat(SALES_HARIAN_USERS.includes(userName) ? [{ id: 'sales_harian', icon: '📈', label: 'Sales Harian' }] : [])
-  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
-  .concat(BI_USERS.includes(userName) ? [{ id: 'business_analyst', icon: '💡', label: 'Business Analyst' }] : [])
-  .concat(['Santo', 'Angel', 'Liana', 'GITA'].includes(userName) ? [{ id: 'tarik_pricelist', icon: '📋', label: 'Tarik Pricelist' }] : []);
+  }).concat(accurateSection)
+  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -3834,6 +3835,12 @@ function App() {
       flex: 1
     }
   }, navItems.map(function (n) {
+    if (n._section) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: n.id,
+        style: { padding: '10px 18px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.08em', marginTop: 4, borderTop: '1px solid var(--border)' }
+      }, n.label);
+    }
     return /*#__PURE__*/React.createElement("div", {
       key: n.id,
       className: "nav-item".concat(page === n.id ? ' active' : ''),
@@ -3986,7 +3993,7 @@ function App() {
   }), role === 'ops' && page === 'op_branch' && /*#__PURE__*/React.createElement(OpsBranchManager, {
     requests: branchRequests,
     onUpdate: updateBranchRequest
-  }), ['Santo','Angel','Liana','GITA'].includes(userName) && page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(PricelistSyncPage, null), role === 'supervisor' && userName === 'Santo' && page === 'santo_dashboard' && /*#__PURE__*/React.createElement(SantoDashboard, null), role === 'supervisor' && BI_USERS.includes(userName) && page === 'business_analyst' && /*#__PURE__*/React.createElement(BusinessAnalystPage, { persona: userName }), role === 'supervisor' && userName === 'Santo' && page === 'branch_request' && /*#__PURE__*/React.createElement(BranchRequestPage, {
+  }), role === 'supervisor' && userName === 'Santo' && page === 'santo_dashboard' && /*#__PURE__*/React.createElement(SantoDashboard, null), role === 'supervisor' && userName === 'Santo' && page === 'business_analyst' && /*#__PURE__*/React.createElement(BusinessAnalystPage, null), role === 'supervisor' && userName === 'Santo' && page === 'branch_request' && /*#__PURE__*/React.createElement(BranchRequestPage, {
     requests: branchRequests,
     onSave: saveBranchRequest,
     onUpdate: updateBranchRequest,
@@ -4220,7 +4227,7 @@ function App() {
     userName: userName,
     role: role,
     demoMode: demoMode
-  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
+  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null), page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(TarikPricelistPage, null), page === 'revisi_kode_pelanggan' && /*#__PURE__*/React.createElement(RevisiKodePelangganPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
     order: selectedOrder,
     onClose: function onClose() {
       return setSelectedOrder(null);
@@ -33864,10 +33871,6 @@ function CourierJobTasks(_ref207) {
     _React$useState370 = _slicedToArray(_React$useState369, 2),
     photoMsg = _React$useState370[0],
     setPhotoMsg = _React$useState370[1]; // {key: statusMsg}
-  var _React$useState_sgc = React.useState(null),
-    _React$useState_sgc2 = _slicedToArray(_React$useState_sgc, 2),
-    supGpsConfirm = _React$useState_sgc2[0],
-    setSupGpsConfirm = _React$useState_sgc2[1];
   var setUploadMsg = function setUploadMsg(key) {
     return function (msg) {
       return setPhotoMsg(function (prev) {
@@ -33878,129 +33881,6 @@ function CourierJobTasks(_ref207) {
         }(prev);
       });
     };
-  };
-  // Simpan pickup supplier setelah user konfirmasi GPS
-  var doSaveSupplierPickup = function doSaveSupplierPickup(pk, supPo, supP, startLoc, endLoc) {
-    setSupGpsConfirm(null);
-    setPoKm(function(prev){ return _objectSpread(_objectSpread({}, prev), {}, _defineProperty({}, supPo.id+'_'+supP.no, {loading: true})); });
-    var kmPromise = (startLoc && endLoc)
-      ? getRoadDistanceKm(startLoc.lat, startLoc.lng, endLoc.lat, endLoc.lng)
-      : Promise.resolve(null);
-    kmPromise.then(function(kmTotal) {
-      if (onCheckin && endLoc) onCheckin({ courier_name: courierName, lat: endLoc.lat, lng: endLoc.lng, note: '✅ Tiba jemput supplier: ' + supPo.supplier_name + (kmTotal ? ' \xB7 ' + kmTotal + ' km' : '') });
-      return uploadPhoto(siPhotos[pk], 'supplier', 0, setUploadMsg(pk)).then(function(supPhotoUrl) {
-        var updatedPickups;
-        if (supPhotoUrl) {
-          updatedPickups = (supPo.pickups || []).map(function(t) {
-            return t.no === supP.no ? _objectSpread(_objectSpread({}, t), {}, { status: 'done', arrival_photo: supPhotoUrl, start_location: startLoc, end_location: endLoc, distance_km: kmTotal, done_at: new Date().toISOString() }) : t;
-          });
-          onUpdatePO(supPo.id, { pickups: updatedPickups, pickup: null });
-        } else if (onQueuePhoto) {
-          updatedPickups = (supPo.pickups || []).map(function(t) {
-            return t.no === supP.no ? _objectSpread(_objectSpread({}, t), {}, { status: 'done', arrival_photo: null, start_location: startLoc, end_location: endLoc, distance_km: kmTotal, done_at: new Date().toISOString() }) : t;
-          });
-          onUpdatePO(supPo.id, { pickups: updatedPickups, pickup: null });
-          onQueuePhoto(siPhotos[pk], 'supplier', { type: 'po_pickup_photo', poId: supPo.id, pickupNo: supP.no });
-          setUploadMsg(pk)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-        } else {
-          setUploadMsg(pk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
-        }
-        setPoKm(function(prev){ var n=Object.assign({},prev); n[supPo.id+'_'+supP.no]={loading:false}; return n; });
-      });
-    }).catch(function() {
-      setPoKm(function(prev){ var n=Object.assign({},prev); n[supPo.id+'_'+supP.no]={loading:false}; return n; });
-    });
-  };
-  var _React$useState_pgc = React.useState(null),
-    _React$useState_pgc2 = _slicedToArray(_React$useState_pgc, 2),
-    pendingGps = _React$useState_pgc2[0],
-    setPendingGps = _React$useState_pgc2[1];
-  var doSaveBranchDelivery = function doSaveBranchDelivery(bk, brReq, trip, startLoc, endLoc) {
-    setSiPhotos(function(p){ var n=Object.assign({},p); n[bk+'_gps']=true; return n; });
-    var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
-    kmP.then(function(km){
-      if(onCheckin&&endLoc)onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:'\uD83D\uDCCD Tiba di cabang: '+brReq.branch_name+(km?' \xB7 '+km+' km':'')});
-      return uploadPhoto(branchPhotos[bk]||null,'branch',0,setUploadMsg(bk)).then(function(url){
-        if(url){
-          var ut=(brReq.trips||[]).map(function(t){return t.no===trip.no?_objectSpread(_objectSpread({},t),{},{status:'delivered',in_transit:false,delivered_at:new Date().toISOString(),photo:url,start_location:startLoc||null,arrived_location:endLoc,distance_km:km}):t;});
-          onUpdateBranch(brReq.id,{trips:ut,status:ut.every(function(t){return t.status==='delivered';})?'completed':'partial'});
-        } else if(onQueuePhoto){
-          var ut2=(brReq.trips||[]).map(function(t){return t.no===trip.no?_objectSpread(_objectSpread({},t),{},{status:'delivered',in_transit:false,delivered_at:new Date().toISOString(),photo:null,start_location:startLoc||null,arrived_location:endLoc,distance_km:km}):t;});
-          onUpdateBranch(brReq.id,{trips:ut2,status:ut2.every(function(t){return t.status==='delivered';})?'completed':'partial'});
-          onQueuePhoto(branchPhotos[bk],'branch',{type:'branch_trip_photo',reqId:brReq.id,tripNo:trip.no});
-          setUploadMsg(bk)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-        } else { setUploadMsg(bk)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
-        setSiPhotos(function(p){var n=Object.assign({},p);n[bk+'_gps']=false;return n;});
-      });
-    }).catch(function(){setSiPhotos(function(p){var n=Object.assign({},p);n[bk+'_gps']=false;return n;});});
-  };
-  var doSaveCbPickup = function doSaveCbPickup(k, siReq, startLoc, endLoc) {
-    setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=true;return n;});
-    var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
-    kmP.then(function(km){
-      if(onCheckin&&endLoc)onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:'\u2705 Tiba & jemput di cabang: '+siReq.branch_name+(km?' \xB7 '+km+' km':'')});
-      return uploadPhoto(siPhotos[k],'si_pickup',0,setUploadMsg('sip_'+k)).then(function(url){
-        if(url){onUpdateSI(siReq.id,{courier_picked_up:true,courier_picked_up_at:new Date().toISOString(),pickup_arrival_photo:url,pickup_start_location:startLoc||null,pickup_arrived_location:endLoc,pickup_distance_km:km});}
-        else if(onQueuePhoto){
-          onUpdateSI(siReq.id,{courier_picked_up:true,courier_picked_up_at:new Date().toISOString(),pickup_arrival_photo:null,pickup_start_location:startLoc||null,pickup_arrived_location:endLoc,pickup_distance_km:km});
-          onQueuePhoto(siPhotos[k],'si_pickup',{type:'si_photo_only',id:siReq.id,photoField:'pickup_arrival_photo'});
-          setUploadMsg('sip_'+k)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-        } else { setUploadMsg('sip_'+k)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
-        setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});
-      });
-    }).catch(function(){setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});});
-  };
-  var doSaveScDelivery = function doSaveScDelivery(k, siReq, startLoc, endLoc) {
-    setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=true;return n;});
-    var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
-    kmP.then(function(km){
-      if(onCheckin&&endLoc)onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:'\u2705 Tiba di SC: '+siReq.service_center_name+(km?' \xB7 '+km+' km':'')});
-      return uploadPhoto(siPhotos[k],'sc_receipt',0,setUploadMsg('scr_'+k)).then(function(url){
-        if(url){onUpdateSI(siReq.id,{status:'at_service_center',sc_receipt_photo:url,sc_delivered_at:new Date().toISOString(),sc_start_location:startLoc||null,sc_arrived_location:endLoc,sc_distance_km:km});}
-        else if(onQueuePhoto){
-          onUpdateSI(siReq.id,{status:'at_service_center',sc_receipt_photo:null,sc_delivered_at:new Date().toISOString(),sc_start_location:startLoc||null,sc_arrived_location:endLoc,sc_distance_km:km});
-          onQueuePhoto(siPhotos[k],'sc_receipt',{type:'si_photo_only',id:siReq.id,photoField:'sc_receipt_photo'});
-          setUploadMsg('scr_'+k)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-        } else { setUploadMsg('scr_'+k)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
-        setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});
-      });
-    }).catch(function(){setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});});
-  };
-  var doSaveScPickup = function doSaveScPickup(k, siReq, scNm, startLoc, endLoc) {
-    setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=true;return n;});
-    var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
-    kmP.then(function(km){
-      if(onCheckin&&endLoc)onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:'\u2705 Ambil dari SC: '+(scNm||'SC')+(km?' \xB7 '+km+' km':'')});
-      return uploadPhoto(siPhotos[k]||null,'sc_pickup',0,setUploadMsg('scp_'+k)).then(function(url){
-        if(url){onUpdateSI(siReq.id,{status:'back_from_sc',sc_picked_up_at:new Date().toISOString(),sc_pickup_photo:url,scp_distance_km:km||null});}
-        else if(onQueuePhoto){
-          onUpdateSI(siReq.id,{status:'back_from_sc',sc_picked_up_at:new Date().toISOString(),sc_pickup_photo:null,scp_distance_km:km||null});
-          onQueuePhoto(siPhotos[k],'sc_pickup',{type:'si_photo_only',id:siReq.id,photoField:'sc_pickup_photo'});
-          setUploadMsg('scp_'+k)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-        } else { setUploadMsg('scp_'+k)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
-        setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});
-      });
-    }).catch(function(){setSiPhotos(function(p){var n=Object.assign({},p);n[k+'_gps']=false;return n;});});
-  };
-  var doSaveReturn = function doSaveReturn(retKey, siReq, startLoc, endLoc) {
-    setSiPhotos(function(p){return _objectSpread(_objectSpread({},p),{},_defineProperty({},retKey+'_gpsloading',true));});
-    var dest=siReq.source_type==='branch'?siReq.branch_name:siReq.customer_name;
-    var kmP=(startLoc&&endLoc)?getRoadDistanceKm(startLoc.lat,startLoc.lng,endLoc.lat,endLoc.lng):Promise.resolve(null);
-    kmP.then(function(km){
-      if(onCheckin&&endLoc)onCheckin({courier_name:courierName,lat:endLoc.lat,lng:endLoc.lng,note:'\uD83D\uDCCD Serah terima ke '+dest+(km?' \xB7 '+km+' km':'')});
-      return uploadPhoto(siPhotos[retKey],'si_return',0,setUploadMsg('ret_'+retKey)).then(function(url){
-        if(url){
-          onUpdateSI(siReq.id,{return_status:'returned',return_photo:url,returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:endLoc,return_distance_km:km});
-          setSiPhotos(function(p){return _objectSpread(_objectSpread({},p),{},_defineProperty({},retKey+'_step','done'));});
-        } else if(onQueuePhoto){
-          onUpdateSI(siReq.id,{return_status:'returned',return_photo:null,returned_at:new Date().toISOString(),return_start_location:startLoc||null,return_arrived_location:endLoc,return_distance_km:km});
-          onQueuePhoto(siPhotos[retKey],'si_return',{type:'si_photo_only',id:siReq.id,photoField:'return_photo'});
-          setUploadMsg('ret_'+retKey)('\uD83D\uDCF1 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
-          setSiPhotos(function(p){return _objectSpread(_objectSpread({},p),{},_defineProperty({},retKey+'_step','done'));});
-        } else { setUploadMsg('ret_'+retKey)('\u274C Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.'); }
-        setSiPhotos(function(p){return _objectSpread(_objectSpread({},p),{},_defineProperty({},retKey+'_gpsloading',false));});
-      });
-    }).catch(function(){setSiPhotos(function(p){return _objectSpread(_objectSpread({},p),{},_defineProperty({},retKey+'_gpsloading',false));});});
   };
   // Persist packing check ke localStorage — key per kurir (tanpa tanggal).
   // Check per order/task ID tetap tersimpan sampai order benar-benar terkirim
@@ -35417,59 +35297,133 @@ function CourierJobTasks(_ref207) {
           background: photoMsg['sup_' + po.id + '_' + p.no].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg['sup_' + po.id + '_' + p.no]),
-        supGpsConfirm && supGpsConfirm.pk === 'sup_' + po.id + '_' + p.no
-          ? /*#__PURE__*/React.createElement("div", {
-              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
-            },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, supGpsConfirm.area),
-              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + supGpsConfirm.endLoc.lat + ',' + supGpsConfirm.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
-                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, po.supplier_name), "?"
-              ),
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
-                /*#__PURE__*/React.createElement("button", {
-                  className: "btn-green",
-                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
-                  disabled: !!(poKm[po.id + '_' + p.no] || {}).loading,
-                  onClick: function() { doSaveSupplierPickup('sup_' + po.id + '_' + p.no, po, p, supGpsConfirm.startLoc, supGpsConfirm.endLoc); }
-                }, !!(poKm[po.id + '_' + p.no] || {}).loading ? '\u23F3 Menyimpan...' : '\u2705 Benar, Lanjutkan'),
-                /*#__PURE__*/React.createElement("button", {
-                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-                  onClick: function() { setSupGpsConfirm(null); }
-                }, '\uD83D\uDD04 Refresh GPS')
-              )
-            )
-          : /*#__PURE__*/React.createElement("button", {
-              className: "btn-green",
-              style: { width: '100%', padding: '10px', fontWeight: 700, marginTop: 8 },
-              disabled: isGpsLoading || !!photoMsg['sup_' + po.id + '_' + p.no] && !photoMsg['sup_' + po.id + '_' + p.no].startsWith('\u274C'),
-              onClick: function() {
-                var supPk = 'sup_' + po.id + '_' + p.no;
-                setPhotoMsg(function(prev){ var n = Object.assign({}, prev); delete n[supPk]; return n; });
-                if (!siPhotos[supPk]) { alert('Upload foto bukti tiba di supplier dulu'); return; }
-                setPoKm(function(prev){ return _objectSpread(_objectSpread({}, prev), {}, _defineProperty({}, po.id + '_' + p.no, { loading: true })); });
-                var startLoc = getLastCheckin();
-                getGPS().then(function(endLoc) {
-                  setPoKm(function(prev){ var n = Object.assign({}, prev); n[po.id + '_' + p.no] = { loading: false }; return n; });
-                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
-                  fetch('https://nominatim.openstreetmap.org/reverse?lat=' + endLoc.lat + '&lon=' + endLoc.lng + '&format=json&accept-language=id')
-                    .then(function(r){ return r.json(); })
-                    .then(function(geo) {
-                      var a = geo.address || {};
-                      var area = [a.road || a.pedestrian, a.neighbourhood || a.suburb || a.quarter || a.village, a.city_district || a.district].filter(Boolean).slice(0, 2).join(', ') || (endLoc.lat.toFixed(5) + ', ' + endLoc.lng.toFixed(5));
-                      setSupGpsConfirm({ pk: supPk, po: po, p: p, startLoc: startLoc, endLoc: endLoc, area: area });
-                    })
-                    .catch(function() {
-                      setSupGpsConfirm({ pk: supPk, po: po, p: p, startLoc: startLoc, endLoc: endLoc, area: endLoc.lat.toFixed(5) + ', ' + endLoc.lng.toFixed(5) });
-                    });
-                }).catch(function() {
-                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
-                  setPoKm(function(prev){ var n = Object.assign({}, prev); n[po.id + '_' + p.no] = { loading: false }; return n; });
+      }, photoMsg['sup_' + po.id + '_' + p.no]), /*#__PURE__*/React.createElement("button", {
+        className: "btn-green",
+        style: {
+          width: '100%',
+          padding: '10px',
+          fontWeight: 700
+        },
+        disabled: isGpsLoading || !!photoMsg['sup_' + po.id + '_' + p.no] && !photoMsg['sup_' + po.id + '_' + p.no].startsWith('❌'),
+        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee87() {
+          var supPk, startLoc, endLoc, kmTotal, supPhotoUrl, _updatedPickups2, updatedPickups;
+          return _regeneratorRuntime().wrap(function _callee87$(_context89) {
+            while (1) switch (_context89.prev = _context89.next) {
+              case 0:
+                supPk = 'sup_' + po.id + '_' + p.no;
+                setPhotoMsg(function (prev) {
+                  return function (_ref218) {
+                    var _ = _ref218[supPk],
+                      r = _objectWithoutProperties(_ref218, [supPk].map(_toPropertyKey));
+                    return r;
+                  }(prev);
                 });
-              }
-            }, photoMsg['sup_' + po.id + '_' + p.no] && !photoMsg['sup_' + po.id + '_' + p.no].startsWith('\u274C') ? photoMsg['sup_' + po.id + '_' + p.no] : isGpsLoading ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba di Supplier'))))));
+                if (siPhotos[supPk]) {
+                  _context89.next = 5;
+                  break;
+                }
+                alert('Upload foto bukti tiba di supplier dulu');
+                return _context89.abrupt("return");
+              case 5:
+                setPoKm(function (prev) {
+                  return _objectSpread(_objectSpread({}, prev), {}, _defineProperty({}, po.id + '_' + p.no, {
+                    loading: true
+                  }));
+                });
+                startLoc = getLastCheckin();
+                endLoc = null;
+                _context89.prev = 8;
+                _context89.next = 11;
+                return getGPS();
+              case 11:
+                endLoc = _context89.sent;
+                _context89.next = 16;
+                break;
+              case 14:
+                _context89.prev = 14;
+                _context89.t0 = _context89["catch"](8);
+              case 16:
+                if (!endLoc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setPoKm(function(prev){ var n=Object.assign({},prev); n[po.id+'_'+p.no]={loading:false}; return n; }); return _context89.abrupt('return'); }
+                setPoKm(function (prev) {
+                  return _objectSpread(_objectSpread({}, prev), {}, _defineProperty({}, po.id + '_' + p.no, {
+                    loading: false
+                  }));
+                });
+                if (!(startLoc && endLoc)) {
+                  _context89.next = 23;
+                  break;
+                }
+                _context89.next = 20;
+                return getRoadDistanceKm(startLoc.lat, startLoc.lng, endLoc.lat, endLoc.lng);
+              case 20:
+                _context89.t1 = _context89.sent;
+                _context89.next = 24;
+                break;
+              case 23:
+                _context89.t1 = null;
+              case 24:
+                kmTotal = _context89.t1;
+                if (onCheckin && endLoc) onCheckin({
+                  courier_name: courierName,
+                  lat: endLoc.lat,
+                  lng: endLoc.lng,
+                  note: "\u2705 Tiba jemput supplier: ".concat(po.supplier_name).concat(kmTotal ? ' · ' + kmTotal + ' km' : '')
+                });
+                _context89.next = 28;
+                return uploadPhoto(siPhotos[supPk], 'supplier', 0, setUploadMsg(supPk));
+              case 28:
+                supPhotoUrl = _context89.sent;
+                if (supPhotoUrl) {
+                  _context89.next = 32;
+                  break;
+                }
+                if (onQueuePhoto) {
+                  _updatedPickups2 = (po.pickups || []).map(function (t) {
+                    return t.no === p.no ? _objectSpread(_objectSpread({}, t), {}, {
+                      status: 'done',
+                      arrival_photo: null,
+                      start_location: startLoc,
+                      end_location: endLoc,
+                      distance_km: kmTotal,
+                      done_at: new Date().toISOString()
+                    }) : t;
+                  });
+                  onUpdatePO(po.id, {
+                    pickups: _updatedPickups2,
+                    pickup: null
+                  });
+                  onQueuePhoto(siPhotos[supPk], 'supplier', {
+                    type: 'po_pickup_photo',
+                    poId: po.id,
+                    pickupNo: p.no
+                  });
+                  setUploadMsg(supPk)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+                } else {
+                  setUploadMsg(supPk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
+                }
+                return _context89.abrupt("return");
+              case 32:
+                updatedPickups = (po.pickups || []).map(function (t) {
+                  return t.no === p.no ? _objectSpread(_objectSpread({}, t), {}, {
+                    status: 'done',
+                    arrival_photo: supPhotoUrl,
+                    start_location: startLoc,
+                    end_location: endLoc,
+                    distance_km: kmTotal,
+                    done_at: new Date().toISOString()
+                  }) : t;
+                });
+                onUpdatePO(po.id, {
+                  pickups: updatedPickups,
+                  pickup: null
+                });
+              case 34:
+              case "end":
+                return _context89.stop();
+            }
+          }, _callee87, null, [[8, 14]]);
+        }))
+      }, photoMsg['sup_' + po.id + '_' + p.no] && !photoMsg['sup_' + po.id + '_' + p.no].startsWith('❌') ? photoMsg['sup_' + po.id + '_' + p.no] : isGpsLoading ? '📡 GPS...' : '✅ Tiba & Sudah Dijemput dari Supplier'))))));
     }
 
     // ── BRANCH DELIVERY ──
@@ -35645,53 +35599,149 @@ function CourierJobTasks(_ref207) {
           background: photoMsg[bk].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg[bk]),
-        pendingGps && pendingGps.pk === 'br_'+bk
-          ? /*#__PURE__*/React.createElement("div", {
-              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
-            },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, pendingGps.area),
-              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + pendingGps.endLoc.lat + ',' + pendingGps.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
-                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, pendingGps.destName), "?"
-              ),
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
-                /*#__PURE__*/React.createElement("button", {
-                  className: "btn-green",
-                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
-                  onClick: function() { var fn = pendingGps.saveFn; setPendingGps(null); fn(); }
-                }, '\u2705 Benar, Lanjutkan'),
-                /*#__PURE__*/React.createElement("button", {
-                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-                  onClick: function() { setPendingGps(null); }
-                }, '\uD83D\uDD04 Refresh GPS')
-              )
-            )
-          : /*#__PURE__*/React.createElement("button", {
-              className: "btn-green",
-              style: { width: '100%', padding: '11px', fontWeight: 700, marginTop: 8 },
-              disabled: bGps || !!photoMsg[bk] && !photoMsg[bk].startsWith('\u274C'),
-              onClick: function() {
-                setPhotoMsg(function(prev){ var n=Object.assign({},prev); delete n[bk]; return n; });
-                if (!branchPhotos[bk]) { alert('Upload foto bukti pengiriman ke cabang dulu'); return; }
-                var startLoc = trip.transit_start_location || getLastCheckin();
-                getGPS().then(function(endLoc) {
-                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
-                  fetch('https://nominatim.openstreetmap.org/reverse?lat='+endLoc.lat+'&lon='+endLoc.lng+'&format=json&accept-language=id')
-                    .then(function(res){ return res.json(); })
-                    .then(function(geo) {
-                      var a = geo.address || {};
-                      var area = [a.road||a.pedestrian,a.neighbourhood||a.suburb||a.quarter||a.village,a.city_district||a.district].filter(Boolean).slice(0,2).join(', ')||(endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5));
-                      setPendingGps({ pk: 'br_'+bk, destName: r.branch_name, area: area, endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveBranchDelivery(bk, r, trip, startLoc, endLoc); } });
-                    }).catch(function() {
-                      setPendingGps({ pk: 'br_'+bk, destName: r.branch_name, area: endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5), endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveBranchDelivery(bk, r, trip, startLoc, endLoc); } });
-                    });
-                }).catch(function() {
-                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
+      }, photoMsg[bk]), /*#__PURE__*/React.createElement("button", {
+        className: "btn-green",
+        style: {
+          width: '100%',
+          padding: '11px',
+          fontWeight: 700
+        },
+        disabled: bGps || !!photoMsg[bk] && !photoMsg[bk].startsWith('❌'),
+        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee89() {
+          var _loc11, _loc12;
+          var startLoc, loc, km, branchPhotoUrl, _updatedTrips2, _allDone, pendingIt, updatedTrips, allDone, pendingItems;
+          return _regeneratorRuntime().wrap(function _callee89$(_context91) {
+            while (1) switch (_context91.prev = _context91.next) {
+              case 0:
+                setPhotoMsg(function (prev) {
+                  return function (_ref221) {
+                    var _ = _ref221[bk],
+                      r = _objectWithoutProperties(_ref221, [bk].map(_toPropertyKey));
+                    return r;
+                  }(prev);
                 });
-              }
-            }, photoMsg[bk] && !photoMsg[bk].startsWith('\u274C') ? photoMsg[bk] : bGps ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba'))))));
+                if (branchPhotos[bk]) {
+                  _context91.next = 4;
+                  break;
+                }
+                alert('Upload foto bukti pengiriman ke cabang dulu');
+                return _context91.abrupt("return");
+              case 4:
+                setSiPhotos(function (p) {
+                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, bk + '_gps', true));
+                });
+                startLoc = trip.transit_start_location || getLastCheckin();
+                loc = null;
+                _context91.prev = 7;
+                _context91.next = 10;
+                return getGPS();
+              case 10:
+                loc = _context91.sent;
+                _context91.next = 15;
+                break;
+              case 13:
+                _context91.prev = 13;
+                _context91.t0 = _context91["catch"](7);
+              case 15:
+                setSiPhotos(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, bk + '_gps', false)); });
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setSiPhotos(function(p){ return _objectSpread(_objectSpread({},p),{},_defineProperty({},bk+'_gps',false)); }); return _context91.abrupt('return'); }
+                if (!(startLoc && loc)) {
+                  _context91.next = 22;
+                  break;
+                }
+                _context91.next = 19;
+                return getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng);
+              case 19:
+                _context91.t1 = _context91.sent;
+                _context91.next = 23;
+                break;
+              case 22:
+                _context91.t1 = null;
+              case 23:
+                km = _context91.t1;
+                if (onCheckin) onCheckin({
+                  courier_name: courierName,
+                  lat: ((_loc11 = loc) === null || _loc11 === void 0 ? void 0 : _loc11.lat) || null,
+                  lng: ((_loc12 = loc) === null || _loc12 === void 0 ? void 0 : _loc12.lng) || null,
+                  note: "\uD83D\uDCCD Tiba di cabang: ".concat(r.branch_name).concat(km ? ' · ' + km + ' km' : '')
+                });
+                _context91.next = 27;
+                return uploadPhoto(branchPhotos[bk] || null, 'branch', 0, setUploadMsg(bk));
+              case 27:
+                branchPhotoUrl = _context91.sent;
+                if (branchPhotoUrl) {
+                  _context91.next = 31;
+                  break;
+                }
+                if (onQueuePhoto) {
+                  _updatedTrips2 = (r.trips || []).map(function (t) {
+                    return t.no === trip.no ? _objectSpread(_objectSpread({}, t), {}, {
+                      status: 'delivered',
+                      in_transit: false,
+                      delivered_at: new Date().toISOString(),
+                      photo: null,
+                      start_location: startLoc || null,
+                      arrived_location: loc,
+                      distance_km: km
+                    }) : t;
+                  });
+                  _allDone = _updatedTrips2.every(function (t) {
+                    return t.status === 'delivered';
+                  });
+                  pendingIt = (r.items || []).filter(function (it) {
+                    return !_updatedTrips2.find(function (t) {
+                      return t.status === 'delivered' && (t.items || []).find(function (ti) {
+                        return ti.name === it.name;
+                      });
+                    });
+                  });
+                  onUpdateBranch(r.id, {
+                    trips: _updatedTrips2,
+                    status: _allDone && pendingIt.length === 0 ? 'completed' : 'partial'
+                  });
+                  onQueuePhoto(branchPhotos[bk], 'branch', {
+                    type: 'branch_trip_photo',
+                    reqId: r.id,
+                    tripNo: trip.no
+                  });
+                  setUploadMsg(bk)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+                } else {
+                  setUploadMsg(bk)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
+                }
+                return _context91.abrupt("return");
+              case 31:
+                updatedTrips = (r.trips || []).map(function (t) {
+                  return t.no === trip.no ? _objectSpread(_objectSpread({}, t), {}, {
+                    status: 'delivered',
+                    in_transit: false,
+                    delivered_at: new Date().toISOString(),
+                    photo: branchPhotoUrl || null,
+                    start_location: startLoc || null,
+                    arrived_location: loc,
+                    distance_km: km
+                  }) : t;
+                });
+                allDone = updatedTrips.every(function (t) {
+                  return t.status === 'delivered';
+                });
+                pendingItems = (r.items || []).filter(function (it) {
+                  return !updatedTrips.find(function (t) {
+                    return t.status === 'delivered' && (t.items || []).find(function (ti) {
+                      return ti.name === it.name;
+                    });
+                  });
+                });
+                onUpdateBranch(r.id, {
+                  trips: updatedTrips,
+                  status: allDone && pendingItems.length === 0 ? 'completed' : 'partial'
+                });
+              case 35:
+              case "end":
+                return _context91.stop();
+            }
+          }, _callee89, null, [[7, 13]]);
+        }))
+      }, photoMsg[bk] && !photoMsg[bk].startsWith('❌') ? photoMsg[bk] : bGps ? '📡 GPS...' : '✅ Tiba & Diserahkan ke Cabang'))))));
     }
 
     // ── JEMPUT SERVIS dari CABANG ──
@@ -35838,53 +35888,115 @@ function CourierJobTasks(_ref207) {
           background: photoMsg['sip_' + k].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg['sip_' + k]),
-        pendingGps && pendingGps.pk === 'cb_'+k
-          ? /*#__PURE__*/React.createElement("div", {
-              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
-            },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, pendingGps.area),
-              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + pendingGps.endLoc.lat + ',' + pendingGps.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
-                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, pendingGps.destName), "?"
-              ),
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
-                /*#__PURE__*/React.createElement("button", {
-                  className: "btn-green",
-                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
-                  onClick: function() { var fn = pendingGps.saveFn; setPendingGps(null); fn(); }
-                }, '\u2705 Benar, Lanjutkan'),
-                /*#__PURE__*/React.createElement("button", {
-                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-                  onClick: function() { setPendingGps(null); }
-                }, '\uD83D\uDD04 Refresh GPS')
-              )
-            )
-          : /*#__PURE__*/React.createElement("button", {
-              className: "btn-green",
-              style: { width: '100%', padding: '11px', fontWeight: 700, marginTop: 8 },
-              disabled: gpsL || !!photoMsg['sip_' + k] && !photoMsg['sip_' + k].startsWith('\u274C'),
-              onClick: function() {
-                setPhotoMsg(function(prev){ var n=Object.assign({},prev); delete n['sip_' + k]; return n; });
-                if (!siPhotos[k]) { alert('Upload foto bukti tiba di cabang dulu'); return; }
-                var startLoc = getLastCheckin();
-                getGPS().then(function(endLoc) {
-                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
-                  fetch('https://nominatim.openstreetmap.org/reverse?lat='+endLoc.lat+'&lon='+endLoc.lng+'&format=json&accept-language=id')
-                    .then(function(res){ return res.json(); })
-                    .then(function(geo) {
-                      var a = geo.address || {};
-                      var area = [a.road||a.pedestrian,a.neighbourhood||a.suburb||a.quarter||a.village,a.city_district||a.district].filter(Boolean).slice(0,2).join(', ')||(endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5));
-                      setPendingGps({ pk: 'cb_'+k, destName: s.branch_name, area: area, endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveCbPickup(k, s, startLoc, endLoc); } });
-                    }).catch(function() {
-                      setPendingGps({ pk: 'cb_'+k, destName: s.branch_name, area: endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5), endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveCbPickup(k, s, startLoc, endLoc); } });
-                    });
-                }).catch(function() {
-                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
+      }, photoMsg['sip_' + k]), /*#__PURE__*/React.createElement("button", {
+        className: "btn-green",
+        style: {
+          width: '100%',
+          padding: '11px',
+          fontWeight: 700
+        },
+        disabled: gpsL || !!photoMsg['sip_' + k] && !photoMsg['sip_' + k].startsWith('❌'),
+        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee91() {
+          var _loc15, _loc16;
+          var startLoc, loc, km, pickupPhotoUrl;
+          return _regeneratorRuntime().wrap(function _callee91$(_context93) {
+            while (1) switch (_context93.prev = _context93.next) {
+              case 0:
+                setPhotoMsg(function (prev) {
+                  return function (_ref224) {
+                    var _ = _ref224['sip_' + k],
+                      r = _objectWithoutProperties(_ref224, ['sip_' + k].map(_toPropertyKey));
+                    return r;
+                  }(prev);
                 });
-              }
-            }, photoMsg['sip_' + k] && !photoMsg['sip_' + k].startsWith('\u274C') ? photoMsg['sip_' + k] : gpsL ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba')))));
+                if (siPhotos[k]) {
+                  _context93.next = 4;
+                  break;
+                }
+                alert('Upload foto bukti tiba di cabang dulu');
+                return _context93.abrupt("return");
+              case 4:
+                setSiPhotos(function (p) {
+                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, k + '_gps', true));
+                });
+                startLoc = s.cb_transit_start_location || getLastCheckin();
+                loc = null;
+                _context93.prev = 7;
+                _context93.next = 10;
+                return getGPS();
+              case 10:
+                loc = _context93.sent;
+                _context93.next = 15;
+                break;
+              case 13:
+                _context93.prev = 13;
+                _context93.t0 = _context93["catch"](7);
+              case 15:
+                setSiPhotos(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, k + '_gps', false)); });
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setSiPhotos(function(p){ return _objectSpread(_objectSpread({},p),{},_defineProperty({},k+'_gps',false)); }); return _context93.abrupt('return'); }
+                if (!(startLoc && loc)) {
+                  _context93.next = 22;
+                  break;
+                }
+                _context93.next = 19;
+                return getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng);
+              case 19:
+                _context93.t1 = _context93.sent;
+                _context93.next = 23;
+                break;
+              case 22:
+                _context93.t1 = null;
+              case 23:
+                km = _context93.t1;
+                if (onCheckin) onCheckin({
+                  courier_name: courierName,
+                  lat: ((_loc15 = loc) === null || _loc15 === void 0 ? void 0 : _loc15.lat) || null,
+                  lng: ((_loc16 = loc) === null || _loc16 === void 0 ? void 0 : _loc16.lng) || null,
+                  note: "\u2705 Tiba & jemput di cabang: ".concat(s.branch_name).concat(km ? ' · ' + km + ' km' : '')
+                });
+                _context93.next = 27;
+                return uploadPhoto(siPhotos[k], 'si_pickup', 0, setUploadMsg('sip_' + k));
+              case 27:
+                pickupPhotoUrl = _context93.sent;
+                if (pickupPhotoUrl) {
+                  _context93.next = 31;
+                  break;
+                }
+                if (onQueuePhoto) {
+                  onUpdateSI(s.id, {
+                    courier_picked_up: true,
+                    courier_picked_up_at: new Date().toISOString(),
+                    pickup_arrival_photo: null,
+                    pickup_start_location: startLoc || null,
+                    pickup_arrived_location: loc,
+                    pickup_distance_km: km
+                  });
+                  onQueuePhoto(siPhotos[k], 'si_pickup', {
+                    type: 'si_photo_only',
+                    id: s.id,
+                    photoField: 'pickup_arrival_photo'
+                  });
+                  setUploadMsg('sip_' + k)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+                } else {
+                  setUploadMsg('sip_' + k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
+                }
+                return _context93.abrupt("return");
+              case 31:
+                onUpdateSI(s.id, {
+                  courier_picked_up: true,
+                  courier_picked_up_at: new Date().toISOString(),
+                  pickup_arrival_photo: pickupPhotoUrl,
+                  pickup_start_location: startLoc || null,
+                  pickup_arrived_location: loc,
+                  pickup_distance_km: km
+                });
+              case 32:
+              case "end":
+                return _context93.stop();
+            }
+          }, _callee91, null, [[7, 13]]);
+        }))
+      }, photoMsg['sip_' + k] && !photoMsg['sip_' + k].startsWith('❌') ? photoMsg['sip_' + k] : gpsL ? '📡 GPS...' : '✅ Tiba & Sudah Dijemput dari Cabang')))));
     }
 
     // ── ANTAR ke SC ──
@@ -36025,53 +36137,117 @@ function CourierJobTasks(_ref207) {
           background: photoMsg['scr_' + _k].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg['scr_' + _k]),
-        pendingGps && pendingGps.pk === 'sc_'+_k
-          ? /*#__PURE__*/React.createElement("div", {
-              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
-            },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, pendingGps.area),
-              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + pendingGps.endLoc.lat + ',' + pendingGps.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
-                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, pendingGps.destName), "?"
-              ),
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
-                /*#__PURE__*/React.createElement("button", {
-                  className: "btn-green",
-                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
-                  onClick: function() { var fn = pendingGps.saveFn; setPendingGps(null); fn(); }
-                }, '\u2705 Benar, Lanjutkan'),
-                /*#__PURE__*/React.createElement("button", {
-                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-                  onClick: function() { setPendingGps(null); }
-                }, '\uD83D\uDD04 Refresh GPS')
-              )
-            )
-          : /*#__PURE__*/React.createElement("button", {
-              className: "btn-green",
-              style: { width: '100%', padding: '11px', fontWeight: 700, marginTop: 8 },
-              disabled: _gpsL || !!photoMsg['scr_' + _k] && !photoMsg['scr_' + _k].startsWith('\u274C'),
-              onClick: function() {
-                setPhotoMsg(function(prev){ var n=Object.assign({},prev); delete n['scr_' + _k]; return n; });
-                if (!siPhotos[_k]) { alert('Upload foto tanda terima SC dulu'); return; }
-                var startLoc = getLastCheckin();
-                getGPS().then(function(endLoc) {
-                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
-                  fetch('https://nominatim.openstreetmap.org/reverse?lat='+endLoc.lat+'&lon='+endLoc.lng+'&format=json&accept-language=id')
-                    .then(function(res){ return res.json(); })
-                    .then(function(geo) {
-                      var a = geo.address || {};
-                      var area = [a.road||a.pedestrian,a.neighbourhood||a.suburb||a.quarter||a.village,a.city_district||a.district].filter(Boolean).slice(0,2).join(', ')||(endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5));
-                      setPendingGps({ pk: 'sc_'+_k, destName: _s4.service_center_name, area: area, endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveScDelivery(_k, _s4, startLoc, endLoc); } });
-                    }).catch(function() {
-                      setPendingGps({ pk: 'sc_'+_k, destName: _s4.service_center_name, area: endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5), endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveScDelivery(_k, _s4, startLoc, endLoc); } });
-                    });
-                }).catch(function() {
-                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
+      }, photoMsg['scr_' + _k]), /*#__PURE__*/React.createElement("button", {
+        className: "btn-green",
+        style: {
+          width: '100%',
+          padding: '11px',
+          fontWeight: 700
+        },
+        disabled: _gpsL || !!photoMsg['scr_' + _k] && !photoMsg['scr_' + _k].startsWith('❌'),
+        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee93() {
+          var _loc19, _loc20;
+          var startLoc, loc, km, scReceiptPhotoUrl;
+          return _regeneratorRuntime().wrap(function _callee93$(_context95) {
+            while (1) switch (_context95.prev = _context95.next) {
+              case 0:
+                setPhotoMsg(function (prev) {
+                  return function (_ref227) {
+                    var _ = _ref227['scr_' + _k],
+                      r = _objectWithoutProperties(_ref227, ['scr_' + _k].map(_toPropertyKey));
+                    return r;
+                  }(prev);
                 });
-              }
-            }, photoMsg['scr_' + _k] && !photoMsg['scr_' + _k].startsWith('\u274C') ? photoMsg['scr_' + _k] : _gpsL ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba')))));
+                if (siPhotos[_k]) {
+                  _context95.next = 4;
+                  break;
+                }
+                alert('Upload bukti tanda terima dari SC dulu');
+                return _context95.abrupt("return");
+              case 4:
+                setSiPhotos(function (p) {
+                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, _k + '_gps', true));
+                });
+                startLoc = _s4.sc_transit_start_location || getLastCheckin();
+                loc = null;
+                _context95.prev = 7;
+                _context95.next = 10;
+                return getGPS();
+              case 10:
+                loc = _context95.sent;
+                _context95.next = 15;
+                break;
+              case 13:
+                _context95.prev = 13;
+                _context95.t0 = _context95["catch"](7);
+              case 15:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return _context95.abrupt('return'); }
+                setSiPhotos(function (p) {
+                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, _k + '_gps', false));
+                });
+                if (!(startLoc && loc)) {
+                  _context95.next = 22;
+                  break;
+                }
+                _context95.next = 19;
+                return getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng);
+              case 19:
+                _context95.t1 = _context95.sent;
+                _context95.next = 23;
+                break;
+              case 22:
+                _context95.t1 = null;
+              case 23:
+                km = _context95.t1;
+                if (onCheckin) onCheckin({
+                  courier_name: courierName,
+                  lat: ((_loc19 = loc) === null || _loc19 === void 0 ? void 0 : _loc19.lat) || null,
+                  lng: ((_loc20 = loc) === null || _loc20 === void 0 ? void 0 : _loc20.lng) || null,
+                  note: "\u2705 Tiba di SC: ".concat(_s4.service_center_name).concat(km ? ' · ' + km + ' km' : '')
+                });
+                _context95.next = 27;
+                return uploadPhoto(siPhotos[_k], 'sc_receipt', 0, setUploadMsg('scr_' + _k));
+              case 27:
+                scReceiptPhotoUrl = _context95.sent;
+                if (scReceiptPhotoUrl) {
+                  _context95.next = 31;
+                  break;
+                }
+                if (onQueuePhoto) {
+                  onUpdateSI(_s4.id, {
+                    status: 'at_service_center',
+                    sc_receipt_photo: null,
+                    sc_delivered_at: new Date().toISOString(),
+                    sc_start_location: startLoc || null,
+                    sc_arrived_location: loc,
+                    sc_distance_km: km
+                  });
+                  onQueuePhoto(siPhotos[_k], 'sc_receipt', {
+                    type: 'si_photo_only',
+                    id: _s4.id,
+                    photoField: 'sc_receipt_photo'
+                  });
+                  setUploadMsg('scr_' + _k)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+                } else {
+                  setUploadMsg('scr_' + _k)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
+                }
+                return _context95.abrupt("return");
+              case 31:
+                onUpdateSI(_s4.id, {
+                  status: 'at_service_center',
+                  sc_receipt_photo: scReceiptPhotoUrl,
+                  sc_delivered_at: new Date().toISOString(),
+                  sc_start_location: startLoc || null,
+                  sc_arrived_location: loc,
+                  sc_distance_km: km
+                });
+              case 32:
+              case "end":
+                return _context95.stop();
+            }
+          }, _callee93, null, [[7, 13]]);
+        }))
+      }, photoMsg['scr_' + _k] && !photoMsg['scr_' + _k].startsWith('❌') ? photoMsg['scr_' + _k] : _gpsL ? '📡 GPS...' : '✅ Tiba & Sudah Diserahkan ke SC')))));
     }
 
     // ── ANTAR ke SC — DIBATALKAN OPS saat kurir masih di jalan ──
@@ -36272,53 +36448,113 @@ function CourierJobTasks(_ref207) {
           background: photoMsg['scp_' + _k2].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg['scp_' + _k2]),
-        pendingGps && pendingGps.pk === 'scp_'+_k2
-          ? /*#__PURE__*/React.createElement("div", {
-              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
-            },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, pendingGps.area),
-              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + pendingGps.endLoc.lat + ',' + pendingGps.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
-                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, pendingGps.destName), "?"
-              ),
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
-                /*#__PURE__*/React.createElement("button", {
-                  className: "btn-green",
-                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
-                  onClick: function() { var fn = pendingGps.saveFn; setPendingGps(null); fn(); }
-                }, '\u2705 Benar, Lanjutkan'),
-                /*#__PURE__*/React.createElement("button", {
-                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-                  onClick: function() { setPendingGps(null); }
-                }, '\uD83D\uDD04 Refresh GPS')
-              )
-            )
-          : /*#__PURE__*/React.createElement("button", {
-              className: "btn-green",
-              style: { width: '100%', padding: '11px', fontWeight: 700, marginTop: 8 },
-              disabled: _gpsL2 || !!photoMsg['scp_' + _k2] && !photoMsg['scp_' + _k2].startsWith('\u274C'),
-              onClick: function() {
-                setPhotoMsg(function(prev){ var n=Object.assign({},prev); delete n['scp_' + _k2]; return n; });
-                if (!siPhotos[_k2]) { alert('Upload foto bukti pengambilan dari SC dulu'); return; }
-                var startLoc = getLastCheckin();
-                getGPS().then(function(endLoc) {
-                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
-                  fetch('https://nominatim.openstreetmap.org/reverse?lat='+endLoc.lat+'&lon='+endLoc.lng+'&format=json&accept-language=id')
-                    .then(function(res){ return res.json(); })
-                    .then(function(geo) {
-                      var a = geo.address || {};
-                      var area = [a.road||a.pedestrian,a.neighbourhood||a.suburb||a.quarter||a.village,a.city_district||a.district].filter(Boolean).slice(0,2).join(', ')||(endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5));
-                      setPendingGps({ pk: 'scp_'+_k2, destName: (typeof scName !== 'undefined' ? scName : 'SC'), area: area, endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveScPickup(_k2, _s6, scName, startLoc, endLoc); } });
-                    }).catch(function() {
-                      setPendingGps({ pk: 'scp_'+_k2, destName: (typeof scName !== 'undefined' ? scName : 'SC'), area: endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5), endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveScPickup(_k2, _s6, scName, startLoc, endLoc); } });
-                    });
-                }).catch(function() {
-                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
+      }, photoMsg['scp_' + _k2]), /*#__PURE__*/React.createElement("button", {
+        className: "btn-green",
+        style: {
+          width: '100%',
+          padding: '11px',
+          fontWeight: 700
+        },
+        disabled: _gpsL2 || !!photoMsg['scp_' + _k2] && !photoMsg['scp_' + _k2].startsWith('❌'),
+        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee95() {
+          var _loc23, _loc24;
+          var startLoc, loc, km, scPickupPhotoUrl;
+          return _regeneratorRuntime().wrap(function _callee95$(_context97) {
+            while (1) switch (_context97.prev = _context97.next) {
+              case 0:
+                setPhotoMsg(function (prev) {
+                  return function (_ref231) {
+                    var _ = _ref231['scp_' + _k2],
+                      r = _objectWithoutProperties(_ref231, ['scp_' + _k2].map(_toPropertyKey));
+                    return r;
+                  }(prev);
                 });
-              }
-            }, photoMsg['scp_' + _k2] && !photoMsg['scp_' + _k2].startsWith('\u274C') ? photoMsg['scp_' + _k2] : _gpsL2 ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba')))));
+                if (siPhotos[_k2]) {
+                  _context97.next = 4;
+                  break;
+                }
+                alert('Upload foto bukti pengambilan dari SC dulu');
+                return _context97.abrupt("return");
+              case 4:
+                setSiPhotos(function (p) {
+                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, _k2 + '_gps', true));
+                });
+                startLoc = _s6.scp_transit_start_location || siPhotos[_k2 + '_startloc'] || getLastCheckin();
+                loc = null;
+                _context97.prev = 7;
+                _context97.next = 10;
+                return getGPS();
+              case 10:
+                loc = _context97.sent;
+                _context97.next = 15;
+                break;
+              case 13:
+                _context97.prev = 13;
+                _context97.t0 = _context97["catch"](7);
+              case 15:
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return _context97.abrupt('return'); }
+                setSiPhotos(function (p) {
+                  return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, _k2 + '_gps', false));
+                });
+                if (!(startLoc && loc)) {
+                  _context97.next = 22;
+                  break;
+                }
+                _context97.next = 19;
+                return getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng);
+              case 19:
+                _context97.t1 = _context97.sent;
+                _context97.next = 23;
+                break;
+              case 22:
+                _context97.t1 = null;
+              case 23:
+                km = _context97.t1;
+                if (onCheckin) onCheckin({
+                  courier_name: courierName,
+                  lat: ((_loc23 = loc) === null || _loc23 === void 0 ? void 0 : _loc23.lat) || null,
+                  lng: ((_loc24 = loc) === null || _loc24 === void 0 ? void 0 : _loc24.lng) || null,
+                  note: "\u2705 Ambil dari SC: ".concat(scName).concat(km ? ' · ' + km + ' km' : '')
+                });
+                _context97.next = 27;
+                return uploadPhoto(siPhotos[_k2] || null, 'sc_pickup', 0, setUploadMsg('scp_' + _k2));
+              case 27:
+                scPickupPhotoUrl = _context97.sent;
+                if (scPickupPhotoUrl) {
+                  _context97.next = 31;
+                  break;
+                }
+                if (onQueuePhoto) {
+                  onUpdateSI(_s6.id, {
+                    status: 'back_from_sc',
+                    sc_picked_up_at: new Date().toISOString(),
+                    sc_pickup_photo: null,
+                    scp_distance_km: km || null
+                  });
+                  onQueuePhoto(siPhotos[_k2], 'sc_pickup', {
+                    type: 'si_photo_only',
+                    id: _s6.id,
+                    photoField: 'sc_pickup_photo'
+                  });
+                  setUploadMsg('scp_' + _k2)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+                } else {
+                  setUploadMsg('scp_' + _k2)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
+                }
+                return _context97.abrupt("return");
+              case 31:
+                onUpdateSI(_s6.id, {
+                  status: 'back_from_sc',
+                  sc_picked_up_at: new Date().toISOString(),
+                  sc_pickup_photo: scPickupPhotoUrl || null,
+                  scp_distance_km: km || null
+                });
+              case 32:
+              case "end":
+                return _context97.stop();
+            }
+          }, _callee95, null, [[7, 13]]);
+        }))
+      }, photoMsg['scp_' + _k2] && !photoMsg['scp_' + _k2].startsWith('❌') ? photoMsg['scp_' + _k2] : _gpsL2 ? '📡 GPS...' : '✅ Tiba & Sudah Diambil dari SC')))));
     }
 
     // ── ANTAR BALIK ke Customer ──
@@ -36484,53 +36720,116 @@ function CourierJobTasks(_ref207) {
           background: photoMsg['ret_' + retKey].startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
           borderRadius: 6
         }
-      }, photoMsg['ret_' + retKey]),
-        pendingGps && pendingGps.pk === 'ret_'+retKey
-          ? /*#__PURE__*/React.createElement("div", {
-              style: { background: 'rgba(59,130,246,0.08)', border: '1px solid var(--blue)', borderRadius: 10, padding: '12px', marginTop: 8 }
-            },
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 4 } }, "\uD83D\uDCCD Lokasi GPS terdeteksi:"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 14, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 } }, pendingGps.area),
-              /*#__PURE__*/React.createElement("a", { href: 'https://maps.google.com?q=' + pendingGps.endLoc.lat + ',' + pendingGps.endLoc.lng, target: '_blank', style: { fontSize: 11, color: 'var(--text3)' } }, "\uD83D\uDDFA\uFE0F Lihat di Maps"),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', margin: '8px 0 10px' } },
-                "Apakah ini lokasi yang benar di ", /*#__PURE__*/React.createElement("strong", null, pendingGps.destName), "?"
-              ),
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8 } },
-                /*#__PURE__*/React.createElement("button", {
-                  className: "btn-green",
-                  style: { flex: 1, padding: '10px', fontWeight: 700, fontSize: 13 },
-                  onClick: function() { var fn = pendingGps.saveFn; setPendingGps(null); fn(); }
-                }, '\u2705 Benar, Lanjutkan'),
-                /*#__PURE__*/React.createElement("button", {
-                  style: { padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-                  onClick: function() { setPendingGps(null); }
-                }, '\uD83D\uDD04 Refresh GPS')
-              )
-            )
-          : /*#__PURE__*/React.createElement("button", {
-              className: "btn-green",
-              style: { width: '100%', padding: '11px', fontWeight: 700, marginTop: 8 },
-              disabled: retGpsLoading || !!photoMsg['ret_' + retKey] && !photoMsg['ret_' + retKey].startsWith('\u274C'),
-              onClick: function() {
-                setPhotoMsg(function(prev){ var n=Object.assign({},prev); delete n['ret_' + retKey]; return n; });
-                if (!siPhotos[retKey]) { alert('Foto bukti serah terima wajib diupload dulu'); return; }
-                var startLoc = getLastCheckin();
-                getGPS().then(function(endLoc) {
-                  if (!endLoc) { showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); return; }
-                  fetch('https://nominatim.openstreetmap.org/reverse?lat='+endLoc.lat+'&lon='+endLoc.lng+'&format=json&accept-language=id')
-                    .then(function(res){ return res.json(); })
-                    .then(function(geo) {
-                      var a = geo.address || {};
-                      var area = [a.road||a.pedestrian,a.neighbourhood||a.suburb||a.quarter||a.village,a.city_district||a.district].filter(Boolean).slice(0,2).join(', ')||(endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5));
-                      setPendingGps({ pk: 'ret_'+retKey, destName: (_s7.source_type === 'branch' ? _s7.branch_name : _s7.customer_name), area: area, endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveReturn(retKey, _s7, startLoc, endLoc); } });
-                    }).catch(function() {
-                      setPendingGps({ pk: 'ret_'+retKey, destName: (_s7.source_type === 'branch' ? _s7.branch_name : _s7.customer_name), area: endLoc.lat.toFixed(5)+', '+endLoc.lng.toFixed(5), endLoc: endLoc, startLoc: startLoc, saveFn: function() { doSaveReturn(retKey, _s7, startLoc, endLoc); } });
-                    });
-                }).catch(function() {
-                  showToast('\u26A0 GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error');
+      }, photoMsg['ret_' + retKey]), /*#__PURE__*/React.createElement("button", {
+        className: "btn-green",
+        style: {
+          width: '100%',
+          padding: '11px',
+          fontWeight: 700
+        },
+        disabled: retGpsLoading || !!photoMsg['ret_' + retKey] && !photoMsg['ret_' + retKey].startsWith('❌'),
+        onClick: /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee97() {
+          var _loc27, _loc28;
+          var startLoc, loc, rKm, dest2, retPhotoUrl;
+          return _regeneratorRuntime().wrap(function _callee97$(_context99) {
+            while (1) switch (_context99.prev = _context99.next) {
+              case 0:
+                setPhotoMsg(function (prev) {
+                  return function (_ref234) {
+                    var _ = _ref234['ret_' + retKey],
+                      r = _objectWithoutProperties(_ref234, ['ret_' + retKey].map(_toPropertyKey));
+                    return r;
+                  }(prev);
                 });
-              }
-            }, photoMsg['ret_' + retKey] && !photoMsg['ret_' + retKey].startsWith('\u274C') ? photoMsg['ret_' + retKey] : retGpsLoading ? '\uD83D\uDCE1 Mengambil GPS...' : '\uD83D\uDCCD Konfirmasi Tiba'))))));
+                if (siPhotos[retKey]) {
+                  _context99.next = 4;
+                  break;
+                }
+                alert('Foto bukti serah terima wajib diupload dulu');
+                return _context99.abrupt("return");
+              case 4:
+                setRetGps(true);
+                startLoc = _s7.return_transit_start_location || getLastCheckin() || null;
+                loc = null;
+                _context99.prev = 7;
+                _context99.next = 10;
+                return getGPS();
+              case 10:
+                loc = _context99.sent;
+                _context99.next = 15;
+                break;
+              case 13:
+                _context99.prev = 13;
+                _context99.t0 = _context99["catch"](7);
+              case 15:
+                setRetGps(false);
+                if (!loc) { showToast('⚠ GPS tidak tersedia. Aktifkan GPS dan coba lagi.', 'error'); setRetGps(false); return _context99.abrupt('return'); }
+                if (!(startLoc && loc)) {
+                  _context99.next = 22;
+                  break;
+                }
+                _context99.next = 19;
+                return getRoadDistanceKm(startLoc.lat, startLoc.lng, loc.lat, loc.lng);
+              case 19:
+                _context99.t1 = _context99.sent;
+                _context99.next = 23;
+                break;
+              case 22:
+                _context99.t1 = null;
+              case 23:
+                rKm = _context99.t1;
+                dest2 = _s7.source_type === 'branch' ? _s7.branch_name : _s7.customer_name;
+                if (onCheckin) onCheckin({
+                  courier_name: courierName,
+                  lat: ((_loc27 = loc) === null || _loc27 === void 0 ? void 0 : _loc27.lat) || null,
+                  lng: ((_loc28 = loc) === null || _loc28 === void 0 ? void 0 : _loc28.lng) || null,
+                  note: "\uD83D\uDCCD Serah terima ke ".concat(dest2).concat(rKm ? ' · ' + rKm + ' km' : '')
+                });
+                _context99.next = 28;
+                return uploadPhoto(siPhotos[retKey], 'si_return', 0, setUploadMsg('ret_' + retKey));
+              case 28:
+                retPhotoUrl = _context99.sent;
+                if (retPhotoUrl) {
+                  _context99.next = 32;
+                  break;
+                }
+                if (onQueuePhoto) {
+                  onUpdateSI(_s7.id, {
+                    return_status: 'returned',
+                    return_photo: null,
+                    returned_at: new Date().toISOString(),
+                    return_start_location: startLoc || null,
+                    return_arrived_location: loc,
+                    return_distance_km: rKm
+                  });
+                  onQueuePhoto(siPhotos[retKey], 'si_return', {
+                    type: 'si_photo_only',
+                    id: _s7.id,
+                    photoField: 'return_photo'
+                  });
+                  setUploadMsg('ret_' + retKey)('📱 Data tersimpan! Foto menyusul otomatis saat sinyal kembali');
+                  setRetStep('done');
+                } else {
+                  setUploadMsg('ret_' + retKey)('❌ Foto gagal diupload. Pastikan internet aktif lalu foto ulang & coba lagi.');
+                }
+                return _context99.abrupt("return");
+              case 32:
+                onUpdateSI(_s7.id, {
+                  return_status: 'returned',
+                  return_photo: retPhotoUrl,
+                  returned_at: new Date().toISOString(),
+                  return_start_location: startLoc || null,
+                  return_arrived_location: loc,
+                  return_distance_km: rKm
+                });
+                setRetStep('done');
+              case 34:
+              case "end":
+                return _context99.stop();
+            }
+          }, _callee97, null, [[7, 13]]);
+        }))
+      }, photoMsg['ret_' + retKey] && !photoMsg['ret_' + retKey].startsWith('❌') ? photoMsg['ret_' + retKey] : retGpsLoading ? '📡 GPS...' : _s7.source_type === 'branch' ? "\u2705 Sudah Diserahkan ke Cabang ".concat(_s7.branch_name || '') : '✅ Konfirmasi Sudah Diserahkan ke Customer'))))));
     }
     return null;
   }), filter === 'active' && totalActive === 0 && /*#__PURE__*/React.createElement("div", {
@@ -46359,79 +46658,6 @@ function OrderDetailModal(_ref278) {
 }
 
 
-// ─── PRICELIST SYNC PAGE ──────────────────────────────────────────
-function PricelistSyncPage() {
-  var _s = React.useState(null); var syncStatus = _s[0]; var setSyncStatus = _s[1];
-  var _l = React.useState(false); var loading = _l[0]; var setLoading = _l[1];
-  var _m = React.useState(null); var msg = _m[0]; var setMsg = _m[1];
-  var _st = React.useState(null); var statusData = _st[0]; var setStatusData = _st[1];
-
-  var CONN = 'https://connectoracc.dzoutlet.co.id';
-  var KEY  = 'dzone-connector-secret-2026';
-
-  React.useEffect(function() {
-    fetch(CONN + '/api/sheet/status', { headers: { 'x-api-key': KEY } })
-      .then(function(r) { return r.json(); })
-      .then(function(d) { setStatusData(d.stock_sync); })
-      .catch(function() {});
-  }, []);
-
-  function handleSync() {
-    setLoading(true); setMsg(null);
-    fetch(CONN + '/api/sheet/sync', {
-      method: 'POST',
-      headers: { 'x-api-key': KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      setMsg(d.message || 'Sync dimulai. Google Sheet akan diperbarui dalam 5-7 menit.');
-      setLoading(false);
-    })
-    .catch(function(e) { setMsg('Error: ' + e.message); setLoading(false); });
-  }
-
-  var cardStyle = { background: 'var(--bg2)', borderRadius: 12, padding: '20px 24px', marginBottom: 16, border: '1px solid var(--border)' };
-  var labelStyle = { fontSize: 12, color: 'var(--text3)', marginBottom: 4 };
-  var valueStyle = { fontSize: 14, fontWeight: 600 };
-
-  return React.createElement('div', { style: { padding: '24px', maxWidth: 560 } },
-    React.createElement('h2', { style: { fontSize: 20, fontWeight: 700, marginBottom: 6 } }, '📋 Tarik Data Pricelist'),
-    React.createElement('p', { style: { color: 'var(--text3)', fontSize: 14, marginBottom: 20 } },
-      'Memperbarui stok dan modal di Google Sheet Pricelist dari data Accurate terkini. Proses berjalan di background (±5 menit).'),
-
-    React.createElement('div', { style: cardStyle },
-      React.createElement('div', { style: { ...labelStyle, marginBottom: 12 } }, 'STATUS SINKRONISASI TERAKHIR'),
-      statusData ? statusData.map(function(s) {
-        return React.createElement('div', { key: s.accurate_db_id, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } },
-          React.createElement('span', { style: valueStyle }, s.db_alias),
-          React.createElement('div', { style: { textAlign: 'right' } },
-            React.createElement('div', { style: { ...valueStyle, color: s.status === 'idle' ? 'var(--green,#22c55e)' : s.status === 'syncing' ? '#f59e0b' : '#ef4444', fontSize: 12 } }, s.status),
-            React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, s.last_sync_at ? new Date(s.last_sync_at).toLocaleString('id-ID') : 'Belum pernah sync'),
-            React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, s.total_items ? s.total_items + ' items' : '')
-          )
-        );
-      }) : React.createElement('div', { style: { color: 'var(--text3)', fontSize: 13 } }, 'Memuat status...')
-    ),
-
-    React.createElement('div', { style: cardStyle },
-      React.createElement('div', { style: { ...labelStyle, marginBottom: 12 } }, 'JADWAL OTOMATIS'),
-      ['09:45', '15:00', '18:30', '21:00'].map(function(t) {
-        return React.createElement('span', { key: t, style: { display: 'inline-block', background: 'var(--bg3,var(--bg1))', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', marginRight: 8, marginBottom: 6, fontSize: 13, fontWeight: 600 } }, t);
-      }),
-      React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 8 } }, 'Jadwal berjalan otomatis setiap hari.')
-    ),
-
-    msg && React.createElement('div', { style: { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 14, color: msg.startsWith('Error') ? '#ef4444' : 'var(--text1)' } }, msg),
-
-    React.createElement('button', {
-      onClick: handleSync,
-      disabled: loading,
-      style: { background: loading ? 'var(--border)' : '#2563eb', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 28px', fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', width: '100%' }
-    }, loading ? '⏳ Memproses...' : '🔄 Tarik Data Sekarang')
-  );
-}
-
 // ─── SANTO DASHBOARD ──────────────────────────────────────────────
 function SantoDashboard() {
   var _s1 = React.useState(function() {
@@ -46441,10 +46667,6 @@ function SantoDashboard() {
   var _s3 = React.useState(false); var loading = _s3[0]; var setLoading = _s3[1];
   var _s4 = React.useState(null); var error = _s4[0]; var setError = _s4[1];
   var _s5 = React.useState('Semua'); var activeBranch = _s5[0]; var setActiveBranch = _s5[1];
-  var _s6 = React.useState(null); var gpData = _s6[0]; var setGpData = _s6[1];
-
-  var SD_WHITELIST = new Set(['APRIL','ULIN','RIA','FAJAR','ARYA','MONA','GUSTI','RIZAL','DEFA','SANDI','DARTIK','TITI','ADE','LILI']);
-  var normFirst = function(n) { return (n||'').trim().toUpperCase().split(/[\s_]/)[0]; };
 
   var BRANCHES = ['Semua', 'Tangerang', 'Poins', 'Mangga Dua'];
   var BRANCH_STORES = { Tangerang: 'TC DZ · TC NMC · TC HOI', Poins: 'PS NMC', 'Mangga Dua': 'M2 DZ · M2 BIG · M2 ADL' };
@@ -46459,18 +46681,10 @@ function SantoDashboard() {
 
   React.useEffect(function() {
     if (!period) return;
-    var parts = period.split('-'); var yr = parts[0]; var mo = parseInt(parts[1], 10);
-    setLoading(true); setError(null); setData(null); setGpData(null); setActiveBranch('Semua');
-    Promise.all([
-      fetch('/api/accurate?period=' + period).then(function(r){ return r.json(); }),
-      fetch('/api/sales-gp?year=' + yr + '&month=' + mo).then(function(r){ return r.json(); }).catch(function(){ return null; })
-    ])
-      .then(function(results) {
-        var json = results[0]; var gp = results[1];
-        if (json.error) throw new Error(json.error);
-        setData(json);
-        if (gp && gp.available) setGpData(gp);
-      })
+    setLoading(true); setError(null); setData(null); setActiveBranch('Semua');
+    fetch('/api/accurate?period=' + period)
+      .then(function(r) { return r.json(); })
+      .then(function(json) { if (json.error) throw new Error(json.error); setData(json); })
       .catch(function(e) { setError(e.message); })
       .finally(function() { setLoading(false); });
   }, [period]);
@@ -46602,81 +46816,33 @@ function SantoDashboard() {
           )
         ),
 
-      // Sales list — full width, with laba from sales-gp if available
-      React.createElement('div', { style:Object.assign({}, cs, { marginBottom:16 }) },
-        React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '👤 Penjualan per Sales'),
-        view.salesList.length === 0
-          ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
-          : React.createElement('div', null,
-              // Header row when laba data exists
-              gpData && React.createElement('div', { style:{ display:'flex', gap:8, marginBottom:4, paddingBottom:6, borderBottom:'1px solid var(--border)' } },
-                React.createElement('div', { style:{ width:22 } }, ''),
-                React.createElement('div', { style:{ flex:1, fontSize:10, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.06em' } }, 'Sales'),
-                React.createElement('div', { style:{ width:100, fontSize:10, color:'var(--text3)', textAlign:'right', textTransform:'uppercase', letterSpacing:'.06em' } }, 'Omzet'),
-                React.createElement('div', { style:{ width:90, fontSize:10, color:'var(--text3)', textAlign:'right', textTransform:'uppercase', letterSpacing:'.06em' } }, 'Laba'),
-                React.createElement('div', { style:{ width:52, fontSize:10, color:'var(--text3)', textAlign:'right', textTransform:'uppercase', letterSpacing:'.06em' } }, 'Margin')
-              ),
-              view.salesList.map(function(s, i) {
-                var labaEntry = gpData ? (gpData.combined.list||[]).find(function(g){ return normFirst(g.name) === normFirst(s.name); }) : null;
-                var laba   = labaEntry ? labaEntry.laba    : null;
-                var margin = (laba != null && s.revenue > 0) ? (laba / s.revenue * 100).toFixed(1) : null;
-                return React.createElement('div', { key:s.name, style:{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', borderTop: i===0?'none':'1px solid var(--border)' } },
-                  React.createElement('div', { style:{ width:22, fontSize:11, color:'var(--text3)', textAlign:'right', flexShrink:0 } }, '#'+(i+1)),
+      // Sales + Items
+      React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 } },
+        React.createElement('div', { style:cs },
+          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '👤 Penjualan per Sales'),
+          view.salesList.length === 0
+            ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
+            : view.salesList.map(function(s, i) {
+                return React.createElement('div', { key:s.name, style:{ display:'flex', alignItems:'center', gap:8, marginBottom:8 } },
+                  React.createElement('div', { style:{ width:22, fontSize:11, color:'var(--text3)', textAlign:'right' } }, '#'+(i+1)),
                   React.createElement('div', { style:{ flex:1, fontSize:13, fontWeight:500 } }, s.name),
-                  React.createElement('div', { style:{ width:100, fontSize:13, fontFamily:'DM Mono', color:'var(--text2)', textAlign:'right', flexShrink:0 } }, fmtRp(s.revenue)),
-                  gpData && React.createElement('div', { style:{ width:90, fontSize:13, fontFamily:'DM Mono', textAlign:'right', flexShrink:0, color: laba == null ? 'var(--text3)' : laba >= 0 ? '#22c55e' : '#ef4444' } },
-                    laba == null ? '—' : fmtRp(laba)
-                  ),
-                  gpData && React.createElement('div', { style:{ width:52, fontSize:12, fontFamily:'DM Mono', textAlign:'right', flexShrink:0, color: margin == null ? 'var(--text3)' : Number(margin)>=10?'#22c55e':Number(margin)>=5?'#f59e0b':'var(--text2)' } },
-                    margin == null ? '—' : margin + '%'
-                  )
+                  React.createElement('div', { style:{ fontSize:13, fontFamily:'DM Mono', color:'var(--text2)' } }, fmtRp(s.revenue))
                 );
               })
-            )
-      ),
-
-      // Qty per Kategori per Sales (NB/PC/Monitor/Printer/Projector) — Semua only, from DB
-      activeBranch === 'Semua' && data.catPerSales && data.catPerSales.length > 0 &&
-        React.createElement('div', { style:Object.assign({}, cs, { marginBottom:16, overflowX:'auto' }) },
-          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '📦 Unit per Kategori per Sales'),
-          React.createElement('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:12, fontFamily:'DM Mono, monospace' } },
-            React.createElement('thead', null,
-              React.createElement('tr', null,
-                ['Sales','Notebook','PC/AIO','Monitor','Printer','Projector','Total'].map(function(h, hi) {
-                  return React.createElement('th', { key:h, style:{ padding:'6px 8px', textAlign: hi===0?'left':'right', fontSize:10, color:'var(--text3)', textTransform:'uppercase', letterSpacing:'.06em', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' } }, h);
-                })
-              )
-            ),
-            React.createElement('tbody', null,
-              data.catPerSales.filter(function(r){ return SD_WHITELIST.has(normFirst(r.name)); }).map(function(r, i) {
-                var total = r.nb + r.pc + r.monitor + r.printer + r.projector;
-                return React.createElement('tr', { key:r.name, style:{ background: i%2===0?'transparent':'var(--border)' } },
-                  React.createElement('td', { style:{ padding:'5px 8px', fontWeight:500, fontFamily:'inherit', fontSize:13, color:'var(--text1)', whiteSpace:'nowrap' } }, r.name),
-                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', color: r.nb>0?'var(--text1)':'var(--text3)' } }, r.nb>0 ? r.nb : '—'),
-                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', color: r.pc>0?'var(--text1)':'var(--text3)' } }, r.pc>0 ? r.pc : '—'),
-                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', color: r.monitor>0?'var(--text1)':'var(--text3)' } }, r.monitor>0 ? r.monitor : '—'),
-                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', color: r.printer>0?'var(--text1)':'var(--text3)' } }, r.printer>0 ? r.printer : '—'),
-                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', color: r.projector>0?'var(--text1)':'var(--text3)' } }, r.projector>0 ? r.projector : '—'),
-                  React.createElement('td', { style:{ padding:'5px 8px', textAlign:'right', fontWeight:600, color:'var(--text1)' } }, total>0 ? total : '—')
-                );
-              }),
-              // Totals row
-              React.createElement('tr', { style:{ borderTop:'2px solid var(--border)', fontWeight:700 } },
-                React.createElement('td', { style:{ padding:'7px 8px', fontSize:12, color:'var(--text2)' } }, 'Total'),
-                (function() {
-                  var wl = data.catPerSales.filter(function(r){ return SD_WHITELIST.has(normFirst(r.name)); });
-                  var sum = function(f){ return wl.reduce(function(s,r){ return s+r[f]; },0); };
-                  var cols = ['nb','pc','monitor','printer','projector'];
-                  var totals = cols.map(sum);
-                  var grand = totals.reduce(function(s,v){ return s+v; },0);
-                  return cols.map(function(f,fi){
-                    return React.createElement('td', { key:f, style:{ padding:'7px 8px', textAlign:'right', color: totals[fi]>0?'var(--text1)':'var(--text3)' } }, totals[fi]>0 ? totals[fi] : '—');
-                  }).concat([React.createElement('td', { key:'grand', style:{ padding:'7px 8px', textAlign:'right' } }, grand)]);
-                })()
-              )
-            )
-          )
         ),
+        React.createElement('div', { style:cs },
+          React.createElement('div', { style:{ fontWeight:600, marginBottom:12, fontSize:14 } }, '🏆 Barang Terlaris (Top 10)'),
+          view.topItems.length === 0
+            ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data')
+            : view.topItems.map(function(it, i) {
+                return React.createElement('div', { key:it.name, style:{ display:'flex', alignItems:'center', gap:8, marginBottom:7 } },
+                  React.createElement('div', { style:{ width:22, fontSize:11, color:'var(--text3)', textAlign:'right' } }, '#'+(i+1)),
+                  React.createElement('div', { style:{ flex:1, fontSize:12 } }, it.name),
+                  React.createElement('div', { style:{ fontSize:12, color:'var(--text3)' } }, fmtNum(it.qty)+' pcs')
+                );
+              })
+        )
+      ),
 
       // Brand + Category
       React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 } },
@@ -46716,655 +46882,387 @@ function SantoDashboard() {
   );
 }
 
-// ─── BUSINESS ANALYST PAGE ─────────────────────────────────────────
-var _BI_DESC = { Santo: 'Retail · Operasional · SDM', Angel: 'Korporat · Pertumbuhan', Liana: 'Keuangan · Revenue · AR', Lukas: 'Produk · Channel · Stok', Jenny: 'Pembelian · Supplier · Servis' };
-function BusinessAnalystPage(_ref_bi) {
-  var persona = _ref_bi.persona;
-  var _now = new Date();
-  var _bs1 = React.useState(_now.getFullYear()); var biYear = _bs1[0]; var setBiYear = _bs1[1];
-  var _bs2 = React.useState(_now.getMonth() + 1); var biMonth = _bs2[0]; var setBiMonth = _bs2[1];
-  var _bs3 = React.useState(null); var biResult = _bs3[0]; var setBiResult = _bs3[1];
-  var _bs4 = React.useState(false); var biLoading = _bs4[0]; var setBiLoading = _bs4[1];
-  var _bs5 = React.useState(null); var biErr = _bs5[0]; var setBiErr = _bs5[1];
-  var _ai1 = React.useState(null);  var _aiInsights = _ai1[0]; var _setAiInsights = _ai1[1];
-  var _ai2 = React.useState(false); var _aiLoading  = _ai2[0]; var _setAiLoading  = _ai2[1];
-  var _ai3 = React.useState(true);  var _aiExpanded = _ai3[0]; var _setAiExpanded = _ai3[1];
-  var _BI_MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-  function _fRp(v) {
-    if (v == null) return '—';
-    var n = Math.abs(+v), s = +v < 0 ? '-' : '';
-    if (n >= 1e9) return s + 'Rp ' + (n/1e9).toFixed(2) + 'M';
-    if (n >= 1e6) return s + 'Rp ' + (n/1e6).toFixed(1) + 'jt';
-    return s + 'Rp ' + Math.round(n).toLocaleString('id-ID');
-  }
-  function _fPct(v) { return v == null ? '' : (v > 0 ? '+' : '') + v + '%'; }
-  function _pColor(v) { return v == null ? 'var(--text3)' : v >= 0 ? '#22c55e' : '#ef4444'; }
-  function _fNum(v) { return (v || 0).toLocaleString('id-ID'); }
-  React.useEffect(function() {
-    setBiLoading(true); setBiErr(null); setBiResult(null);
-    fetch('/api/bi?persona=' + encodeURIComponent(persona) + '&year=' + biYear + '&month=' + biMonth)
+// ─── TARIK PRICELIST PAGE ─────────────────────────────────────────
+function TarikPricelistPage() {
+  var _s = React.useState(null); var status = _s[0]; var setStatus = _s[1];
+  var _s2 = React.useState(false); var loading = _s2[0]; var setLoading = _s2[1];
+  var CONNECTOR = 'https://connectoracc.dzoutlet.co.id';
+  var API_KEY = 'dzone-connector-secret-2026';
+
+  function trigger() {
+    if (!window.confirm('Tarik pricelist dari Accurate dan update Google Sheet sekarang?')) return;
+    setLoading(true); setStatus(null);
+    fetch(CONNECTOR + '/api/sheet/sync', {
+      method: 'POST',
+      headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' }
+    })
       .then(function(r) { return r.json(); })
-      .then(function(j) { if (j.error) throw new Error(j.error); setBiResult(j); })
-      .catch(function(e) { setBiErr(e.message); })
-      .finally(function() { setBiLoading(false); });
-  }, [persona, biYear, biMonth]);
-  // Reset AI insights when persona/period changes
-  React.useEffect(function() {
-    _setAiInsights(null); _setAiLoading(false);
-  }, [persona, biYear, biMonth]);
-  // Fetch AI insights after KPI data loads (lazy, non-blocking)
-  React.useEffect(function() {
-    var bd = biResult && biResult.data;
-    if (!bd) return;
-    _setAiInsights(null); _setAiLoading(true);
-    fetch('/api/bi-insights?persona=' + encodeURIComponent(persona) + '&year=' + biYear + '&month=' + biMonth)
-      .then(function(r) { return r.ok ? r.json() : Promise.reject('HTTP ' + r.status); })
-      .then(function(d) { if (d.available !== false && d.insights) _setAiInsights(d.insights); })
-      .catch(function() { /* fail silently — dashboard works without AI */ })
-      .finally(function() { _setAiLoading(false); });
-  }, [biResult, persona, biYear, biMonth]);
-  var _bd = biResult && biResult.data;
-  var _cs = { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px', flex: '1 1 180px', minWidth: 160 };
-  var _lbs = { fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 };
-  var _vbs = { fontSize: 22, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 };
-  function _KC(key, label, value, sub, sc) {
-    return React.createElement('div', { key: key, style: _cs },
-      React.createElement('div', { style: _lbs }, label),
-      React.createElement('div', { style: _vbs }, value),
-      sub != null ? React.createElement('div', { style: { fontSize: 12, color: sc || 'var(--text3)', marginTop: 3 } }, sub) : null
-    );
+      .then(function(d) { setStatus({ ok: true, msg: d.message || JSON.stringify(d) }); })
+      .catch(function(e) { setStatus({ ok: false, msg: e.message }); })
+      .finally(function() { setLoading(false); });
   }
-  function _Sec(label, children) {
-    return React.createElement('div', { style: { marginBottom: 20 } },
-      React.createElement('div', { style: { fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.05em' } }, label),
-      children
-    );
-  }
-  function _Row(items) {
-    return React.createElement('div', { style: { display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 } }, items);
-  }
-  function _Tbl(hdrs, rows) {
-    return React.createElement('div', { style: { overflowX: 'auto', marginBottom: 4 } },
-      React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 13 } },
-        React.createElement('thead', null, React.createElement('tr', null,
-          hdrs.map(function(h,i) { return React.createElement('th', { key: i, style: { textAlign: i > 0 ? 'right' : 'left', padding: '6px 10px', borderBottom: '1px solid var(--border)', color: 'var(--text3)', fontWeight: 500, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' } }, h); })
-        )),
-        React.createElement('tbody', null,
-          rows.map(function(row, ri) { return React.createElement('tr', { key: ri, style: { borderBottom: '1px solid var(--border)' } },
-            row.map(function(c, ci) { return React.createElement('td', { key: ci, style: { textAlign: ci > 0 ? 'right' : 'left', padding: '8px 10px', color: 'var(--text)' } }, c); })
-          ); })
-        )
-      )
-    );
-  }
-  function _renderAIPanel() {
-    if (!_aiInsights && !_aiLoading) return null;
-    var _pclr = function(p) { return p === 1 ? '#ef4444' : p === 2 ? '#f97316' : '#eab308'; };
-    var _sec = function(label, color, items, bg) {
-      return React.createElement('div', null,
-        React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: color, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' } }, label),
-        React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
-          items.map(function(item, i) {
-            var pc = _pclr(item.priority || 2);
-            return React.createElement('div', { key: i, style: { display: 'flex', gap: 10, padding: '8px 12px', background: bg, borderRadius: 7, borderLeft: '3px solid ' + pc } },
-              React.createElement('span', { style: { fontSize: 11, fontWeight: 700, color: pc, flexShrink: 0, marginTop: 2 } }, 'P' + (item.priority || 2)),
-              React.createElement('div', null,
-                React.createElement('div', { style: { fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 } }, item.judul || ''),
-                React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', lineHeight: 1.6 } }, item.teks || '')
-              )
-            );
-          })
-        )
-      );
-    };
-    return React.createElement('div', { style: { marginBottom: 16, border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--card)' } },
-      React.createElement('div', {
-        onClick: function() { _setAiExpanded(!_aiExpanded); },
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', cursor: 'pointer', userSelect: 'none', borderBottom: _aiExpanded ? '1px solid var(--border)' : 'none', background: 'rgba(99,102,241,0.08)' }
-      },
-        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
-          React.createElement('span', { style: { fontSize: 16 } }, '🤖'),
-          React.createElement('span', { style: { fontWeight: 600, fontSize: 14, color: 'var(--text)' } }, 'AI Business Analyst'),
-          _aiLoading && React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)', marginLeft: 6 } }, '· Memuat analisis...')
-        ),
-        !_aiLoading && React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, _aiExpanded ? '▲' : '▼')
+
+  var cs = { background: 'var(--surface)', borderRadius: 12, padding: '24px', border: '1px solid var(--border)', maxWidth: 480 };
+  return React.createElement('div', { style: { padding: '32px 24px' } },
+    React.createElement('h2', { style: { fontSize: 18, fontWeight: 700, marginBottom: 8 } }, '🗒️ Tarik Pricelist'),
+    React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, marginBottom: 24 } }, 'Ambil data harga terbaru dari Accurate dan update Google Sheet secara manual.'),
+    React.createElement('div', { style: cs },
+      React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)', marginBottom: 16 } },
+        'Proses ini biasanya berjalan otomatis sesuai jadwal sync. Klik tombol di bawah untuk memicu sync manual sekarang.'
       ),
-      _aiExpanded && _aiLoading && React.createElement('div', { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 } },
-        [85,65,75].map(function(w, i) { return React.createElement('div', { key: i, style: { height: 13, background: 'var(--border)', borderRadius: 6, opacity: 0.5, width: w + '%' } }); })
+      React.createElement('button', {
+        onClick: trigger, disabled: loading,
+        style: { padding: '10px 20px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }
+      }, loading ? '⏳ Sedang proses...' : '🔄 Tarik Pricelist Sekarang'),
+      status && React.createElement('div', {
+        style: { marginTop: 16, padding: '10px 14px', borderRadius: 8, background: status.ok ? '#f0fdf4' : '#fef2f2',
+          color: status.ok ? '#166534' : '#991b1b', fontSize: 13, border: '1px solid ' + (status.ok ? '#bbf7d0' : '#fecaca') }
+      }, status.ok ? '✅ ' : '❌ ', status.msg)
+    )
+  );
+}
+
+// ─── REVISI KODE PELANGGAN PAGE ────────────────────────────────────
+var RKP_CONNECTOR = 'https://connectoracc.dzoutlet.co.id';
+var RKP_API_KEY   = 'dzone-connector-secret-2026';
+
+function RevisiKodePelangganPage() {
+  var _s1 = React.useState(null); var data = _s1[0]; var setData = _s1[1];
+  var _s2 = React.useState(false); var loading = _s2[0]; var setLoading = _s2[1];
+  var _s3 = React.useState(null); var err = _s3[0]; var setErr = _s3[1];
+  var _s4 = React.useState({}); var rowStatus = _s4[0]; var setRowStatus = _s4[1]; // id → 'loading'|'done'|'skip'|'error'
+  var _s5 = React.useState('c68'); var activeTab = _s5[0]; var setActiveTab = _s5[1];
+
+  function loadAudit(force) {
+    setLoading(true); setErr(null);
+    var url = RKP_CONNECTOR + '/api/customers/audit' + (force ? '?refresh=1' : '');
+    fetch(url, { headers: { 'X-API-Key': RKP_API_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { if (d.error) throw new Error(d.error); setData(d); })
+      .catch(function(e) { setErr(e.message); })
+      .finally(function() { setLoading(false); });
+  }
+
+  React.useEffect(function() { loadAudit(false); }, []);
+
+  function approve(item, usulan) {
+    if (!usulan) return;
+    setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'loading'}); });
+    fetch(RKP_CONNECTOR + '/api/customers/' + item.id, {
+      method: 'PUT',
+      headers: { 'X-API-Key': RKP_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerNo: usulan })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error || (d.s === false)) throw new Error(d.error || (d.d && d.d[0]) || 'Gagal');
+        setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'done'}); });
+      })
+      .catch(function(e) {
+        setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'error:' + e.message}); });
+      });
+  }
+
+  function skip(id) {
+    setRowStatus(function(prev) { return Object.assign({}, prev, {[id]: 'skip'}); });
+  }
+
+  var cs = { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', marginBottom: 16, overflow: 'hidden' };
+  var tabs = [
+    { id: 'c68', label: '68xxx', desc: 'kemungkinan typo 62' },
+    { id: 'c8',  label: '8xxx',  desc: 'hilang awalan 6' },
+    { id: 'cshort', label: 'Kode Pendek', desc: 'bukan nomor HP' },
+  ];
+
+  function renderTable(items, hasUsulan) {
+    var visible = items.filter(function(r) { return rowStatus[r.id] !== 'skip' && rowStatus[r.id] !== 'done'; });
+    var done = items.filter(function(r) { return rowStatus[r.id] === 'done'; }).length;
+    var skipped = items.filter(function(r) { return rowStatus[r.id] === 'skip'; }).length;
+
+    return React.createElement(React.Fragment, null,
+      React.createElement('div', { style: { padding: '10px 16px', fontSize: 12, color: 'var(--text3)', borderBottom: '1px solid var(--border)', display: 'flex', gap: 16 } },
+        React.createElement('span', null, 'Total: ', React.createElement('b', null, items.length)),
+        done > 0 && React.createElement('span', { style: { color: '#16a34a' } }, '✓ Approved: ', done),
+        skipped > 0 && React.createElement('span', { style: { color: 'var(--text3)' } }, 'Dilewati: ', skipped),
+        React.createElement('span', null, 'Sisa: ', React.createElement('b', null, visible.length))
       ),
-      _aiExpanded && _aiInsights && React.createElement('div', { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: 14 } },
-        _aiInsights.executive_summary && React.createElement('div', { style: { fontSize: 13, lineHeight: 1.7, color: 'var(--text)', padding: '10px 14px', background: 'rgba(99,102,241,0.06)', borderRadius: 8, borderLeft: '3px solid #6366f1' } }, _aiInsights.executive_summary),
-        _aiInsights.needs_attention && _aiInsights.needs_attention.length > 0 && _sec('⚠️ Perlu Perhatian', '#ef4444', _aiInsights.needs_attention, 'rgba(239,68,68,0.05)'),
-        _aiInsights.what_is_going_well && _aiInsights.what_is_going_well.length > 0 && _sec('✅ Berjalan Baik', '#22c55e', _aiInsights.what_is_going_well, 'rgba(34,197,94,0.05)'),
-        _aiInsights.recommended_actions && _aiInsights.recommended_actions.length > 0 && _sec('💡 Rekomendasi Tindakan', '#3b82f6', _aiInsights.recommended_actions, 'rgba(59,130,246,0.05)')
-      )
-    );
-  }
-  function _renderLiana() {
-    var acc = _bd && _bd.accurate, ytd = _bd && _bd.ytd;
-    var dso = _bd && _bd.dso, arAlert = _bd && _bd.ar_alert;
-    var rev = acc && acc.revenue, col = acc && acc.collection, ar = acc && acc.ar;
-    var yoy = _bd && _bd.yoy_revenue;
-    var colTrend = _bd && _bd.collection_rate_trend;
-    var _alertC = { green: '#22c55e', warning: '#f59e0b', critical: '#ef4444' };
-    var _alertBg = { green: '#f0fdf4', warning: '#fffbeb', critical: '#fef2f2' };
-    var _alertLbl = { green: 'Normal — AR dalam batas aman', warning: 'Perhatian — AR mendekati batas', critical: 'Kritis — AR melebihi batas' };
-    var _alertIcon = { green: '🟢', warning: '🟡', critical: '🔴' };
-    var alertSt = arAlert && arAlert.status || 'green';
-    var _BI_MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-    function _barChart(data, getVal, getLabel, accentColor) {
-      var maxVal = data.reduce(function(m, r) { return Math.max(m, getVal(r) || 0); }, 1);
-      return React.createElement('div', { style: { overflowX: 'auto', paddingBottom: 4 } },
-        React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 6, minWidth: 0, height: 120 } },
-          data.map(function(r, i) {
-            var val = getVal(r) || 0;
-            var pct = Math.max(4, (val / maxVal) * 100);
-            var isLast = i === data.length - 1;
-            return React.createElement('div', { key: i, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '1 1 0', minWidth: 28 } },
-              React.createElement('div', { style: { fontSize: 9, color: 'var(--text3)', marginBottom: 3, whiteSpace: 'nowrap' } }, typeof val === 'number' && val > 1000000 ? _fRp(val) : (val + (getLabel ? '' : ''))),
-              React.createElement('div', { style: { width: '100%', height: pct + '%', background: isLast ? (accentColor || '#3b82f6') : (accentColor || '#3b82f6') + '33', borderRadius: '3px 3px 0 0', minHeight: 4 } }),
-              React.createElement('div', { style: { fontSize: 10, color: isLast ? 'var(--text)' : 'var(--text3)', marginTop: 4, fontWeight: isLast ? 600 : 400 } }, getLabel(r, i))
-            );
-          })
-        )
-      );
-    }
-    return React.createElement(React.Fragment, null,
-      !acc && React.createElement('div', { style: { padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text3)', fontSize: 13, marginBottom: 16 } }, 'Data Accurate tidak tersedia saat ini. Hanya data internal yang ditampilkan.'),
-      arAlert && React.createElement('div', { style: { padding: '10px 14px', marginBottom: 16, borderRadius: 8, border: '1px solid ' + _alertC[alertSt], background: _alertBg[alertSt], display: 'flex', alignItems: 'center', gap: 10 } },
-        React.createElement('span', { style: { fontSize: 16 } }, _alertIcon[alertSt]),
-        React.createElement('div', null,
-          React.createElement('div', { style: { fontWeight: 600, color: _alertC[alertSt], fontSize: 13 } }, 'AR Alert: ' + _alertLbl[alertSt]),
-          React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', marginTop: 2 } }, 'Total: ' + _fRp(arAlert.total) + ' · ' + _fNum(arAlert.count) + ' invoice outstanding')
-        )
-      ),
-      _Sec('Revenue & Koleksi (Accurate)', _Row([
-        _KC('rev', 'Revenue MTD', _fRp(rev && rev.total), _fPct(rev && rev.mom_pct) + ' MoM', _pColor(rev && rev.mom_pct)),
-        _KC('inv', 'Jumlah Invoice', _fNum(rev && rev.invoice_count), 'MTD'),
-        _KC('col', 'Koleksi MTD', _fRp(col && col.total), col && col.collection_rate != null ? 'Rate ' + col.collection_rate + '%' : null),
-        _KC('ar', 'AR Outstanding', _fRp(ar && ar.total), ar && ar.count ? _fNum(ar.count) + ' invoice' : null),
-        dso != null ? _KC('dso', 'DSO', dso + ' hari', 'Days Sales Outstanding') : null,
-        yoy && yoy.yoy_pct != null ? _KC('yoy', 'YoY Revenue', _fPct(yoy.yoy_pct), yoy.is_partial ? 'Adj. s/d ' + (yoy.data_through || '').slice(8,10) + ' ' + _BI_MONTHS[parseInt((yoy.data_through || '').split('-')[1])] : 'vs thn lalu (bulan sama)', _pColor(yoy.yoy_pct)) : null,
-      ].filter(Boolean))),
-      _renderAIPanel(),
-      ar && (ar.over_30d > 0 || ar.over_60d > 0 || ar.over_90d > 0) && _Sec('AR Aging (Saldo Tertunggak)', _Row([
-        _KC('a30', 'Overdue >30 Hari', _fRp(ar.over_30d), ar.over_30d_count != null ? _fNum(ar.over_30d_count) + ' invoice' : null, '#f59e0b'),
-        _KC('a60', 'Overdue >60 Hari', _fRp(ar.over_60d), ar.over_60d_count != null ? _fNum(ar.over_60d_count) + ' invoice' : null, '#f97316'),
-        _KC('a90', 'Overdue >90 Hari', _fRp(ar.over_90d), ar.over_90d_count != null ? _fNum(ar.over_90d_count) + ' invoice' : null, '#ef4444'),
-      ])),
-      ytd && _Sec('YTD ' + biYear, _Row([
-        _KC('yr', 'Revenue YTD', _fRp(ytd.revenue_ytd)),
-        _KC('yc', 'Koleksi YTD', _fRp(ytd.collected_ytd)),
-        _KC('yi', 'Invoice YTD', _fNum(ytd.invoice_count_ytd)),
-      ])),
-      acc && acc.monthly_trend && acc.monthly_trend.length > 0 && _Sec('Trend Revenue (Tahun Ini)', _barChart(
-        acc.monthly_trend,
-        function(r) { return r.revenue; },
-        function(r, i) { var mNum = parseInt((r.month || '').split('-')[1]) || (i+1); return _BI_MONTHS[mNum]; },
-        '#3b82f6'
-      )),
-      colTrend && colTrend.length > 0 && _Sec('Trend Collection Rate — 6 Bulan', React.createElement('div', null,
-        _barChart(
-          colTrend,
-          function(r) { return r.collection_rate || 0; },
-          function(r) { var p = (r.month || '').split('-'); return _BI_MONTHS[parseInt(p[1])] + ' ' + (p[0] || '').slice(2); },
-          '#22c55e'
-        ),
-        React.createElement('div', { style: { overflowX: 'auto' } },
-          React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12, marginTop: 8 } },
-            React.createElement('thead', null, React.createElement('tr', null,
-              ['Bulan','Invoiced','Collected','Rate'].map(function(h) {
-                return React.createElement('th', { key: h, style: { textAlign: 'right', padding: '4px 8px', color: 'var(--text3)', fontWeight: 500, borderBottom: '1px solid var(--border)' } }, h);
-              })
-            )),
-            React.createElement('tbody', null, colTrend.map(function(r, i) {
-              var p = (r.month || '').split('-');
-              var label = _BI_MONTHS[parseInt(p[1])] + ' ' + (p[0] || '').slice(2);
-              var rate = r.collection_rate;
-              var rateColor = rate == null ? 'var(--text3)' : rate >= 95 ? '#22c55e' : rate >= 80 ? '#f59e0b' : '#ef4444';
-              return React.createElement('tr', { key: i, style: { borderBottom: '1px solid var(--border)' } },
-                React.createElement('td', { style: { padding: '4px 8px', color: 'var(--text3)' } }, label),
-                React.createElement('td', { style: { padding: '4px 8px', textAlign: 'right' } }, _fRp(r.invoiced)),
-                React.createElement('td', { style: { padding: '4px 8px', textAlign: 'right' } }, _fRp(r.collected)),
-                React.createElement('td', { style: { padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: rateColor } }, rate != null ? rate + '%' : '—')
-              );
-            }))
-          )
-        ),
-        yoy && yoy.is_partial && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)', marginTop: 6 } },
-          'YoY dibandingkan periode ' + (yoy.prior_year_through || '') + ' (prorata, bukan bulan penuh)'
-        )
-      )),
-      acc && acc.channel_split && acc.channel_split.length > 0 && _Sec('Channel Split', _Row(
-        acc.channel_split.map(function(c, i) { return _KC('ch'+i, c.channel === 'b2b' ? 'B2B / Korporat' : 'Online / Marketplace', _fRp(c.revenue), _fNum(c.count) + ' inv · ' + _fNum(c.customers) + ' cust'); })
-      )),
-      acc && acc.top_customers && acc.top_customers.length > 0 && _Sec('Top Customer Bulan Ini', _Tbl(['Customer','Invoice','Revenue'],
-        acc.top_customers.slice(0,8).map(function(c) { return [c.name, _fNum(c.invoices), _fRp(c.revenue)]; })
-      )),
-      _bd && _bd.internal_orders && Object.keys(_bd.internal_orders.payment_breakdown || {}).length > 0 && _Sec('Status Pembayaran (Internal Orders)', _Row(
-        Object.entries(_bd.internal_orders.payment_breakdown).map(function(e, i) { return _KC('pb'+i, e[0], _fNum(e[1].count), _fRp(e[1].value)); })
-      ))
-    );
-  }
-  function _renderAngel() {
-    var pl = _bd && _bd.pipeline, b2b = _bd && _bd.b2b_revenue, nc = _bd && _bd.new_customers;
-    var b2bTrend = _bd && _bd.b2b_revenue_trend;
-    var ret = _bd && _bd.customer_retention;
-    var funnelStages = pl ? [
-      { label: 'Aktif (Draft/Sent/Approved)', count: pl.total_count, color: '#3b82f6' },
-      { label: 'Converted', count: pl.converted_this_period, color: '#22c55e' },
-      { label: 'Ditolak', count: pl.rejected_count || 0, color: '#ef4444' },
-    ] : [];
-    var funnelMax = funnelStages.reduce(function(m, s) { return Math.max(m, s.count || 0); }, 1);
-    var _BI_MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-    return React.createElement(React.Fragment, null,
-      _Sec('Pipeline Penawaran (Internal)', _Row([
-        _KC('pu', 'Penawaran Aktif', _fNum(pl && pl.total_count), _fRp(pl && pl.total_value)),
-        _KC('cv', 'Converted MTD', _fNum(pl && pl.converted_this_period), pl && pl.conversion_rate != null ? 'Rate ' + pl.conversion_rate + '%' : null),
-        pl && pl.rejected_count != null ? _KC('rj', 'Ditolak MTD', _fNum(pl.rejected_count), null, '#ef4444') : null,
-      ].filter(Boolean))),
-      _renderAIPanel(),
-      pl && funnelStages.length > 0 && _Sec('Funnel Penawaran', React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 480 } },
-        funnelStages.map(function(s, i) { return React.createElement('div', { key: i },
-          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 } },
-            React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', width: 210, flexShrink: 0 } }, s.label),
-            React.createElement('div', { style: { fontSize: 12, fontWeight: 600, color: s.color, width: 32, textAlign: 'right', flexShrink: 0 } }, s.count || 0)
-          ),
-          React.createElement('div', { style: { height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' } },
-            React.createElement('div', { style: { height: '100%', width: (((s.count || 0) / funnelMax) * 100) + '%', background: s.color, borderRadius: 4 } })
-          )
-        ); })
-      )),
-      b2b && _Sec('Revenue B2B Korporat (Accurate)', _Row([
-        _KC('b2b', 'B2B Korporat', _fRp(b2b.revenue), _fPct(b2b.mom_pct) + ' MoM', _pColor(b2b.mom_pct)),
-        ret && ret.retention_rate != null ? _KC('ret', 'Customer Retention', ret.retention_rate + '%',
-          _fNum(ret.retained) + ' dari ' + _fNum(ret.prior_customers) + ' cust bulan lalu',
-          ret.retention_rate >= 50 ? '#22c55e' : ret.retention_rate >= 30 ? '#f59e0b' : '#ef4444'
-        ) : null,
-      ].filter(Boolean))),
-      b2bTrend && b2bTrend.length > 0 && _Sec('Trend Revenue B2B — 12 Bulan', React.createElement('div', { style: { overflowX: 'auto', paddingBottom: 4 } },
-        React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 6, minWidth: 0, height: 120 } },
-          (function() {
-            var maxRev = b2bTrend.reduce(function(m, r) { return Math.max(m, r.revenue || 0); }, 1);
-            return b2bTrend.map(function(r, i) {
-              var p = (r.month || '').split('-');
-              var label = _BI_MONTHS[parseInt(p[1])] + ' ' + (p[0] || '').slice(2);
-              var pct = Math.max(4, ((r.revenue || 0) / maxRev) * 100);
-              var isLast = i === b2bTrend.length - 1;
-              return React.createElement('div', { key: r.month, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '1 1 0', minWidth: 36 } },
-                React.createElement('div', { style: { fontSize: 9, color: 'var(--text3)', marginBottom: 3, whiteSpace: 'nowrap' } }, _fRp(r.revenue)),
-                React.createElement('div', { style: { width: '100%', height: pct + '%', background: isLast ? '#3b82f6' : '#3b82f633', borderRadius: '3px 3px 0 0', minHeight: 4 } }),
-                React.createElement('div', { style: { fontSize: 9, color: isLast ? 'var(--text)' : 'var(--text3)', marginTop: 4, fontWeight: isLast ? 600 : 400, whiteSpace: 'nowrap' } }, label)
-              );
-            });
-          })()
-        )
-      )),
-      nc && _Sec('Pelanggan (Accurate)', _Row([
-        _KC('nc', 'Customer Baru MTD', _fNum(nc.new_this_period), nc.new_prior_period != null ? 'Bulan lalu: ' + _fNum(nc.new_prior_period) : null),
-        _KC('tc', 'Total Unik MTD', _fNum(nc.total_unique), _fNum(nc.b2b_unique) + ' B2B unik'),
-      ])),
-      _bd && _bd.sales_conversion && _bd.sales_conversion.length > 0 && _Sec('Konversi per Sales', _Tbl(['Sales','Total','Converted','Pipeline','Rate'],
-        _bd.sales_conversion.map(function(s) { return [s.name, _fNum(s.total), _fNum(s.converted), _fNum(s.pipeline), s.rate + '%']; })
-      )),
-      _bd && _bd.top_customers && _bd.top_customers.length > 0 && _Sec('Top Customer B2B (Accurate)', _Tbl(['Customer','Invoice','Revenue'],
-        _bd.top_customers.slice(0,8).map(function(c) { return [c.name, _fNum(c.invoices), _fRp(c.revenue)]; })
-      ))
-    );
-  }
-  function _renderLukas() {
-    var acc = _bd && _bd.accurate, cs = acc && acc.channel_split;
-    var stk = acc && acc.stock, online = cs && cs.online;
-    var mktTrend = acc && acc.marketplace_revenue_trend;
-    var _BI_MONTHS = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-    return React.createElement(React.Fragment, null,
-      !acc && React.createElement('div', { style: { padding: '12px 16px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text3)', fontSize: 13, marginBottom: 16 } }, 'Data Accurate tidak tersedia. Pastikan connector sedang berjalan.'),
-      online && _Sec('Online / Marketplace MTD (Accurate)', _Row([
-        _KC('onl', 'Online / Marketplace', _fRp(online && online.revenue), _fPct(online && online.mom_pct) + ' MoM', _pColor(online && online.mom_pct)),
-      ])),
-      _renderAIPanel(),
-      mktTrend && mktTrend.length > 0 && _Sec('Trend Revenue Marketplace — 12 Bulan', React.createElement('div', { style: { overflowX: 'auto', paddingBottom: 4 } },
-        React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 6, minWidth: 0, height: 120 } },
-          (function() {
-            var maxRev = mktTrend.reduce(function(m, r) { return Math.max(m, r.revenue || 0); }, 1);
-            return mktTrend.map(function(r, i) {
-              var p = (r.month || '').split('-');
-              var label = _BI_MONTHS[parseInt(p[1])] + ' ' + (p[0] || '').slice(2);
-              var pct = Math.max(4, ((r.revenue || 0) / maxRev) * 100);
-              var isLast = i === mktTrend.length - 1;
-              return React.createElement('div', { key: r.month, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '1 1 0', minWidth: 36 } },
-                React.createElement('div', { style: { fontSize: 9, color: 'var(--text3)', marginBottom: 3, whiteSpace: 'nowrap' } }, _fRp(r.revenue)),
-                React.createElement('div', { style: { width: '100%', height: pct + '%', background: isLast ? '#8b5cf6' : '#8b5cf633', borderRadius: '3px 3px 0 0', minHeight: 4 } }),
-                React.createElement('div', { style: { fontSize: 9, color: isLast ? 'var(--text)' : 'var(--text3)', marginTop: 4, fontWeight: isLast ? 600 : 400, whiteSpace: 'nowrap' } }, label)
-              );
-            });
-          })()
-        )
-      )),
-      stk && _Sec('Status Stok (Accurate)', _Row([
-        _KC('s0', 'Stockout', _fNum(stk.stockout_count), 'qty ≤ 0', '#ef4444'),
-        _KC('s1', 'Kritis (≤3)', _fNum(stk.critical_count), 'segera restock', '#f97316'),
-        _KC('s2', 'Rendah (≤10)', _fNum(stk.low_count), 'perlu perhatian', '#eab308'),
-        _KC('s3', 'Total Item', _fNum(stk.total_items)),
-      ])),
-      acc && acc.top_items_by_revenue && acc.top_items_by_revenue.length > 0 && _Sec('Top Item — Revenue', _Tbl(['Item','Qty','Revenue','Order'],
-        acc.top_items_by_revenue.slice(0,10).map(function(it) { return [it.name, _fNum(it.qty), _fRp(it.revenue), _fNum(it.orders)]; })
-      )),
-      acc && acc.top_items_by_qty && acc.top_items_by_qty.length > 0 && _Sec('Top Item — Quantity Terjual', _Tbl(['Item','Qty','Revenue'],
-        acc.top_items_by_qty.slice(0,10).map(function(it) { return [it.name, _fNum(it.qty), _fRp(it.revenue)]; })
-      )),
-      acc && acc.slow_moving && acc.slow_moving.length > 0 && _Sec('Slow Moving Items', _Tbl(['Item','Stok Sisa','Terjual (bulan ini)','Revenue'],
-        acc.slow_moving.slice(0,8).map(function(it) { return [it.name, _fNum(it.available), _fNum(it.sold_qty), _fRp(it.sold_revenue)]; })
-      ))
-    );
-  }
-  function _renderSanto() {
-    if (!_bd || !_bd.adl) {
-      return React.createElement('div', { style: { color: 'var(--text3)', padding: 24, fontSize: 14 } }, 'Data Santo tidak tersedia.');
-    }
-    var adl = _bd.adl || {}, grp = _bd.group || {};
-    var adlS = adl.entity_summary || {}, grpS = grp.entity_summary || {};
-    var adlIntel = adl.product_intelligence || {}, grpIntel = grp.product_intelligence || {};
-
-    // Revenue trend bar chart
-    function _TrendBars(trend, color) {
-      if (!Array.isArray(trend) || !trend.length) return null;
-      var maxRev = trend.reduce(function(m, r) { return Math.max(m, r.revenue_gross || 0); }, 1);
-      return React.createElement('div', { style: { overflowX: 'auto', paddingBottom: 4 } },
-        React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 6, minWidth: 0, height: 120 } },
-          trend.map(function(r, i) {
-            var p = (r.month || '').split('-');
-            var label = ['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][parseInt(p[1])] + ' ' + (p[0] || '').slice(2);
-            var pct = Math.max(4, ((r.revenue_gross || 0) / maxRev) * 100);
-            var isLast = i === trend.length - 1;
-            return React.createElement('div', { key: r.month, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '1 1 0', minWidth: 36 } },
-              React.createElement('div', { style: { fontSize: 9, color: 'var(--text3)', marginBottom: 3, whiteSpace: 'nowrap' } }, _fRp(r.revenue_gross)),
-              React.createElement('div', { style: { width: '100%', height: pct + '%', background: isLast ? color : color + '33', borderRadius: '3px 3px 0 0', minHeight: 4 } }),
-              React.createElement('div', { style: { fontSize: 9, color: isLast ? 'var(--text)' : 'var(--text3)', marginTop: 4, fontWeight: isLast ? 600 : 400, whiteSpace: 'nowrap' } }, label)
-            );
-          })
-        )
-      );
-    }
-
-    function _SalesTable(list, label) {
-      if (!Array.isArray(list) || !list.length) return null;
-      return _Sec(label, _Tbl(['#','Sales','Omzet (Gross)','Qty','Invoice'],
-        list.map(function(s, i) { return [i + 1, s.sales, _fRp(s.revenue_gross), _fNum(s.total_qty), _fNum(s.invoice_count)]; })
-      ));
-    }
-
-    function _BranchTable(list, label) {
-      if (!Array.isArray(list) || !list.length) return null;
-      return _Sec(label, _Tbl(['#','Cabang','Omzet (Gross)','Qty','Invoice'],
-        list.map(function(b, i) { return [i + 1, b.branch, _fRp(b.revenue_gross), _fNum(b.total_qty), _fNum(b.invoice_count)]; })
-      ));
-    }
-
-    function _ProdTable(list) {
-      if (!Array.isArray(list) || !list.length) return React.createElement('div', { style: { color: 'var(--text3)', fontSize: 12 } }, '—');
-      return React.createElement('div', null, list.map(function(p, i) {
-        return React.createElement('div', { key: p.item_no || i, style: { display: 'flex', alignItems: 'baseline', gap: 8, padding: '7px 0', borderTop: i === 0 ? 'none' : '1px solid var(--border)' } },
-          React.createElement('div', { style: { width: 20, fontSize: 11, color: 'var(--text3)', textAlign: 'right', flexShrink: 0 } }, i + 1),
-          React.createElement('div', { style: { flex: 1, fontSize: 12, lineHeight: 1.4 } },
-            React.createElement('div', null, p.item_name || p.item_no),
-            React.createElement('div', { style: { fontSize: 10, color: 'var(--text3)', fontFamily: 'DM Mono, monospace', marginTop: 1 } }, p.item_no)
-          ),
-          React.createElement('div', { style: { fontSize: 12, color: 'var(--text3)', fontFamily: 'DM Mono, monospace', flexShrink: 0, textAlign: 'right' } },
-            React.createElement('div', null, _fNum(p.total_qty) + ' pcs'),
-            React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, _fRp(p.line_revenue))
-          )
-        );
-      }));
-    }
-
-    function _CatBlock(title, list) {
-      if (!Array.isArray(list) || !list.length) return null;
-      return React.createElement('div', { style: { marginBottom: 16 } },
-        React.createElement('div', { style: { fontWeight: 600, fontSize: 13, marginBottom: 6, color: 'var(--text)' } }, title),
-        _ProdTable(list)
-      );
-    }
-
-    return React.createElement(React.Fragment, null,
-      // A: PT ADL summary
-      _Sec('PT Anugerah Digital Lestari — Ringkasan', _Row([
-        _KC('ar', 'Omzet Gross ADL', _fRp(adlS.revenue_gross), _fNum(adlS.invoice_count) + ' invoice'),
-        _KC('au', 'Total Qty ADL', _fNum(adlS.total_qty), 'unit terjual'),
-      ])),
-      _Sec('Trend Revenue ADL — 6 Bulan', _TrendBars(adl.revenue_trend, '#6c63ff')),
-
-      // B: Group summary
-      _Sec('Group Non-PPN — Ringkasan', _Row([
-        _KC('gr', 'Omzet Gross Group', _fRp(grpS.revenue_gross), _fNum(grpS.invoice_count) + ' invoice'),
-        _KC('gu', 'Total Qty Group', _fNum(grpS.total_qty), 'unit terjual'),
-      ])),
-      _Sec('Trend Revenue Group — 6 Bulan', _TrendBars(grp.revenue_trend, '#14b8a6')),
-
-      // AI Panel
-      _renderAIPanel(),
-
-      // C: Sales ranking — PT ADL & Group side by side
-      (function() {
-        var adlList = Array.isArray(adl.sales_ranking) ? adl.sales_ranking : [];
-        var grpList = Array.isArray(grp.sales_ranking) ? grp.sales_ranking : [];
-        if (!adlList.length && !grpList.length) return null;
-        var allNames = [];
-        adlList.forEach(function(s) { if (allNames.indexOf(s.sales) < 0) allNames.push(s.sales); });
-        grpList.forEach(function(s) { if (allNames.indexOf(s.sales) < 0) allNames.push(s.sales); });
-        var adlMap = {}, grpMap = {};
-        adlList.forEach(function(s) { adlMap[s.sales] = s; });
-        grpList.forEach(function(s) { grpMap[s.sales] = s; });
-        allNames.sort(function(a, b) {
-          var ra = adlMap[a] ? adlMap[a].revenue_gross : 0;
-          var rb = adlMap[b] ? adlMap[b].revenue_gross : 0;
-          return rb - ra;
-        });
-        var dash = React.createElement('span', { style: { color: 'var(--text3)' } }, '—');
-        var thStyle = { padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' };
-        var thR = Object.assign({}, thStyle, { textAlign: 'right' });
-        var tdStyle = { padding: '7px 10px', fontSize: 13, borderTop: '1px solid var(--border)', whiteSpace: 'nowrap' };
-        var tdR = Object.assign({}, tdStyle, { textAlign: 'right', fontFamily: 'DM Mono, monospace' });
-        var divider = React.createElement('th', { style: Object.assign({}, thStyle, { borderLeft: '2px solid var(--border)', paddingLeft: 16 }) }, 'Omzet Group (Gross)');
-        var rows = allNames.map(function(name, i) {
-          var a = adlMap[name], g = grpMap[name];
-          return React.createElement('tr', { key: name },
-            React.createElement('td', { style: tdStyle }, i + 1),
-            React.createElement('td', { style: Object.assign({}, tdStyle, { fontWeight: 500 }) }, name),
-            React.createElement('td', { style: tdR }, a ? _fRp(a.revenue_gross) : dash),
-            React.createElement('td', { style: tdR }, a ? _fNum(a.total_qty) : dash),
-            React.createElement('td', { style: tdR }, a ? _fNum(a.invoice_count) : dash),
-            React.createElement('td', { style: Object.assign({}, tdR, { borderLeft: '2px solid var(--border)', paddingLeft: 16 }) }, g ? _fRp(g.revenue_gross) : dash),
-            React.createElement('td', { style: tdR }, g ? _fNum(g.total_qty) : dash),
-            React.createElement('td', { style: tdR }, g ? _fNum(g.invoice_count) : dash)
-          );
-        });
-        return _Sec('Performa Sales — PT ADL & Group (by Omzet)',
-          React.createElement('div', { style: { overflowX: 'auto' } },
-            React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } },
+      visible.length === 0
+        ? React.createElement('div', { style: { padding: 32, textAlign: 'center', color: 'var(--text3)', fontSize: 13 } }, '✅ Semua sudah diproses')
+        : React.createElement('div', { style: { overflowX: 'auto' } },
+            React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 13 } },
               React.createElement('thead', null,
                 React.createElement('tr', null,
-                  React.createElement('th', { style: thStyle }, '#'),
-                  React.createElement('th', { style: thStyle }, 'Sales'),
-                  React.createElement('th', { style: thR }, 'Omzet PT (Gross)'),
-                  React.createElement('th', { style: thR }, 'Qty'),
-                  React.createElement('th', { style: thR }, 'Invoice'),
-                  React.createElement('th', { style: Object.assign({}, thR, { borderLeft: '2px solid var(--border)', paddingLeft: 16 }) }, 'Omzet Group (Gross)'),
-                  React.createElement('th', { style: thR }, 'Qty'),
-                  React.createElement('th', { style: thR }, 'Invoice')
+                  ['Nama Customer', 'Kode Lama', hasUsulan ? 'Usulan Kode Baru' : 'mobilePhone', 'Aksi'].map(function(h) {
+                    return React.createElement('th', { key: h, style: { padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--text3)', fontWeight: 600, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' } }, h);
+                  })
                 )
               ),
-              React.createElement('tbody', null, rows)
-            )
-          )
-        );
-      })(),
-
-      // D: Branch ranking — PT ADL & Group side by side
-      (function() {
-        var adlList = Array.isArray(adl.branch_ranking) ? adl.branch_ranking : [];
-        var grpList = Array.isArray(grp.branch_ranking) ? grp.branch_ranking : [];
-        if (!adlList.length && !grpList.length) return null;
-        var allNames = [];
-        adlList.forEach(function(b) { if (allNames.indexOf(b.branch) < 0) allNames.push(b.branch); });
-        grpList.forEach(function(b) { if (allNames.indexOf(b.branch) < 0) allNames.push(b.branch); });
-        var adlMap = {}, grpMap = {};
-        adlList.forEach(function(b) { adlMap[b.branch] = b; });
-        grpList.forEach(function(b) { grpMap[b.branch] = b; });
-        allNames.sort(function(a, b) {
-          var ra = adlMap[a] ? adlMap[a].revenue_gross : 0;
-          var rb = adlMap[b] ? adlMap[b].revenue_gross : 0;
-          return rb - ra;
-        });
-        var dash = React.createElement('span', { style: { color: 'var(--text3)' } }, '—');
-        var thStyle = { padding: '8px 10px', textAlign: 'left', fontWeight: 600, fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' };
-        var thR = Object.assign({}, thStyle, { textAlign: 'right' });
-        var tdStyle = { padding: '7px 10px', fontSize: 13, borderTop: '1px solid var(--border)', whiteSpace: 'nowrap' };
-        var tdR = Object.assign({}, tdStyle, { textAlign: 'right', fontFamily: 'DM Mono, monospace' });
-        var rows = allNames.map(function(name, i) {
-          var a = adlMap[name], g = grpMap[name];
-          return React.createElement('tr', { key: name },
-            React.createElement('td', { style: tdStyle }, i + 1),
-            React.createElement('td', { style: Object.assign({}, tdStyle, { fontWeight: 500 }) }, name),
-            React.createElement('td', { style: tdR }, a ? _fRp(a.revenue_gross) : dash),
-            React.createElement('td', { style: tdR }, a ? _fNum(a.total_qty) : dash),
-            React.createElement('td', { style: tdR }, a ? _fNum(a.invoice_count) : dash),
-            React.createElement('td', { style: Object.assign({}, tdR, { borderLeft: '2px solid var(--border)', paddingLeft: 16 }) }, g ? _fRp(g.revenue_gross) : dash),
-            React.createElement('td', { style: tdR }, g ? _fNum(g.total_qty) : dash),
-            React.createElement('td', { style: tdR }, g ? _fNum(g.invoice_count) : dash)
-          );
-        });
-        return _Sec('Performa Cabang — PT ADL & Group (by Omzet)',
-          React.createElement('div', { style: { overflowX: 'auto' } },
-            React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } },
-              React.createElement('thead', null,
-                React.createElement('tr', null,
-                  React.createElement('th', { style: thStyle }, '#'),
-                  React.createElement('th', { style: thStyle }, 'Cabang'),
-                  React.createElement('th', { style: thR }, 'Omzet PT (Gross)'),
-                  React.createElement('th', { style: thR }, 'Qty'),
-                  React.createElement('th', { style: thR }, 'Invoice'),
-                  React.createElement('th', { style: Object.assign({}, thR, { borderLeft: '2px solid var(--border)', paddingLeft: 16 }) }, 'Omzet Group (Gross)'),
-                  React.createElement('th', { style: thR }, 'Qty'),
-                  React.createElement('th', { style: thR }, 'Invoice')
-                )
-              ),
-              React.createElement('tbody', null, rows)
-            )
-          )
-        );
-      })(),
-
-      // E: Product Intelligence (ADL only — GROUP is accessories, no category prefix)
-      (adlIntel.notebook || adlIntel.pc_aio || adlIntel.printer || adlIntel.monitor || adlIntel.projector)
-        ? _Sec('Product Intelligence — PT ADL', React.createElement('div', null,
-            _CatBlock('Notebook — Top 10', adlIntel.notebook),
-            _CatBlock('PC / AIO — Top 3', adlIntel.pc_aio),
-            _CatBlock('Printer — Top 3', adlIntel.printer),
-            _CatBlock('Monitor — Top 3', adlIntel.monitor),
-            _CatBlock('Projector — Top 3', adlIntel.projector)
-          ))
-        : null
-    );
-  }
-  function _renderJenny() {
-    var pur = _bd && _bd.purchasing, sup = _bd && _bd.top_suppliers, si = _bd && _bd.service_intakes, stk = _bd && _bd.stock;
-    var supP = _bd && _bd.top_suppliers_prior, tiq = _bd && _bd.top_items_by_qty;
-    var sc = _bd && _bd.stock_coverage;
-    var supMap = {}; if (supP) supP.forEach(function(s) { supMap[s.name] = s.value; });
-    var _scBuckets = sc && sc.buckets;
-    return React.createElement(React.Fragment, null,
-      _Sec('Purchase Orders MTD', _Row([
-        _KC('pv', 'Nilai PO', _fRp(pur && pur.total_value), _fPct(pur && pur.value_mom) + ' MoM', _pColor(pur && pur.value_mom)),
-        _KC('pc', 'Jumlah PO', _fNum(pur && pur.po_count), _fPct(pur && pur.po_count_mom) + ' MoM', _pColor(pur && pur.po_count_mom)),
-        _KC('pp', 'PO Pending', _fNum(pur && pur.pending_count), _fRp(pur && pur.pending_value)),
-        si ? _KC('si', 'Servis Masuk', _fNum(si.total), 'MTD') : null,
-      ].filter(Boolean))),
-      _renderAIPanel(),
-      sc && _Sec('Restock Forecast & Stock Coverage (30 hari)', React.createElement('div', null,
-        _Row([
-          _KC('rc', 'Kritis (<7 hari)', _fNum(_scBuckets && _scBuckets.critical), 'segera restock', '#ef4444'),
-          _KC('rw', 'Warning (7–14 hari)', _fNum(_scBuckets && _scBuckets.warning), 'pantau stok', '#f97316'),
-          _KC('rca', 'Caution (14–30 hari)', _fNum(_scBuckets && _scBuckets.caution), 'monitor mingguan', '#eab308'),
-          _KC('rh', 'Healthy (≥30 hari)', _fNum(_scBuckets && _scBuckets.healthy), 'stok aman', '#22c55e'),
-        ]),
-        sc.items && sc.items.length > 0 && React.createElement('div', { style: { marginTop: 12 } },
-          React.createElement('div', { style: { fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 6 } }, 'Item Prioritas Restock'),
-          React.createElement('div', { style: { overflowX: 'auto' } },
-            React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12 } },
-              React.createElement('thead', null, React.createElement('tr', null,
-                ['Item','Stok','Jual/Hari','Coverage'].map(function(h) {
-                  return React.createElement('th', { key: h, style: { textAlign: h === 'Item' ? 'left' : 'right', padding: '4px 8px', color: 'var(--text3)', fontWeight: 500, borderBottom: '1px solid var(--border)' } }, h);
+              React.createElement('tbody', null,
+                visible.map(function(item) {
+                  var st = rowStatus[item.id];
+                  var isLoading = st === 'loading';
+                  var isErr = st && st.startsWith('error:');
+                  var usulan = item.usulan;
+                  return React.createElement('tr', { key: item.id, style: { borderBottom: '1px solid var(--border)', opacity: isLoading ? 0.6 : 1 } },
+                    React.createElement('td', { style: { padding: '8px 12px', fontWeight: 500 } },
+                      React.createElement('div', null, item.name),
+                      React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, 'ID: ', item.id)
+                    ),
+                    React.createElement('td', { style: { padding: '8px 12px', fontFamily: 'monospace', color: '#dc2626' } }, item.kode),
+                    React.createElement('td', { style: { padding: '8px 12px', fontFamily: 'monospace', color: usulan ? '#16a34a' : 'var(--text3)' } },
+                      hasUsulan
+                        ? (usulan ? React.createElement(React.Fragment, null, usulan, item.duplikat ? React.createElement('span', { style: { color: '#dc2626', fontSize: 10, marginLeft: 4 } }, '⚠️ duplikat') : null) : '—')
+                        : (item.mobilePhone || '—')
+                    ),
+                    React.createElement('td', { style: { padding: '8px 12px', whiteSpace: 'nowrap' } },
+                      isErr
+                        ? React.createElement('span', { style: { color: '#dc2626', fontSize: 11 } }, '❌ ', st.slice(6))
+                        : React.createElement(React.Fragment, null,
+                            hasUsulan && usulan && !item.duplikat && React.createElement('button', {
+                              onClick: function() { approve(item, usulan); },
+                              disabled: isLoading,
+                              style: { padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginRight: 6 }
+                            }, isLoading ? '...' : '✓ Approve'),
+                            React.createElement('button', {
+                              onClick: function() { skip(item.id); },
+                              disabled: isLoading,
+                              style: { padding: '4px 10px', background: 'var(--bg)', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, cursor: 'pointer' }
+                            }, 'Lewati')
+                          )
+                    )
+                  );
                 })
-              )),
-              React.createElement('tbody', null, sc.items.slice(0, 15).map(function(it, i) {
-                var d = it.coverage_days;
-                var dColor = d < 7 ? '#ef4444' : d < 14 ? '#f97316' : d < 30 ? '#eab308' : '#22c55e';
-                return React.createElement('tr', { key: i, style: { borderBottom: '1px solid var(--border)' } },
-                  React.createElement('td', { style: { padding: '4px 8px', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, it.name),
-                  React.createElement('td', { style: { padding: '4px 8px', textAlign: 'right' } }, _fNum(it.available)),
-                  React.createElement('td', { style: { padding: '4px 8px', textAlign: 'right', color: 'var(--text3)' } }, it.avg_daily_sales != null ? (+it.avg_daily_sales).toFixed(2) : '—'),
-                  React.createElement('td', { style: { padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: dColor } }, d != null ? d + ' hr' : '—')
-                );
-              }))
+              )
+            )
+          )
+    );
+  }
+
+  return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 960, margin: '0 auto' } },
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 } },
+      React.createElement('h2', { style: { fontSize: 18, fontWeight: 700, margin: 0, flex: 1 } }, '🔧 Revisi Kode Pelanggan'),
+      data && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, 'Cache: ', data.cachedAt ? new Date(data.cachedAt).toLocaleString('id-ID') : '—'),
+      React.createElement('button', {
+        onClick: function() { loadAudit(true); }, disabled: loading,
+        style: { padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, cursor: 'pointer', color: 'var(--text1)' }
+      }, loading ? '⏳' : '🔄 Refresh')
+    ),
+
+    loading && React.createElement('div', { style: { padding: 60, textAlign: 'center', color: 'var(--text3)' } },
+      React.createElement('div', null, '⏳ Mengambil data dari Accurate...'),
+      React.createElement('div', { style: { fontSize: 11, marginTop: 8 } }, 'Proses ini memerlukan ~30–60 detik')
+    ),
+    err && React.createElement('div', { style: { padding: 16, color: '#dc2626', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)' } }, '⚠️ ', err),
+
+    data && React.createElement(React.Fragment, null,
+      React.createElement('div', { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 16 } },
+        'Total customer: ', React.createElement('b', null, data.total ? data.total.toLocaleString('id-ID') : '—'),
+        ' | 68xxx: ', React.createElement('b', null, (data.c68 || []).length),
+        ' | 8xxx: ', React.createElement('b', null, (data.c8 || []).length),
+        ' | Kode pendek: ', React.createElement('b', null, (data.cshort || []).length)
+      ),
+
+      // Tabs
+      React.createElement('div', { style: { display: 'flex', gap: 8, marginBottom: 12 } },
+        tabs.map(function(t) {
+          var active = t.id === activeTab;
+          var count = (data[t.id] || []).length;
+          return React.createElement('button', {
+            key: t.id, onClick: function() { setActiveTab(t.id); },
+            style: { padding: '6px 14px', borderRadius: 20, border: '1px solid ' + (active ? '#3b82f6' : 'var(--border)'),
+              background: active ? '#3b82f6' : 'var(--surface)', color: active ? '#fff' : 'var(--text1)',
+              fontWeight: active ? 600 : 400, fontSize: 12, cursor: 'pointer' }
+          }, t.label, ' (', count, ')');
+        })
+      ),
+
+      // Active category table
+      React.createElement('div', { style: cs },
+        activeTab === 'c68' && React.createElement(React.Fragment, null,
+          React.createElement('div', { style: { padding: '10px 16px', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', fontSize: 12, color: '#1e40af' } },
+            '💡 68xxx: kemungkinan besar typo — awalan ',
+            React.createElement('code', null, '0'),
+            ' diganti ',
+            React.createElement('code', null, '6'),
+            ' saja (harusnya ',
+            React.createElement('code', null, '62'),
+            '). Usulan: ',
+            React.createElement('code', null, '68XXX → 62XXX'),
+            ' (hapus 8 setelah 6, tambah 2).'
+          ),
+          renderTable(data.c68 || [], true)
+        ),
+        activeTab === 'c8' && React.createElement(React.Fragment, null,
+          React.createElement('div', { style: { padding: '10px 16px', background: '#fefce8', borderBottom: '1px solid #fde68a', fontSize: 12, color: '#92400e' } },
+            '⚠️ 8xxx: format tidak jelas — mungkin hilang awalan, atau memang kode lain. Cek manual, tidak ada usulan otomatis.'
+          ),
+          renderTable(data.c8 || [], false)
+        ),
+        activeTab === 'cshort' && React.createElement(React.Fragment, null,
+          React.createElement('div', { style: { padding: '10px 16px', background: '#f9fafb', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text2)' } },
+            'ℹ️ Kode pendek: bukan nomor HP, mungkin kode internal lama. Tidak ada usulan otomatis — review manual.'
+          ),
+          renderTable(data.cshort || [], false)
+        )
+      )
+    )
+  );
+}
+
+// ─── BUSINESS ANALYST PAGE ────────────────────────────────────────
+var BA_API = 'https://connectoracc.dzoutlet.co.id/api/analytics/business-analyst';
+var BA_SANTO_WHITELIST = ['APRIL','ULIN','RIA','FAJAR','ARYA','MONA','GUSTI','RIZAL','DEFA','SANDI','ADE','LILI','DARTIK','TITI'];
+var BA_CATEGORIES = ['Notebook','PC/AIO','Monitor','Printer','Projector'];
+
+function BusinessAnalystPage() {
+  var now = new Date();
+  var _s1 = React.useState(now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0'));
+  var period = _s1[0]; var setPeriod = _s1[1];
+  var _s2 = React.useState(null); var data = _s2[0]; var setData = _s2[1];
+  var _s3 = React.useState(false); var loading = _s3[0]; var setLoading = _s3[1];
+  var _s4 = React.useState(null); var err = _s4[0]; var setErr = _s4[1];
+  var _s5 = React.useState('Notebook'); var activeTab = _s5[0]; var setActiveTab = _s5[1];
+
+  React.useEffect(function() {
+    if (!period) return;
+    var parts = period.split('-');
+    var y = parts[0]; var m = parts[1];
+    setLoading(true); setErr(null); setData(null);
+    fetch(BA_API + '?year=' + y + '&month=' + parseInt(m,10))
+      .then(function(r) { return r.json(); })
+      .then(function(d) { if (d.error) throw new Error(d.error); setData(d); })
+      .catch(function(e) { setErr(e.message); })
+      .finally(function() { setLoading(false); });
+  }, [period]);
+
+  var cs = { background:'var(--surface)', borderRadius:12, padding:'16px 20px', border:'1px solid var(--border)', marginBottom:16 };
+  var lbl = { fontSize:12, color:'var(--text3)' };
+  var fmtN = function(v) { return (v||0).toLocaleString('id-ID'); };
+  var barBg = { height:5, background:'var(--border)', borderRadius:3, marginTop:4 };
+  var barFill = function(pct,col) { return { height:'100%', width:Math.min(pct,100).toFixed(1)+'%', background:col||'#3b82f6', borderRadius:3 }; };
+
+  return React.createElement('div', { style:{ padding:'20px 24px', maxWidth:1200, margin:'0 auto' } },
+    // Header
+    React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:12, marginBottom:20 } },
+      React.createElement('h2', { style:{ fontSize:20, fontWeight:700, margin:0, flex:1 } }, '🧠 Business Analyst'),
+      React.createElement('input', {
+        type:'month', value:period, onChange:function(e){ setPeriod(e.target.value); },
+        style:{ padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', background:'var(--surface)', color:'var(--text1)', fontSize:14 }
+      })
+    ),
+
+    loading && React.createElement('div', { style:{ textAlign:'center', padding:60, color:'var(--text3)' } }, '⏳ Memuat data...'),
+    err && React.createElement('div', { style:{ padding:20, color:'#ef4444', background:'var(--surface)', borderRadius:12, border:'1px solid var(--border)' } }, '⚠️ ', err),
+
+    data && React.createElement(React.Fragment, null,
+
+      // ── Section 1: Unit per Kategori per Sales ──────────────────────
+      React.createElement('div', { style:cs },
+        React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:12 } }, '📦 Unit per Kategori per Sales'),
+        React.createElement('div', { style:{ overflowX:'auto' } },
+          React.createElement('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:13, fontFamily:'var(--mono,"monospace")' } },
+            React.createElement('thead', null,
+              React.createElement('tr', null,
+                ['SALES','NOTEBOOK','PC/AIO','MONITOR','PRINTER','PROJECTOR','TOTAL'].map(function(h) {
+                  return React.createElement('th', { key:h, style:{ padding:'6px 10px', textAlign: h==='SALES'?'left':'right', fontSize:11, color:'var(--text3)', fontWeight:600, letterSpacing:'0.05em', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' } }, h);
+                })
+              )
+            ),
+            React.createElement('tbody', null,
+              (function() {
+                var rows = data.catPerSales.filter(function(r){ return BA_SANTO_WHITELIST.includes(r.name.toUpperCase()); });
+                rows.sort(function(a,b){ return (b.nb+b.pc+b.monitor+b.printer+b.projector)-(a.nb+a.pc+a.monitor+a.printer+a.projector); });
+                var totals = { nb:0, pc:0, monitor:0, printer:0, projector:0 };
+                rows.forEach(function(r){ totals.nb+=r.nb; totals.pc+=r.pc; totals.monitor+=r.monitor; totals.printer+=r.printer; totals.projector+=r.projector; });
+                var allRows = rows.concat([{ name:'Total', nb:totals.nb, pc:totals.pc, monitor:totals.monitor, printer:totals.printer, projector:totals.projector, _total:true }]);
+                return allRows.map(function(r) {
+                  var total = r.nb + r.pc + r.monitor + r.printer + r.projector;
+                  var isTotal = r._total;
+                  var tdStyle = function(v) { return { padding:'5px 10px', textAlign:'right', fontSize:13, color: v>0?'var(--text1)':'var(--text3)', fontWeight: isTotal?700:400, borderTop: isTotal?'2px solid var(--border)':'none' }; };
+                  return React.createElement('tr', { key:r.name },
+                    React.createElement('td', { style:{ padding:'5px 10px', fontWeight: isTotal?700:500, fontSize:13, borderTop: isTotal?'2px solid var(--border)':'none' } }, r.name),
+                    React.createElement('td', { style:tdStyle(r.nb) }, r.nb > 0 ? fmtN(r.nb) : '—'),
+                    React.createElement('td', { style:tdStyle(r.pc) }, r.pc > 0 ? fmtN(r.pc) : '—'),
+                    React.createElement('td', { style:tdStyle(r.monitor) }, r.monitor > 0 ? fmtN(r.monitor) : '—'),
+                    React.createElement('td', { style:tdStyle(r.printer) }, r.printer > 0 ? fmtN(r.printer) : '—'),
+                    React.createElement('td', { style:tdStyle(r.projector) }, r.projector > 0 ? fmtN(r.projector) : '—'),
+                    React.createElement('td', { style:Object.assign({},tdStyle(total),{fontWeight:700}) }, fmtN(total))
+                  );
+                });
+              })()
             )
           )
         )
-      )),
-      stk && _Sec('Status Stok (Accurate)', _Row([
-        _KC('s0', 'Stockout', _fNum(stk.stockout_count), null, '#ef4444'),
-        _KC('s1', 'Kritis (≤3)', _fNum(stk.critical_count), null, '#f97316'),
-        _KC('s2', 'Rendah (≤10)', _fNum(stk.low_count)),
-        _KC('s3', 'Total Item', _fNum(stk.total_items)),
-      ])),
-      pur && Object.keys(pur.by_status || {}).length > 0 && _Sec('Status PO', _Row(
-        Object.entries(pur.by_status).map(function(e, i) { return _KC('ps'+i, e[0], _fNum(e[1])); })
-      )),
-      sup && sup.length > 0 && _Sec('Top Supplier MTD', _Tbl(['Supplier','PO','Nilai'],
-        sup.slice(0,10).map(function(s) { return [s.name, _fNum(s.count), _fRp(s.value)]; })
-      )),
-      sup && supP && supP.length > 0 && _Sec('Supplier Spend MoM', _Tbl(['Supplier','Bulan Ini','Bulan Lalu','MoM'],
-        sup.slice(0,10).map(function(s) {
-          var prev = supMap[s.name] || 0;
-          var chg = prev > 0 ? +((s.value - prev) / prev * 100).toFixed(1) : null;
-          return [s.name, _fRp(s.value), prev > 0 ? _fRp(prev) : '—', chg != null ? (chg > 0 ? '+' : '') + chg + '%' : '—'];
-        })
-      )),
-      tiq && tiq.length > 0 && _Sec('Top Item — Quantity Dibeli', _Tbl(['Item','Qty','Nilai'],
-        tiq.slice(0,10).map(function(it) { return [it.name, _fNum(it.qty), _fRp(it.value != null ? it.value : (it.total_price || 0))]; })
-      ))
-    );
-  }
-  function _renderBI() {
-    if (!_bd) return null;
-    switch (persona) {
-      case 'Liana': return _renderLiana();
-      case 'Angel': return _renderAngel();
-      case 'Lukas': return _renderLukas();
-      case 'Santo': return _renderSanto();
-      case 'Jenny': return _renderJenny();
-      default: return null;
-    }
-  }
-  return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 960, margin: '0 auto' } },
-    React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 } },
-      React.createElement('div', null,
-        React.createElement('div', { style: { fontSize: 20, fontWeight: 700, color: 'var(--text)' } }, '💡 Business Analyst'),
-        React.createElement('div', { style: { fontSize: 13, color: 'var(--text3)', marginTop: 2 } }, _BI_DESC[persona] || persona)
       ),
-      React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
-        React.createElement('select', { value: biMonth, onChange: function(e) { setBiMonth(+e.target.value); }, style: { padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 13 } },
-          _BI_MONTHS.slice(1).map(function(m, i) { return React.createElement('option', { key: i+1, value: i+1 }, m); })
+
+      // ── Section 2: Brand Terlaris per Kategori ──────────────────────
+      React.createElement('div', { style:cs },
+        React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:12 } }, '🏷️ Brand Terlaris per Kategori'),
+        React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px,1fr))', gap:16 } },
+          ['Notebook','PC/AIO','Printer'].map(function(cat) {
+            var brands = (data.brandByCategory[cat] || []).slice(0,6);
+            var maxQty = brands[0] ? brands[0].qty : 1;
+            var colors = { 'Notebook':'#3b82f6', 'PC/AIO':'#8b5cf6', 'Printer':'#f59e0b' };
+            return React.createElement('div', { key:cat, style:{ background:'var(--bg)', borderRadius:10, padding:'14px 16px', border:'1px solid var(--border)' } },
+              React.createElement('div', { style:{ fontWeight:600, fontSize:13, marginBottom:12 } }, cat),
+              brands.length === 0
+                ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:12 } }, 'Tidak ada data')
+                : brands.map(function(b) {
+                    var pct = maxQty > 0 ? b.qty/maxQty*100 : 0;
+                    return React.createElement('div', { key:b.brand, style:{ marginBottom:8 } },
+                      React.createElement('div', { style:{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:2 } },
+                        React.createElement('span', { style:{ fontWeight:500 } }, b.brand),
+                        React.createElement('span', { style:{ color:'var(--text3)', fontFamily:'monospace' } }, fmtN(b.qty)+' unit')
+                      ),
+                      React.createElement('div', { style:barBg }, React.createElement('div', { style:barFill(pct, colors[cat]) }))
+                    );
+                  })
+            );
+          })
+        )
+      ),
+
+      // ── Section 3: Top 10 Product Comparison 3 Bulan ───────────────
+      React.createElement('div', { style:cs },
+        React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:12 } }, '📊 Top 10 Produk — 3 Bulan Terakhir'),
+        // Category tabs
+        React.createElement('div', { style:{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' } },
+          BA_CATEGORIES.map(function(cat) {
+            var active = cat === activeTab;
+            return React.createElement('button', {
+              key:cat, onClick:function(){ setActiveTab(cat); },
+              style:{ padding:'5px 12px', borderRadius:16, border:'1px solid '+(active?'#3b82f6':'var(--border)'),
+                background:active?'#3b82f6':'var(--surface)', color:active?'#fff':'var(--text1)',
+                fontWeight:active?600:400, fontSize:12, cursor:'pointer' }
+            }, cat);
+          })
         ),
-        React.createElement('select', { value: biYear, onChange: function(e) { setBiYear(+e.target.value); }, style: { padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--text)', fontSize: 13 } },
-          [2025, 2026, 2027].map(function(y) { return React.createElement('option', { key: y, value: y }, y); })
+        // 3-column grid — one column per month
+        React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12 } },
+          data.topProductsHistory.map(function(monthData, mi) {
+            var products = (monthData.data[activeTab] || []).slice(0,10);
+            var maxQty = products[0] ? products[0].qty : 1;
+            var cols = ['#3b82f6','#8b5cf6','#6b7280'];
+            return React.createElement('div', { key:monthData.label, style:{ background:'var(--bg)', borderRadius:10, padding:'12px 14px', border:'1px solid var(--border)' } },
+              React.createElement('div', { style:{ fontWeight:600, fontSize:12, color:'var(--text3)', marginBottom:10, fontFamily:'monospace', letterSpacing:'0.05em' } }, monthData.label + (mi===0?' (ini)':'')),
+              products.length === 0
+                ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:12 } }, 'Tidak ada data')
+                : products.map(function(p, i) {
+                    var pct = maxQty > 0 ? p.qty/maxQty*100 : 0;
+                    return React.createElement('div', { key:p.name, style:{ marginBottom:7 } },
+                      React.createElement('div', { style:{ display:'flex', alignItems:'baseline', gap:6, marginBottom:2 } },
+                        React.createElement('span', { style:{ fontSize:10, color:'var(--text3)', width:14, textAlign:'right', flexShrink:0 } }, '#'+(i+1)),
+                        React.createElement('span', { style:{ fontSize:11, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, p.name),
+                        React.createElement('span', { style:{ fontSize:11, color:'var(--text3)', fontFamily:'monospace', flexShrink:0 } }, fmtN(p.qty))
+                      ),
+                      React.createElement('div', { style:barBg }, React.createElement('div', { style:barFill(pct, cols[mi]) }))
+                    );
+                  })
+            );
+          })
         )
       )
-    ),
-    biErr && React.createElement('div', { style: { background: 'var(--card)', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 16 } }, 'Error: ' + biErr),
-    biLoading && React.createElement('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--text3)' } }, 'Memuat data…'),
-    !biLoading && _renderBI(),
-    biResult && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)', marginTop: 20, textAlign: 'right' } }, 'Data per ' + new Date(biResult.generated_at).toLocaleString('id-ID'))
+    )
   );
 }
 
