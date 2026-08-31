@@ -22,9 +22,10 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ available: false, reason: 'not_configured' }), { headers: CORS });
   }
 
-  // CF Cache check (1 hour)
+  // CF Cache check (1 hour, key includes day so stale data from previous days doesn't persist)
   const cache    = caches.default;
-  const cacheKey = new Request(`https://sales-gp-cache/${year}/${month}`);
+  const today    = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const cacheKey = new Request(`https://sales-gp-cache/${year}/${month}/${today}`);
   const cached   = await cache.match(cacheKey);
   if (cached) return cached;
 
