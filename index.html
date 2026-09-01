@@ -5463,17 +5463,22 @@ function AbsensiPage(_ref46) {
       var hdr2 = [''];
       cabNames.forEach(function() { hdr2.push('Jam Masuk'); hdr2.push('Jam Pulang'); hdr2.push('Telat'); });
       var pivotRows = [hdr1, hdr2];
+      var totals = new Array(cabNames.length).fill(0);
       allDates.forEach(function(date) {
         var row = [fmtDateShort(date)];
-        cabNames.forEach(function(name) {
+        cabNames.forEach(function(name, ni) {
           var rec = recs.find(function(a) { return a.date === date && a.user_name === name; });
           row.push(rec ? fmtT(rec.check_in) : '-');
           row.push(rec ? fmtT(rec.check_out) : '-');
           var late = rec ? lateMinutes(rec) : 0;
+          totals[ni] += late;
           row.push(late > 0 ? late + ' mnt (batas ' + getSchedule(name).label + ')' : '-');
         });
         pivotRows.push(row);
       });
+      var totalRow = ['Total'];
+      cabNames.forEach(function(_, ni) { totalRow.push(''); totalRow.push(''); totalRow.push(totals[ni] > 0 ? totals[ni] + ' mnt' : '-'); });
+      pivotRows.push(totalRow);
       var ws = XLSX.utils.aoa_to_sheet(pivotRows);
       var pivotCols = [{ wch: 10 }];
       cabNames.forEach(function() { pivotCols.push({ wch: 11 }, { wch: 11 }, { wch: 9 }); });
