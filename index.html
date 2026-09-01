@@ -665,7 +665,7 @@ var USER_ACCOUNTS = [
 // Branch groups — PS (Poins) and TC (Dusit) are siloed; cannot see each other's data
 var BRANCH_GROUPS = {
   PS: ['PS TITI', 'PS DARTIK', 'PS DWI'],
-  TC: ['TC RIZAL', 'TC ULIN', 'TC APRIL', 'TC LUVI', 'TC RIA', 'TC Salzabil', 'TC ARYA', 'TC DEFA', 'TC SANDI', 'TC FAJAR', 'TC DERI', 'TC MAHESA']
+  TC: ['TC RIZAL', 'TC ULIN', 'TC APRIL', 'TC LUVI', 'TC RIA', 'TC Salzabil', 'TC ARYA', 'TC DEFA', 'TC SANDI', 'TC FAJAR', 'TC DERI', 'TC MAHESA', 'TC ALDO']
 };
 var getBranchGroup = function getBranchGroup(name) {
   var keys = Object.keys(BRANCH_GROUPS);
@@ -5444,7 +5444,7 @@ function AbsensiPage(_ref46) {
 
     // ── Sheet 2–4: Ringkasan per Cabang ──
     var _PS_USERS = ['PS TITI', 'PS DARTIK', 'PS DWI'];
-    var _TC_USERS = ['TC RIZAL', 'TC ULIN', 'TC APRIL', 'TC LUVI', 'TC RIA', 'TC Salzabil', 'TC ARYA', 'TC DEFA', 'TC SANDI', 'TC FAJAR', 'TC DERI', 'TC MAHESA', 'TC GUSTI'];
+    var _TC_USERS = ['TC RIZAL', 'TC ULIN', 'TC APRIL', 'TC LUVI', 'TC RIA', 'TC Salzabil', 'TC ARYA', 'TC DEFA', 'TC SANDI', 'TC FAJAR', 'TC DERI', 'TC MAHESA', 'TC GUSTI', 'TC ALDO'];
     var cabangSheets = [
       { label: 'Ringkasan MG',    filter: function(n) { return !_PS_USERS.includes(n) && !_TC_USERS.includes(n); } },
       { label: 'Ringkasan TC',    filter: function(n) { return _TC_USERS.includes(n); } },
