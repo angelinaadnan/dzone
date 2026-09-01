@@ -47102,7 +47102,8 @@ var BA_CATEGORIES = ['Notebook','PC/AIO','Monitor','Printer','Projector'];
 
 function BusinessAnalystPage() {
   var now = new Date();
-  var _s1 = React.useState(now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0'));
+  var _lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  var _s1 = React.useState(_lastMonth.getFullYear() + '-' + String(_lastMonth.getMonth()+1).padStart(2,'0'));
   var period = _s1[0]; var setPeriod = _s1[1];
   var _s2 = React.useState(null); var data = _s2[0]; var setData = _s2[1];
   var _s3 = React.useState(false); var loading = _s3[0]; var setLoading = _s3[1];
