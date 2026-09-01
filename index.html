@@ -46965,6 +46965,20 @@ function RevisiKodePelangganPage() {
       });
   }
 
+  function exportExcelRKP() {
+    var exportItems = data ? (data.problematic || []) : [];
+    if (!exportItems.length) return;
+    var wb = XLSX.utils.book_new();
+    var rows = [['No', 'Nama Customer', 'ID Accurate', 'Kode Sekarang', 'Kode Baru', 'No HP']];
+    exportItems.forEach(function(item, i) {
+      rows.push([i + 1, item.name, item.id, item.kode, item.usulan, item.mobilePhone || '']);
+    });
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 4 }, { wch: 35 }, { wch: 10 }, { wch: 18 }, { wch: 12 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Revisi Kode');
+    XLSX.writeFile(wb, 'RevisiKodePelanggan_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  }
+
   function fixAll() {
     var items = (data.problematic || []).filter(function(r) { return rowStatus[r.id] !== 'done' && rowStatus[r.id] !== 'skip'; });
     if (!items.length) return;
@@ -47008,6 +47022,10 @@ function RevisiKodePelangganPage() {
         doneCount > 0 && React.createElement(React.Fragment, null, ' | ✓ Selesai: ', React.createElement('b', { style: { color: '#16a34a' } }, doneCount)),
         skipCount > 0 && React.createElement(React.Fragment, null, ' | Dilewati: ', skipCount)
       ),
+      React.createElement('button', {
+        onClick: exportExcelRKP, disabled: !items.length,
+        style: { padding: '8px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' }
+      }, '📥 Export Excel'),
       React.createElement('button', {
         onClick: fixAll, disabled: fixingAll || !visible.length,
         style: { padding: '8px 18px', background: fixingAll ? '#6b7280' : '#dc2626', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: fixingAll ? 'not-allowed' : 'pointer' }
