@@ -46915,32 +46915,31 @@ function RevisiKodePelangganPage() {
   var _s1 = React.useState(null); var data = _s1[0]; var setData = _s1[1];
   var _s2 = React.useState(false); var loading = _s2[0]; var setLoading = _s2[1];
   var _s3 = React.useState(null); var err = _s3[0]; var setErr = _s3[1];
-  var _s4 = React.useState({}); var rowStatus = _s4[0]; var setRowStatus = _s4[1]; // id → 'loading'|'done'|'skip'|'error'
-  var _s5 = React.useState('c68'); var activeTab = _s5[0]; var setActiveTab = _s5[1];
+  var _s4 = React.useState({}); var rowStatus = _s4[0]; var setRowStatus = _s4[1];
+  var _s5 = React.useState(false); var fixingAll = _s5[0]; var setFixingAll = _s5[1];
+  var _s6 = React.useState(null); var fixProgress = _s6[0]; var setFixProgress = _s6[1];
 
   function loadAudit(force) {
     setLoading(true); setErr(null);
     var url = RKP_CONNECTOR + '/api/customers/audit' + (force ? '?refresh=1' : '');
     fetch(url, { headers: { 'X-API-Key': RKP_API_KEY } })
       .then(function(r) { return r.json(); })
-      .then(function(d) { if (d.error) throw new Error(d.error); setData(d); })
+      .then(function(d) { if (d.error) throw new Error(d.error); setData(d); setRowStatus({}); })
       .catch(function(e) { setErr(e.message); })
       .finally(function() { setLoading(false); });
   }
 
   React.useEffect(function() { loadAudit(false); }, []);
 
-  function approve(item, usulan) {
-    if (!usulan) return;
-    setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'loading'}); });
-    fetch(RKP_CONNECTOR + '/api/customers/' + item.id, {
+  function fixOne(item) {
+    return fetch(RKP_CONNECTOR + '/api/customers/' + item.id, {
       method: 'PUT',
       headers: { 'X-API-Key': RKP_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customerNo: usulan })
+      body: JSON.stringify({ customerNo: item.usulan })
     })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.error || (d.s === false)) throw new Error(d.error || (d.d && d.d[0]) || 'Gagal');
+        if (d.error || d.s === false) throw new Error(d.error || (d.d && d.d[0]) || 'Gagal');
         setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'done'}); });
       })
       .catch(function(e) {
@@ -46948,37 +46947,75 @@ function RevisiKodePelangganPage() {
       });
   }
 
-  function skip(id) {
-    setRowStatus(function(prev) { return Object.assign({}, prev, {[id]: 'skip'}); });
+  function fixAll() {
+    var items = (data.problematic || []).filter(function(r) { return rowStatus[r.id] !== 'done' && rowStatus[r.id] !== 'skip'; });
+    if (!items.length) return;
+    if (!window.confirm('Fix semua ' + items.length + ' customer sekarang?')) return;
+    setFixingAll(true);
+    setFixProgress({ done: 0, total: items.length, err: 0 });
+    var idx = 0;
+    function next() {
+      if (idx >= items.length) { setFixingAll(false); return; }
+      var item = items[idx++];
+      fixOne(item).then(function() {
+        setFixProgress(function(p) {
+          var st = rowStatus[item.id];
+          return { done: p.done + 1, total: p.total, err: p.err + (st && st.startsWith('error') ? 1 : 0) };
+        });
+        setTimeout(next, 300);
+      });
+    }
+    next();
   }
 
-  var cs = { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', marginBottom: 16, overflow: 'hidden' };
-  var tabs = [
-    { id: 'c68', label: '68xxx', desc: 'kemungkinan typo 62' },
-    { id: 'c8',  label: '8xxx',  desc: 'hilang awalan 6' },
-    { id: 'cshort', label: 'Kode Pendek', desc: 'bukan nomor HP' },
-  ];
+  var items = data ? (data.problematic || []) : [];
+  var visible = items.filter(function(r) { return rowStatus[r.id] !== 'done' && rowStatus[r.id] !== 'skip'; });
+  var doneCount = items.filter(function(r) { return rowStatus[r.id] === 'done'; }).length;
+  var skipCount = items.filter(function(r) { return rowStatus[r.id] === 'skip'; }).length;
 
-  function renderTable(items, hasUsulan) {
-    var visible = items.filter(function(r) { return rowStatus[r.id] !== 'skip' && rowStatus[r.id] !== 'done'; });
-    var done = items.filter(function(r) { return rowStatus[r.id] === 'done'; }).length;
-    var skipped = items.filter(function(r) { return rowStatus[r.id] === 'skip'; }).length;
+  return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 960, margin: '0 auto' } },
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 } },
+      React.createElement('h2', { style: { fontSize: 18, fontWeight: 700, margin: 0, flex: 1 } }, '🔧 Revisi Kode Pelanggan'),
+      data && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, 'Cache: ', data.cachedAt ? new Date(data.cachedAt).toLocaleString('id-ID') : '—'),
+      React.createElement('button', {
+        onClick: function() { loadAudit(true); }, disabled: loading || fixingAll,
+        style: { padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, cursor: 'pointer', color: 'var(--text1)' }
+      }, loading ? '⏳' : '🔄 Refresh')
+    ),
 
-    return React.createElement(React.Fragment, null,
-      React.createElement('div', { style: { padding: '10px 16px', fontSize: 12, color: 'var(--text3)', borderBottom: '1px solid var(--border)', display: 'flex', gap: 16 } },
-        React.createElement('span', null, 'Total: ', React.createElement('b', null, items.length)),
-        done > 0 && React.createElement('span', { style: { color: '#16a34a' } }, '✓ Approved: ', done),
-        skipped > 0 && React.createElement('span', { style: { color: 'var(--text3)' } }, 'Dilewati: ', skipped),
-        React.createElement('span', null, 'Sisa: ', React.createElement('b', null, visible.length))
+    data && items.length > 0 && React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
+      React.createElement('div', { style: { fontSize: 12, color: 'var(--text2)', flex: 1 } },
+        'Total customer: ', React.createElement('b', null, (data.total || 0).toLocaleString('id-ID')),
+        ' | Perlu difix: ', React.createElement('b', { style: { color: '#dc2626' } }, items.length),
+        doneCount > 0 && React.createElement(React.Fragment, null, ' | ✓ Selesai: ', React.createElement('b', { style: { color: '#16a34a' } }, doneCount)),
+        skipCount > 0 && React.createElement(React.Fragment, null, ' | Dilewati: ', skipCount)
       ),
-      visible.length === 0
-        ? React.createElement('div', { style: { padding: 32, textAlign: 'center', color: 'var(--text3)', fontSize: 13 } }, '✅ Semua sudah diproses')
+      React.createElement('button', {
+        onClick: fixAll, disabled: fixingAll || !visible.length,
+        style: { padding: '8px 18px', background: fixingAll ? '#6b7280' : '#dc2626', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: fixingAll ? 'not-allowed' : 'pointer' }
+      }, fixingAll ? ('⏳ Fixing ' + (fixProgress ? fixProgress.done + '/' + fixProgress.total : '...')) : '⚡ Fix Semua (' + visible.length + ')')
+    ),
+
+    data && items.length === 0 && !loading && React.createElement('div', { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 16 } },
+      'Total customer: ', React.createElement('b', null, (data.total || 0).toLocaleString('id-ID')),
+      ' | Tidak ada kode yang perlu difix'
+    ),
+
+    loading && React.createElement('div', { style: { padding: 60, textAlign: 'center', color: 'var(--text3)' } },
+      React.createElement('div', null, '⏳ Mengambil data dari Accurate...'),
+      React.createElement('div', { style: { fontSize: 11, marginTop: 8 } }, 'Proses ini memerlukan ~30–60 detik')
+    ),
+    err && React.createElement('div', { style: { padding: 16, color: '#dc2626', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)' } }, '⚠️ ', err),
+
+    data && React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
+      visible.length === 0 && !loading
+        ? React.createElement('div', { style: { padding: 48, textAlign: 'center', color: 'var(--text3)', fontSize: 14 } }, '✅ Semua sudah diproses')
         : React.createElement('div', { style: { overflowX: 'auto' } },
             React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 13 } },
               React.createElement('thead', null,
                 React.createElement('tr', null,
-                  ['Nama Customer', 'Kode Lama', hasUsulan ? 'Usulan Kode Baru' : 'mobilePhone', 'Aksi'].map(function(h) {
-                    return React.createElement('th', { key: h, style: { padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--text3)', fontWeight: 600, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' } }, h);
+                  ['Nama Customer', 'Kode Sekarang', 'Kode Baru', 'Aksi'].map(function(h) {
+                    return React.createElement('th', { key: h, style: { padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--text3)', fontWeight: 600, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', background: 'var(--bg)' } }, h);
                   })
                 )
               ),
@@ -46987,30 +47024,28 @@ function RevisiKodePelangganPage() {
                   var st = rowStatus[item.id];
                   var isLoading = st === 'loading';
                   var isErr = st && st.startsWith('error:');
-                  var usulan = item.usulan;
-                  return React.createElement('tr', { key: item.id, style: { borderBottom: '1px solid var(--border)', opacity: isLoading ? 0.6 : 1 } },
+                  return React.createElement('tr', { key: item.id, style: { borderBottom: '1px solid var(--border)', opacity: isLoading ? 0.5 : 1, background: isErr ? '#fef2f2' : '' } },
                     React.createElement('td', { style: { padding: '8px 12px', fontWeight: 500 } },
-                      React.createElement('div', null, item.name),
+                      item.name,
                       React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, 'ID: ', item.id)
                     ),
                     React.createElement('td', { style: { padding: '8px 12px', fontFamily: 'monospace', color: '#dc2626' } }, item.kode),
-                    React.createElement('td', { style: { padding: '8px 12px', fontFamily: 'monospace', color: usulan ? '#16a34a' : 'var(--text3)' } },
-                      hasUsulan
-                        ? (usulan ? React.createElement(React.Fragment, null, usulan, item.duplikat ? React.createElement('span', { style: { color: '#dc2626', fontSize: 10, marginLeft: 4 } }, '⚠️ duplikat') : null) : '—')
-                        : (item.mobilePhone || '—')
-                    ),
+                    React.createElement('td', { style: { padding: '8px 12px', fontFamily: 'monospace', color: '#16a34a' } }, item.usulan),
                     React.createElement('td', { style: { padding: '8px 12px', whiteSpace: 'nowrap' } },
                       isErr
                         ? React.createElement('span', { style: { color: '#dc2626', fontSize: 11 } }, '❌ ', st.slice(6))
                         : React.createElement(React.Fragment, null,
-                            hasUsulan && usulan && !item.duplikat && React.createElement('button', {
-                              onClick: function() { approve(item, usulan); },
-                              disabled: isLoading,
-                              style: { padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginRight: 6 }
-                            }, isLoading ? '...' : '✓ Approve'),
                             React.createElement('button', {
-                              onClick: function() { skip(item.id); },
-                              disabled: isLoading,
+                              onClick: function() {
+                                setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'loading'}); });
+                                fixOne(item);
+                              },
+                              disabled: isLoading || fixingAll,
+                              style: { padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginRight: 6 }
+                            }, isLoading ? '...' : '✓ Fix'),
+                            React.createElement('button', {
+                              onClick: function() { setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'skip'}); }); },
+                              disabled: isLoading || fixingAll,
                               style: { padding: '4px 10px', background: 'var(--bg)', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, cursor: 'pointer' }
                             }, 'Lewati')
                           )
@@ -47020,76 +47055,6 @@ function RevisiKodePelangganPage() {
               )
             )
           )
-    );
-  }
-
-  return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 960, margin: '0 auto' } },
-    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 } },
-      React.createElement('h2', { style: { fontSize: 18, fontWeight: 700, margin: 0, flex: 1 } }, '🔧 Revisi Kode Pelanggan'),
-      data && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, 'Cache: ', data.cachedAt ? new Date(data.cachedAt).toLocaleString('id-ID') : '—'),
-      React.createElement('button', {
-        onClick: function() { loadAudit(true); }, disabled: loading,
-        style: { padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, cursor: 'pointer', color: 'var(--text1)' }
-      }, loading ? '⏳' : '🔄 Refresh')
-    ),
-
-    loading && React.createElement('div', { style: { padding: 60, textAlign: 'center', color: 'var(--text3)' } },
-      React.createElement('div', null, '⏳ Mengambil data dari Accurate...'),
-      React.createElement('div', { style: { fontSize: 11, marginTop: 8 } }, 'Proses ini memerlukan ~30–60 detik')
-    ),
-    err && React.createElement('div', { style: { padding: 16, color: '#dc2626', background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)' } }, '⚠️ ', err),
-
-    data && React.createElement(React.Fragment, null,
-      React.createElement('div', { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 16 } },
-        'Total customer: ', React.createElement('b', null, data.total ? data.total.toLocaleString('id-ID') : '—'),
-        ' | 68xxx: ', React.createElement('b', null, (data.c68 || []).length),
-        ' | 8xxx: ', React.createElement('b', null, (data.c8 || []).length),
-        ' | Kode pendek: ', React.createElement('b', null, (data.cshort || []).length)
-      ),
-
-      // Tabs
-      React.createElement('div', { style: { display: 'flex', gap: 8, marginBottom: 12 } },
-        tabs.map(function(t) {
-          var active = t.id === activeTab;
-          var count = (data[t.id] || []).length;
-          return React.createElement('button', {
-            key: t.id, onClick: function() { setActiveTab(t.id); },
-            style: { padding: '6px 14px', borderRadius: 20, border: '1px solid ' + (active ? '#3b82f6' : 'var(--border)'),
-              background: active ? '#3b82f6' : 'var(--surface)', color: active ? '#fff' : 'var(--text1)',
-              fontWeight: active ? 600 : 400, fontSize: 12, cursor: 'pointer' }
-          }, t.label, ' (', count, ')');
-        })
-      ),
-
-      // Active category table
-      React.createElement('div', { style: cs },
-        activeTab === 'c68' && React.createElement(React.Fragment, null,
-          React.createElement('div', { style: { padding: '10px 16px', background: '#eff6ff', borderBottom: '1px solid #bfdbfe', fontSize: 12, color: '#1e40af' } },
-            '💡 68xxx: kemungkinan besar typo — awalan ',
-            React.createElement('code', null, '0'),
-            ' diganti ',
-            React.createElement('code', null, '6'),
-            ' saja (harusnya ',
-            React.createElement('code', null, '62'),
-            '). Usulan: ',
-            React.createElement('code', null, '68XXX → 62XXX'),
-            ' (hapus 8 setelah 6, tambah 2).'
-          ),
-          renderTable(data.c68 || [], true)
-        ),
-        activeTab === 'c8' && React.createElement(React.Fragment, null,
-          React.createElement('div', { style: { padding: '10px 16px', background: '#fefce8', borderBottom: '1px solid #fde68a', fontSize: 12, color: '#92400e' } },
-            '⚠️ 8xxx: format tidak jelas — mungkin hilang awalan, atau memang kode lain. Cek manual, tidak ada usulan otomatis.'
-          ),
-          renderTable(data.c8 || [], false)
-        ),
-        activeTab === 'cshort' && React.createElement(React.Fragment, null,
-          React.createElement('div', { style: { padding: '10px 16px', background: '#f9fafb', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text2)' } },
-            'ℹ️ Kode pendek: bukan nomor HP, mungkin kode internal lama. Tidak ada usulan otomatis — review manual.'
-          ),
-          renderTable(data.cshort || [], false)
-        )
-      )
     )
   );
 }
