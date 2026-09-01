@@ -3770,7 +3770,7 @@ function App() {
     { id: 'tarik_pricelist', icon: '🗒️', label: 'Tarik Pricelist', _inSection: 'accurate' },
     { id: 'revisi_kode_pelanggan', icon: '🔧', label: 'Revisi Kode Pelanggan', _inSection: 'accurate' },
   ] : [];
-  var navItems = (role === 'supervisor' && userName === 'Santo' ? [{ id: 'santo_dashboard', icon: '📊', label: 'Sales Dashboard' }].concat(_toConsumableArray(ROLE_NAV[role]), [{
+  var navItems = (role === 'supervisor' && userName === 'Santo' ? [].concat(_toConsumableArray(ROLE_NAV[role]), [{
     id: 'branch_request',
     icon: '📦',
     label: 'Request Barang'
@@ -4003,7 +4003,7 @@ function App() {
   }), role === 'ops' && page === 'op_branch' && /*#__PURE__*/React.createElement(OpsBranchManager, {
     requests: branchRequests,
     onUpdate: updateBranchRequest
-  }), role === 'supervisor' && userName === 'Santo' && page === 'santo_dashboard' && /*#__PURE__*/React.createElement(SantoDashboard, null), role === 'supervisor' && userName === 'Santo' && page === 'business_analyst' && /*#__PURE__*/React.createElement(BusinessAnalystPage, null), role === 'supervisor' && userName === 'Santo' && page === 'branch_request' && /*#__PURE__*/React.createElement(BranchRequestPage, {
+  }), role === 'supervisor' && userName === 'Santo' && page === 'business_analyst' && /*#__PURE__*/React.createElement(BusinessAnalystPage, null), role === 'supervisor' && userName === 'Santo' && page === 'branch_request' && /*#__PURE__*/React.createElement(BranchRequestPage, {
     requests: branchRequests,
     onSave: saveBranchRequest,
     onUpdate: updateBranchRequest,
@@ -47072,17 +47072,25 @@ function BusinessAnalystPage() {
   var _s3 = React.useState(false); var loading = _s3[0]; var setLoading = _s3[1];
   var _s4 = React.useState(null); var err = _s4[0]; var setErr = _s4[1];
   var _s5 = React.useState('Notebook'); var activeTab = _s5[0]; var setActiveTab = _s5[1];
+  var _s6 = React.useState(null); var gpData = _s6[0]; var setGpData = _s6[1];
+  var _s7 = React.useState(false); var gpLoading = _s7[0]; var setGpLoading = _s7[1];
 
   React.useEffect(function() {
     if (!period) return;
     var parts = period.split('-');
     var y = parts[0]; var m = parts[1];
     setLoading(true); setErr(null); setData(null);
+    setGpLoading(true); setGpData(null);
     fetch(BA_API + '?year=' + y + '&month=' + parseInt(m,10))
       .then(function(r) { return r.json(); })
       .then(function(d) { if (d.error) throw new Error(d.error); setData(d); })
       .catch(function(e) { setErr(e.message); })
       .finally(function() { setLoading(false); });
+    fetch('/api/sales-gp?year=' + y + '&month=' + parseInt(m,10))
+      .then(function(r) { return r.json(); })
+      .then(function(d) { if (d.available) setGpData(d); })
+      .catch(function() {})
+      .finally(function() { setGpLoading(false); });
   }, [period]);
 
   var cs = { background:'var(--surface)', borderRadius:12, padding:'16px 20px', border:'1px solid var(--border)', marginBottom:16 };
@@ -47103,6 +47111,75 @@ function BusinessAnalystPage() {
 
     loading && React.createElement('div', { style:{ textAlign:'center', padding:60, color:'var(--text3)' } }, '⏳ Memuat data...'),
     err && React.createElement('div', { style:{ padding:20, color:'#ef4444', background:'var(--surface)', borderRadius:12, border:'1px solid var(--border)' } }, '⚠️ ', err),
+
+    // ── Section 0: Penjualan per Sales (revenue + laba dari Accurate) ─
+    React.createElement('div', { style:cs },
+      React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:12 } }, '💰 Penjualan per Sales'),
+      gpLoading && React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, '⏳ Memuat data penjualan...'),
+      !gpLoading && !gpData && React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ada data'),
+      gpData && React.createElement(React.Fragment, null,
+        // Summary row
+        React.createElement('div', { style:{ display:'flex', gap:20, marginBottom:16, flexWrap:'wrap' } },
+          React.createElement('div', { style:{ flex:1, minWidth:140, background:'var(--bg)', borderRadius:10, padding:'12px 16px', border:'1px solid var(--border)' } },
+            React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginBottom:4 } }, 'TOTAL REVENUE'),
+            React.createElement('div', { style:{ fontSize:20, fontWeight:700, fontFamily:'DM Mono' } },
+              'Rp ' + (gpData.combined.total_revenue >= 1e9 ? (gpData.combined.total_revenue/1e9).toFixed(2)+'M' : gpData.combined.total_revenue >= 1e6 ? (gpData.combined.total_revenue/1e6).toFixed(1)+'jt' : Math.round(gpData.combined.total_revenue).toLocaleString('id-ID'))
+            )
+          ),
+          React.createElement('div', { style:{ flex:1, minWidth:140, background:'var(--bg)', borderRadius:10, padding:'12px 16px', border:'1px solid var(--border)' } },
+            React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginBottom:4 } }, 'TOTAL LABA'),
+            React.createElement('div', { style:{ fontSize:20, fontWeight:700, fontFamily:'DM Mono', color: gpData.combined.total_laba >= 0 ? '#22c55e' : '#ef4444' } },
+              'Rp ' + (Math.abs(gpData.combined.total_laba) >= 1e9 ? (gpData.combined.total_laba/1e9).toFixed(2)+'M' : Math.abs(gpData.combined.total_laba) >= 1e6 ? (gpData.combined.total_laba/1e6).toFixed(1)+'jt' : Math.round(gpData.combined.total_laba).toLocaleString('id-ID'))
+            ),
+            React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2 } },
+              'Margin ' + (gpData.combined.total_revenue > 0 ? (gpData.combined.total_laba/gpData.combined.total_revenue*100).toFixed(1) : '0') + '%'
+            )
+          ),
+          React.createElement('div', { style:{ flex:1, minWidth:140, background:'var(--bg)', borderRadius:10, padding:'12px 16px', border:'1px solid var(--border)' } },
+            React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginBottom:4 } }, 'ADL (PT)'),
+            React.createElement('div', { style:{ fontSize:15, fontWeight:600, fontFamily:'DM Mono' } },
+              'Rp ' + (gpData.pt.total_revenue >= 1e6 ? (gpData.pt.total_revenue/1e6).toFixed(1)+'jt' : Math.round(gpData.pt.total_revenue).toLocaleString('id-ID'))
+            ),
+            React.createElement('div', { style:{ fontSize:11, color:'#22c55e' } },
+              'laba Rp ' + (gpData.pt.total_laba >= 1e6 ? (gpData.pt.total_laba/1e6).toFixed(1)+'jt' : Math.round(gpData.pt.total_laba).toLocaleString('id-ID'))
+            )
+          ),
+          React.createElement('div', { style:{ flex:1, minWidth:140, background:'var(--bg)', borderRadius:10, padding:'12px 16px', border:'1px solid var(--border)' } },
+            React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginBottom:4 } }, 'GROUP'),
+            React.createElement('div', { style:{ fontSize:15, fontWeight:600, fontFamily:'DM Mono' } },
+              'Rp ' + (gpData.group.total_revenue >= 1e6 ? (gpData.group.total_revenue/1e6).toFixed(1)+'jt' : Math.round(gpData.group.total_revenue).toLocaleString('id-ID'))
+            ),
+            React.createElement('div', { style:{ fontSize:11, color:'#22c55e' } },
+              'laba Rp ' + (gpData.group.total_laba >= 1e6 ? (gpData.group.total_laba/1e6).toFixed(1)+'jt' : Math.round(gpData.group.total_laba).toLocaleString('id-ID'))
+            )
+          )
+        ),
+        // Per salesman table
+        React.createElement('div', { style:{ overflowX:'auto' } },
+          React.createElement('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:13 } },
+            React.createElement('thead', null,
+              React.createElement('tr', null,
+                ['SALES','REVENUE','LABA','MARGIN'].map(function(h) {
+                  return React.createElement('th', { key:h, style:{ padding:'6px 10px', textAlign: h==='SALES'?'left':'right', fontSize:11, color:'var(--text3)', fontWeight:600, letterSpacing:'0.05em', borderBottom:'1px solid var(--border)' } }, h);
+                })
+              )
+            ),
+            React.createElement('tbody', null,
+              gpData.combined.list.map(function(s) {
+                var margin = s.revenue > 0 ? (s.laba/s.revenue*100).toFixed(1) : '0';
+                var fmtRp = function(v) { return 'Rp '+(Math.abs(v)>=1e6?(v/1e6).toFixed(1)+'jt':Math.round(v).toLocaleString('id-ID')); };
+                return React.createElement('tr', { key:s.name, style:{ borderBottom:'1px solid var(--border)' } },
+                  React.createElement('td', { style:{ padding:'7px 10px', fontWeight:600 } }, s.name),
+                  React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', fontFamily:'DM Mono' } }, fmtRp(s.revenue)),
+                  React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', fontFamily:'DM Mono', color: s.laba >= 0 ? '#22c55e' : '#ef4444' } }, fmtRp(s.laba)),
+                  React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', color:'var(--text3)', fontFamily:'DM Mono' } }, margin+'%')
+                );
+              })
+            )
+          )
+        )
+      )
+    ),
 
     data && React.createElement(React.Fragment, null,
 
