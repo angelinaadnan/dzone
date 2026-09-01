@@ -5442,77 +5442,47 @@ function AbsensiPage(_ref46) {
     }
     XLSX.utils.book_append_sheet(wb, ws1, 'Detail');
 
-    // ── Sheet 2: Pivot per orang (format ringkas) ──
-    var allDates = _toConsumableArray(new Set(recs.map(function (a) {
-      return a.date;
-    }))).sort();
-    var allNames = _toConsumableArray(new Set(recs.map(function (a) {
-      return a.user_name;
-    }))).sort();
-    // Header row 1: Nama orang (merged 3 cols each)
-    var hdr1 = ['Tanggal'];
-    allNames.forEach(function (n) {
-      hdr1.push(n);
-      hdr1.push('');
-      hdr1.push('');
-    });
-    // Header row 2: sub-cols
-    var hdr2 = [''];
-    allNames.forEach(function () {
-      hdr2.push('Jam Masuk');
-      hdr2.push('Jam Pulang');
-      hdr2.push('Telat');
-    });
-    // Data rows
-    var pivotRows = [hdr1, hdr2];
-    var fmtDateShort = function fmtDateShort(d) {
+    // ── Sheet 2–4: Ringkasan per Cabang ──
+    var _PS_USERS = ['PS TITI', 'PS DARTIK', 'PS DWI'];
+    var _TC_USERS = ['TC RIZAL', 'TC ULIN', 'TC APRIL', 'TC LUVI', 'TC RIA', 'TC Salzabil', 'TC ARYA', 'TC DEFA', 'TC SANDI', 'TC FAJAR', 'TC DERI', 'TC MAHESA', 'TC GUSTI'];
+    var cabangSheets = [
+      { label: 'Ringkasan MG',    filter: function(n) { return !_PS_USERS.includes(n) && !_TC_USERS.includes(n); } },
+      { label: 'Ringkasan TC',    filter: function(n) { return _TC_USERS.includes(n); } },
+      { label: 'Ringkasan Poins', filter: function(n) { return _PS_USERS.includes(n); } },
+    ];
+    var allDates = _toConsumableArray(new Set(recs.map(function(a) { return a.date; }))).sort();
+    var fmtDateShort = function(d) {
       var dt = new Date(d + 'T00:00:00');
-      return String(dt.getDate()).padStart(2, '0') + '-' + dt.toLocaleString('id-ID', {
-        month: 'short'
-      });
+      return String(dt.getDate()).padStart(2, '0') + '-' + dt.toLocaleString('id-ID', { month: 'short' });
     };
-    allDates.forEach(function (date) {
-      var row = [fmtDateShort(date)];
-      allNames.forEach(function (name) {
-        var rec = recs.find(function (a) {
-          return a.date === date && a.user_name === name;
+    cabangSheets.forEach(function(cab) {
+      var cabNames = _toConsumableArray(new Set(recs.map(function(a) { return a.user_name; }))).sort().filter(cab.filter);
+      if (!cabNames.length) return;
+      var hdr1 = ['Tanggal'];
+      cabNames.forEach(function(n) { hdr1.push(n); hdr1.push(''); hdr1.push(''); });
+      var hdr2 = [''];
+      cabNames.forEach(function() { hdr2.push('Jam Masuk'); hdr2.push('Jam Pulang'); hdr2.push('Telat'); });
+      var pivotRows = [hdr1, hdr2];
+      allDates.forEach(function(date) {
+        var row = [fmtDateShort(date)];
+        cabNames.forEach(function(name) {
+          var rec = recs.find(function(a) { return a.date === date && a.user_name === name; });
+          row.push(rec ? fmtT(rec.check_in) : '-');
+          row.push(rec ? fmtT(rec.check_out) : '-');
+          var late = rec ? lateMinutes(rec) : 0;
+          row.push(late > 0 ? late + ' mnt (batas ' + getSchedule(name).label + ')' : '-');
         });
-        row.push(rec ? fmtT(rec.check_in) : '-');
-        row.push(rec ? fmtT(rec.check_out) : '-');
-        var late = rec ? lateMinutes(rec) : 0;
-        row.push(late > 0 ? late + ' mnt (batas ' + getSchedule(name).label + ')' : '-');
+        pivotRows.push(row);
       });
-      pivotRows.push(row);
-    });
-    var ws2 = XLSX.utils.aoa_to_sheet(pivotRows);
-    // Column widths
-    var pivotCols = [{
-      wch: 10
-    }];
-    allNames.forEach(function () {
-      pivotCols.push({
-        wch: 11
-      }, {
-        wch: 11
-      }, {
-        wch: 9
+      var ws = XLSX.utils.aoa_to_sheet(pivotRows);
+      var pivotCols = [{ wch: 10 }];
+      cabNames.forEach(function() { pivotCols.push({ wch: 11 }, { wch: 11 }, { wch: 9 }); });
+      ws['!cols'] = pivotCols;
+      ws['!merges'] = cabNames.map(function(_, i) {
+        return { s: { r: 0, c: 1 + i * 3 }, e: { r: 0, c: 3 + i * 3 } };
       });
+      XLSX.utils.book_append_sheet(wb, ws, cab.label);
     });
-    ws2['!cols'] = pivotCols;
-    // Merge header cells for each name (span 3 cols)
-    ws2['!merges'] = allNames.map(function (_, i) {
-      return {
-        s: {
-          r: 0,
-          c: 1 + i * 3
-        },
-        e: {
-          r: 0,
-          c: 3 + i * 3
-        }
-      };
-    });
-    XLSX.utils.book_append_sheet(wb, ws2, 'Ringkasan');
     var fname = scope === 'day' ? "Absensi_".concat(selDate, ".xlsx") : "Absensi_".concat(exportFrom, "_sd_").concat(exportTo, ".xlsx");
     XLSX.writeFile(wb, fname);
   };
