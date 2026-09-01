@@ -8,7 +8,7 @@ const CORS = {
 };
 
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { request, env } = context;
 
   const connUrl = env.CONNECTOR_URL     || '';
   const connKey = env.CONNECTOR_API_KEY || '';
@@ -17,7 +17,9 @@ export async function onRequestGet(context) {
     return new Response(JSON.stringify({ error: 'CONNECTOR_URL not set' }), { headers: CORS });
   }
 
-  const resp = await fetch(`${connUrl}/api/sheet/test-appkey`, {
+  const url = new URL(request.url);
+  const qs = url.searchParams.toString();
+  const resp = await fetch(`${connUrl}/api/sheet/test-appkey${qs ? '?' + qs : ''}`, {
     headers: {
       'X-API-Key':            connKey,
       'X-Accurate-App-Key':   env.ACCURATE_APP_KEY    || '',
