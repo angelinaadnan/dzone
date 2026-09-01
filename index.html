@@ -47173,22 +47173,39 @@ function BusinessAnalystPage() {
           React.createElement('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:13 } },
             React.createElement('thead', null,
               React.createElement('tr', null,
-                ['SALES','REVENUE','LABA','MARGIN'].map(function(h) {
-                  return React.createElement('th', { key:h, style:{ padding:'6px 10px', textAlign:h==='SALES'?'left':'right', fontSize:11, color:'var(--text3)', fontWeight:600, letterSpacing:'0.05em', borderBottom:'1px solid var(--border)' } }, h);
-                })
+                React.createElement('th', { style:{ padding:'6px 10px', textAlign:'left', fontSize:11, color:'var(--text3)', fontWeight:600, letterSpacing:'0.05em', borderBottom:'1px solid var(--border)' } }, 'SALES'),
+                React.createElement('th', { colSpan:2, style:{ padding:'6px 10px', textAlign:'center', fontSize:11, color:'var(--text3)', fontWeight:600, letterSpacing:'0.05em', borderBottom:'1px solid var(--border)', borderLeft:'1px solid var(--border)' } }, 'PT ADL'),
+                React.createElement('th', { colSpan:2, style:{ padding:'6px 10px', textAlign:'center', fontSize:11, color:'var(--text3)', fontWeight:600, letterSpacing:'0.05em', borderBottom:'1px solid var(--border)', borderLeft:'1px solid var(--border)' } }, 'GROUP'),
+                React.createElement('th', { style:{ padding:'6px 10px', textAlign:'right', fontSize:11, color:'var(--text3)', fontWeight:600, letterSpacing:'0.05em', borderBottom:'1px solid var(--border)', borderLeft:'1px solid var(--border)' } }, 'MARGIN')
+              ),
+              React.createElement('tr', null,
+                React.createElement('th', { style:{ padding:'3px 10px 6px', borderBottom:'1px solid var(--border)' } }),
+                React.createElement('th', { style:{ padding:'3px 10px 6px', textAlign:'right', fontSize:10, color:'var(--text3)', fontWeight:500, borderBottom:'1px solid var(--border)', borderLeft:'1px solid var(--border)' } }, 'Revenue'),
+                React.createElement('th', { style:{ padding:'3px 10px 6px', textAlign:'right', fontSize:10, color:'var(--text3)', fontWeight:500, borderBottom:'1px solid var(--border)' } }, 'Laba'),
+                React.createElement('th', { style:{ padding:'3px 10px 6px', textAlign:'right', fontSize:10, color:'var(--text3)', fontWeight:500, borderBottom:'1px solid var(--border)', borderLeft:'1px solid var(--border)' } }, 'Revenue'),
+                React.createElement('th', { style:{ padding:'3px 10px 6px', textAlign:'right', fontSize:10, color:'var(--text3)', fontWeight:500, borderBottom:'1px solid var(--border)' } }, 'Laba'),
+                React.createElement('th', { style:{ padding:'3px 10px 6px', borderBottom:'1px solid var(--border)', borderLeft:'1px solid var(--border)' } })
               )
             ),
             React.createElement('tbody', null,
-              gpData.combined.list.map(function(s) {
-                var margin = s.revenue>0?(s.laba/s.revenue*100).toFixed(1):'0';
-                var fmtRp = function(v) { return 'Rp '+(Math.abs(v)>=1e6?(v/1e6).toFixed(1)+'jt':Math.round(v).toLocaleString('id-ID')); };
-                return React.createElement('tr', { key:s.name, style:{ borderBottom:'1px solid var(--border)' } },
-                  React.createElement('td', { style:{ padding:'7px 10px', fontWeight:600 } }, s.name),
-                  React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', fontFamily:'DM Mono' } }, fmtRp(s.revenue)),
-                  React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', fontFamily:'DM Mono', color:s.laba>=0?'#22c55e':'#ef4444' } }, fmtRp(s.laba)),
-                  React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', color:'var(--text3)', fontFamily:'DM Mono' } }, margin+'%')
-                );
-              })
+              (function() {
+                var ptMap = {}; (gpData.pt.list||[]).forEach(function(s){ ptMap[s.name]=s; });
+                var grpMap = {}; (gpData.group.list||[]).forEach(function(s){ grpMap[s.name]=s; });
+                var fmtRp = function(v) { if (!v) return '—'; return 'Rp '+(Math.abs(v)>=1e6?(v/1e6).toFixed(1)+'jt':Math.round(v).toLocaleString('id-ID')); };
+                var labaColor = function(v) { return !v?'var(--text3)':v>=0?'#22c55e':'#ef4444'; };
+                return gpData.combined.list.map(function(s) {
+                  var pt = ptMap[s.name]||{}; var grp = grpMap[s.name]||{};
+                  var margin = s.revenue>0?(s.laba/s.revenue*100).toFixed(1):'0';
+                  return React.createElement('tr', { key:s.name, style:{ borderBottom:'1px solid var(--border)' } },
+                    React.createElement('td', { style:{ padding:'7px 10px', fontWeight:600 } }, s.name),
+                    React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', fontFamily:'DM Mono', borderLeft:'1px solid var(--border)' } }, fmtRp(pt.revenue)),
+                    React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', fontFamily:'DM Mono', color:labaColor(pt.laba) } }, fmtRp(pt.laba)),
+                    React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', fontFamily:'DM Mono', borderLeft:'1px solid var(--border)' } }, fmtRp(grp.revenue)),
+                    React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', fontFamily:'DM Mono', color:labaColor(grp.laba) } }, fmtRp(grp.laba)),
+                    React.createElement('td', { style:{ padding:'7px 10px', textAlign:'right', color:'var(--text3)', fontFamily:'DM Mono', borderLeft:'1px solid var(--border)' } }, margin+'%')
+                  );
+                });
+              })()
             )
           )
         )
