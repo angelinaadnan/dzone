@@ -5488,6 +5488,24 @@ function AbsensiPage(_ref46) {
       });
       XLSX.utils.book_append_sheet(wb, ws, cab.label);
     });
+    // ── Sheet: Rekap per Orang ──
+    var allNames = _toConsumableArray(new Set(recs.map(function(a) { return a.user_name; }))).sort();
+    var allDatesSet = _toConsumableArray(new Set(recs.map(function(a) { return a.date; }))).sort();
+    var rekapRows = [['NAMA', 'TOTAL TELAT (MENIT)', 'TOTAL GAK MASUK (HARI)']];
+    allNames.forEach(function(name) {
+      var totalTelat = 0;
+      var totalAbsen = 0;
+      allDatesSet.forEach(function(date) {
+        var rec = recs.find(function(a) { return a.date === date && a.user_name === name; });
+        if (!rec || !rec.check_in) { totalAbsen++; }
+        else { totalTelat += lateMinutes(rec); }
+      });
+      rekapRows.push([name, totalTelat, totalAbsen]);
+    });
+    var wsRekap = XLSX.utils.aoa_to_sheet(rekapRows);
+    wsRekap['!cols'] = [{ wch: 20 }, { wch: 22 }, { wch: 24 }];
+    XLSX.utils.book_append_sheet(wb, wsRekap, 'Rekap');
+
     var fname = scope === 'day' ? "Absensi_".concat(selDate, ".xlsx") : "Absensi_".concat(exportFrom, "_sd_").concat(exportTo, ".xlsx");
     XLSX.writeFile(wb, fname);
   };
