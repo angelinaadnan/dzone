@@ -3783,7 +3783,8 @@ function App() {
   }) : ROLE_NAV[role]).filter(function (n) {
     return n.id !== 'pesan_barang' || canAccessPesanBarang;
   }).concat(accurateSection)
-  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : []);
+  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
+  .concat(userName === 'TC LUVI' ? [{ id: 'tarik_penjualan', icon: '📥', label: 'Tarik Penjualan' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -4041,7 +4042,7 @@ function App() {
     orders: orders,
     branchName: userName,
     branchMembers: getBranchMembers(userName)
-  }), (role === 'ops' || (role === 'sales' && userName === 'Eliwaty')) && page === 'op_kurir_history' && /*#__PURE__*/React.createElement(OpsKurirHistory, {
+  }), role === 'cabang' && userName === 'TC LUVI' && page === 'tarik_penjualan' && /*#__PURE__*/React.createElement(TarikPenjualanPage, null), (role === 'ops' || (role === 'sales' && userName === 'Eliwaty')) && page === 'op_kurir_history' && /*#__PURE__*/React.createElement(OpsKurirHistory, {
     db: db
   }), role === 'ops' && page === 'assign' && /*#__PURE__*/React.createElement(OpsAssign, {
     orders: orders,
@@ -38146,6 +38147,71 @@ function BranchRequestForm(_ref243) {
     disabled: saving
   }, saving ? 'Menyimpan...' : isEdit ? '💾 Simpan Perubahan' : '📤 Kirim Request ke Ops')));
 }
+
+function TarikPenjualanPage() {
+  var _s1 = React.useState('idle'); var status = _s1[0]; var setStatus = _s1[1];
+  var _s2 = React.useState(null); var result = _s2[0]; var setResult = _s2[1];
+  var _s3 = React.useState(null); var errMsg = _s3[0]; var setErrMsg = _s3[1];
+
+  function handleTarik() {
+    if (status === 'loading') return;
+    setStatus('loading'); setResult(null); setErrMsg(null);
+    fetch('https://script.google.com/macros/s/AKfycbw0AOxdmS_50l-kX8VT0ZhZRkZ95wpyVgPE8ZFuxlttRV_5BSWrE7BaLmSKgot8DErvaw/exec', {
+      method: 'POST',
+      body: JSON.stringify({ secret: 'dzone-internal-webhook-2026', action: 'tarikPenjualanKemarin' }),
+      signal: AbortSignal.timeout(180000),
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.ok) { setStatus('success'); setResult(d); }
+        else { setStatus('error'); setErrMsg(d.error || 'Gagal'); }
+      })
+      .catch(function(e) { setStatus('error'); setErrMsg(e.message || 'Timeout / koneksi gagal'); });
+  }
+
+  return React.createElement('div', { style:{ padding:'24px', maxWidth:600, margin:'0 auto' } },
+    React.createElement('h2', { style:{ fontSize:20, fontWeight:700, marginBottom:20 } }, '📥 Tarik Penjualan dari Accurate'),
+    React.createElement('div', { style:{ background:'var(--surface)', borderRadius:12, padding:'20px 24px', border:'1px solid var(--border)', marginBottom:16 } },
+      React.createElement('p', { style:{ fontSize:14, color:'var(--text2)', marginBottom:16, lineHeight:1.6 } },
+        'Tombol ini akan menarik semua transaksi penjualan ', React.createElement('b', null, 'hari kemarin'), ' dari Accurate (PT Anugerah + Group) ke Google Sheet Penjualan dan menghitung ulang komisi/Selisih Harga secara otomatis.',
+        React.createElement('br', null),
+        React.createElement('span', { style:{ color:'var(--text3)', fontSize:12 } }, 'Proses bisa makan waktu 1–3 menit. Pastikan tidak menutup halaman ini.')
+      ),
+      React.createElement('button', {
+        onClick: handleTarik,
+        disabled: status === 'loading',
+        style:{
+          background: status === 'loading' ? 'var(--border)' : '#3b82f6',
+          color: '#fff', border:'none', borderRadius:8,
+          padding:'12px 24px', fontSize:15, fontWeight:600,
+          cursor: status === 'loading' ? 'not-allowed' : 'pointer',
+          display:'flex', alignItems:'center', gap:8,
+        }
+      },
+        status === 'loading'
+          ? React.createElement(React.Fragment, null,
+              React.createElement('span', { style:{ display:'inline-block', animation:'spin 1s linear infinite', fontSize:18 } }, '⏳'),
+              'Sedang menarik data...'
+            )
+          : '📥 Tarik Penjualan Kemarin'
+      )
+    ),
+    status === 'success' && result && React.createElement('div', { style:{ background:'#14532d22', border:'1px solid #22c55e', borderRadius:10, padding:'16px 20px' } },
+      React.createElement('div', { style:{ fontWeight:700, color:'#22c55e', fontSize:16, marginBottom:8 } }, '✅ Berhasil!'),
+      React.createElement('div', { style:{ fontSize:14, color:'var(--text1)', lineHeight:1.8 } },
+        React.createElement('div', null, '📅 Tanggal: ', React.createElement('b', null, result.tanggal)),
+        React.createElement('div', null, '📊 Transaksi masuk: ', React.createElement('b', null, result.jumlahTransaksi)),
+        result.jumlahDilewati > 0 && React.createElement('div', { style:{ color:'var(--text3)' } }, '⏭ Dilewati (sudah ada): ', result.jumlahDilewati),
+        result.tidakDitemukan > 0 && React.createElement('div', { style:{ color:'#f59e0b' } }, '⚠️ Barang tidak ditemukan: ', result.tidakDitemukan)
+      )
+    ),
+    status === 'error' && React.createElement('div', { style:{ background:'#7f1d1d22', border:'1px solid #ef4444', borderRadius:10, padding:'16px 20px' } },
+      React.createElement('div', { style:{ fontWeight:700, color:'#ef4444', marginBottom:6 } }, '⚠️ Gagal'),
+      React.createElement('div', { style:{ fontSize:13, color:'var(--text2)' } }, errMsg)
+    )
+  );
+}
+
 function BranchRequestPage(_ref245) {
   var requests = _ref245.requests,
     onSave = _ref245.onSave,
