@@ -25,7 +25,7 @@ export async function onRequestGet(context) {
   // CF Cache check (1 hour, key includes day so stale data from previous days doesn't persist)
   const cache    = caches.default;
   const today    = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const cacheKey = new Request(`https://sales-gp-cache/v3/${year}/${month}/${today}`);
+  const cacheKey = new Request(`https://sales-gp-cache/v4/${year}/${month}/${today}`);
   const cached   = await cache.match(cacheKey);
   if (cached) return cached;
 
