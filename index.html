@@ -38156,7 +38156,7 @@ function TarikPenjualanPage() {
   function handleTarik() {
     if (status === 'loading') return;
     setStatus('loading'); setResult(null); setErrMsg(null);
-    fetch('https://script.google.com/macros/s/AKfycbw0AOxdmS_50l-kX8VT0ZhZRkZ95wpyVgPE8ZFuxlttRV_5BSWrE7BaLmSKgot8DErvaw/exec', {
+    fetch('/api/tarik-penjualan', {
       method: 'POST',
       body: JSON.stringify({ secret: 'dzone-internal-webhook-2026', action: 'tarikPenjualanKemarin' }),
       signal: AbortSignal.timeout(180000),
