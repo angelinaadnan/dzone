@@ -23,8 +23,19 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ ok: false, error: 'GAS tidak bisa dihubungi' }), { headers: CORS });
   }
 
-  const data = await resp.json().catch(() => ({ ok: false, error: 'Response bukan JSON' }));
-  return new Response(JSON.stringify(data), { headers: CORS });
+  const text = await resp.text().catch(() => '');
+  try {
+    const data = JSON.parse(text);
+    return new Response(JSON.stringify(data), { headers: CORS });
+  } catch {
+    // GAS returned non-JSON (HTML redirect / error) — return raw for debugging
+    return new Response(JSON.stringify({
+      ok: false,
+      error: 'GAS return bukan JSON',
+      status: resp.status,
+      preview: text.slice(0, 500),
+    }), { headers: CORS });
+  }
 }
 
 export async function onRequestOptions() {

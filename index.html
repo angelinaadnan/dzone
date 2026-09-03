@@ -38164,7 +38164,7 @@ function TarikPenjualanPage() {
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.ok) { setStatus('success'); setResult(d); }
-        else { setStatus('error'); setErrMsg(d.error || 'Gagal'); }
+        else { setStatus('error'); setErrMsg((d.error || 'Gagal') + (d.preview ? '\n\n[Debug] ' + d.preview : '')); }
       })
       .catch(function(e) { setStatus('error'); setErrMsg(e.message || 'Timeout / koneksi gagal'); });
   }
@@ -38207,7 +38207,7 @@ function TarikPenjualanPage() {
     ),
     status === 'error' && React.createElement('div', { style:{ background:'#7f1d1d22', border:'1px solid #ef4444', borderRadius:10, padding:'16px 20px' } },
       React.createElement('div', { style:{ fontWeight:700, color:'#ef4444', marginBottom:6 } }, '⚠️ Gagal'),
-      React.createElement('div', { style:{ fontSize:13, color:'var(--text2)' } }, errMsg)
+      React.createElement('div', { style:{ fontSize:13, color:'var(--text2)', whiteSpace:'pre-wrap', wordBreak:'break-all' } }, errMsg)
     )
   );
 }
