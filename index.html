@@ -3783,8 +3783,7 @@ function App() {
   }) : ROLE_NAV[role]).filter(function (n) {
     return n.id !== 'pesan_barang' || canAccessPesanBarang;
   }).concat(accurateSection)
-  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
-  .concat(userName === 'TC LUVI' ? [{ id: 'tarik_penjualan', icon: '📥', label: 'Tarik Penjualan' }] : []);
+  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -4042,7 +4041,7 @@ function App() {
     orders: orders,
     branchName: userName,
     branchMembers: getBranchMembers(userName)
-  }), role === 'cabang' && userName === 'TC LUVI' && page === 'tarik_penjualan' && /*#__PURE__*/React.createElement(TarikPenjualanPage, null), (role === 'ops' || (role === 'sales' && userName === 'Eliwaty')) && page === 'op_kurir_history' && /*#__PURE__*/React.createElement(OpsKurirHistory, {
+  }), (role === 'ops' || (role === 'sales' && userName === 'Eliwaty')) && page === 'op_kurir_history' && /*#__PURE__*/React.createElement(OpsKurirHistory, {
     db: db
   }), role === 'ops' && page === 'assign' && /*#__PURE__*/React.createElement(OpsAssign, {
     orders: orders,
