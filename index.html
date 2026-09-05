@@ -1812,7 +1812,7 @@ function App() {
               var q = db.from('orders').select(cols).gte('created_at', since.toISOString()).order('created_at', {
                 ascending: false
               }).limit(500);
-              if (role === 'technician') q = q.eq('tech_name', userName);else if (role === 'courier') {
+              if (role === 'technician') q = q.or("tech_name.eq.".concat(userName, ",extra_techs.cs.[\"").concat(userName, "\"]"));else if (role === 'courier') {
                 if (useExtraCourier) {
                   // Load orders where courier is primary OR in extra_couriers array
                   q = q.or("courier_name.eq.".concat(userName, ",extra_couriers.cs.[\"").concat(userName, "\"]"));
@@ -24482,7 +24482,7 @@ function TechnicianJobs(_ref161) {
     onUpdateBranch = _ref161.onUpdateBranch;
   // Tampilkan semua order yang di-assign ke teknisi ini dan belum selesai/dikirim
   var myJobs = orders.filter(function (o) {
-    return o.tech_name === techName && !['tech_done', 'on_delivery', 'delivered', 'cancelled', 'ao_serah'].includes(o.status);
+    return (o.tech_name === techName || (o.extra_techs || []).includes(techName)) && !['tech_done', 'on_delivery', 'delivered', 'cancelled', 'ao_serah'].includes(o.status);
   });
   // Tugas dari cabang — tech entries di branch_requests
   var branchTechJobs = (branchRequests || []).flatMap(function (r) {
@@ -25438,7 +25438,7 @@ function TechnicianSummary(_ref165) {
     branchRequests = _ref165.branchRequests;
   // Instalasi / upgrade jobs
   var myJobs = orders.filter(function (o) {
-    return o.tech_name === techName;
+    return o.tech_name === techName || (o.extra_techs || []).includes(techName);
   });
   var jobsDone = myJobs.filter(function (o) {
     return ['tech_done', 'on_delivery', 'delivered'].includes(o.status);
