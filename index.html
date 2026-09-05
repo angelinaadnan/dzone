@@ -47240,6 +47240,7 @@ function TanyaKodeSKUPage() {
   var _bi = React.useState(''); var brandInput = _bi[0]; var setBrandInput = _bi[1];
   var _bs = React.useState(null); var brandSel = _bs[0]; var setBrandSel = _bs[1]; // { code, name } | null
   var _bo = React.useState(false); var brandOpen = _bo[0]; var setBrandOpen = _bo[1];
+  var _sr = React.useState(''); var series = _sr[0]; var setSeries = _sr[1];
   var _m = React.useState(''); var model = _m[0]; var setModel = _m[1];
   var _sec = React.useState(false); var isSecond = _sec[0]; var setIsSecond = _sec[1];
   var _res = React.useState(null); var result = _res[0]; var setResult = _res[1]; // { baseSku, finalSku, suggestedSku, existing, isNew, isNewBrand }
@@ -47258,7 +47259,7 @@ function TanyaKodeSKUPage() {
       })
     : allBrands;
 
-  React.useEffect(function() { setBrandInput(''); setBrandSel(null); setResult(null); setCheckErr(null); }, [kat]);
+  React.useEffect(function() { setBrandInput(''); setBrandSel(null); setSeries(''); setResult(null); setCheckErr(null); }, [kat]);
 
   // Close dropdown when clicking outside
   React.useEffect(function() {
@@ -47272,8 +47273,10 @@ function TanyaKodeSKUPage() {
   var effectiveBrandCode = brandSel ? brandSel.code : brandInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   var effectiveBrandName = brandSel ? brandSel.name : (brandInput.trim() || '');
   var isNewBrand = !brandSel && brandInput.trim().length > 0;
+  var seriesClean = series.trim().toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9\-]/g, '');
   var modelClean = model.trim().toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9\-\/\.]/g, '');
   var canCheck = kat && effectiveBrandCode && modelClean;
+  var skuParts = [kat, effectiveBrandCode, seriesClean, modelClean].filter(Boolean);
 
   function selectBrand(code, name) {
     setBrandSel({ code: code, name: name });
@@ -47291,7 +47294,7 @@ function TanyaKodeSKUPage() {
   }
 
   function buildBaseSku() {
-    return kat + '-' + effectiveBrandCode + '-' + modelClean;
+    return skuParts.join('-');
   }
 
   function nextVariantSku(baseSku, existingItems) {
@@ -47405,11 +47408,24 @@ function TanyaKodeSKUPage() {
       )
     ),
 
+    // Series (opsional)
+    e2('div', { style: { marginBottom: 18 } },
+      e2('label', { style: lblStyle }, 'Series / Family — Opsional'),
+      e2('input', {
+        type: 'text', placeholder: 'Contoh: IP5 (IdeaPad 5), IP3 (IdeaPad 3), TF (ThinkPad)',
+        value: series, onChange: function(ev) { setSeries(ev.target.value); setResult(null); setCheckErr(null); },
+        style: inpStyle
+      }),
+      e2('div', { style: { fontSize: 11, color: 'var(--text3)', marginTop: 5 } },
+        'Isi hanya jika series merupakan identitas penting yang membedakan line-up (mis. IdeaPad 5 → IP5). Gunakan kode singkat yang sudah ditetapkan.'
+      )
+    ),
+
     // Model
     e2('div', { style: { marginBottom: 18 } },
       e2('label', { style: lblStyle }, 'Tipe / Model / Part Number'),
       e2('input', {
-        type: 'text', placeholder: 'Contoh: A515-R0J0 atau 3440 atau 24G2SE/70',
+        type: 'text', placeholder: 'Contoh: 39ID atau 3440 atau 24G2SE/70',
         value: model, onChange: function(ev) { setModel(ev.target.value); setResult(null); setCheckErr(null); },
         style: inpStyle
       }),
@@ -47469,6 +47485,7 @@ function TanyaKodeSKUPage() {
         e2('span', null, e2('b', null, kat), ' = ' + (KAT_LABELS.find(function(p) { return p[0] === kat; }) || [kat, kat])[1]),
         e2('span', { style: { opacity: 0.4 } }, '·'),
         e2('span', null, e2('b', null, effectiveBrandCode), ' = ' + effectiveBrandName),
+        seriesClean && [e2('span', { style: { opacity: 0.4 } }, '·'), e2('span', null, e2('b', null, seriesClean), ' = Series')],
         e2('span', { style: { opacity: 0.4 } }, '·'),
         e2('span', null, e2('b', null, modelClean), ' = Model'),
         result.suggestedSku && [
