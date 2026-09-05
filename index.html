@@ -47217,108 +47217,293 @@ function CekKodeBarangPage() {
 
 // ─── TANYA KODE SKU PAGE ───────────────────────────────────────────
 var SKU_BRANDS = {
-  'NB':     [['AS','ASUS'],['AC','ACER'],['LN','LENOVO'],['HP','HP'],['DL','DELL'],['MSI','MSI'],['APL','APPLE'],['TOS','TOSHIBA'],['SNY','SONY'],['AX','AXIOO'],['ADV','ADVAN'],['RLM','REALME'],['XMI','XIAOMI'],['GGB','GIGABYTE'],['HW','HUAWEI'],['SS','SAMSUNG'],['ZYR','ZYREX'],['BMAX','BMAX']],
-  'PC-AIO': [['AS','ASUS'],['AC','ACER'],['LN','LENOVO'],['HP','HP'],['MSI','MSI'],['APL','APPLE'],['GGB','GIGABYTE'],['HW','HUAWEI'],['ZYR','ZYREX'],['SYNO','SYNOLOGY'],['AST','ASUSTOR'],['BEE','BEELINK'],['BMAX','BMAX'],['RKT','RAKITAN']],
-  'PC-DES': [['DL','DELL'],['HP','HP'],['HPE','HP ENTERPRISE'],['LN','LENOVO'],['AS','ASUS'],['AC','ACER'],['MSI','MSI'],['AX','AXIOO'],['SYNO','SYNOLOGY'],['AST','ASUSTOR'],['BEE','BEELINK'],['BMAX','BMAX'],['ECS','ECS/LIVA'],['GKM','GEEKOM'],['INT','INTEL NUC'],['ZN','ZOAN'],['RKT','RAKITAN']],
-  'MT':     [['LG','LG'],['SS','SAMSUNG'],['AS','ASUS'],['AC','ACER'],['DL','DELL'],['HP','HP'],['BQ','BENQ'],['AOC','AOC'],['VS','VIEWSONIC'],['PHL','PHILIPS'],['SHP','SHARP'],['NEC','NEC'],['LN','LENOVO'],['MSI','MSI'],['PSN','PANASONIC'],['EL','ENLIGHT'],['CC','COOCAA'],['AMG','ARMAGEDDON'],['TCL','TCL'],['TVS','TAGVISION'],['SW','SKYWORTH'],['DA','DIGITAL ALLIANCE'],['HS','HISENSE'],['POL','POLYTRON'],['CG','CUBE GAMING'],['MH','MAXHUB'],['AVS','AEVISION'],['FS','FORSA'],['VR','VARRO'],['WC','WACOM'],['AT','ATEN'],['AH','ALHUA'],['DH','DAHUA'],['ZYR','ZYREX']],
-  'PJ':     [['EPS','EPSON'],['BQ','BENQ'],['OPT','OPTOMA'],['VS','VIEWSONIC'],['LN','LENOVO'],['PSN','PANASONIC'],['IF','INFOCUS'],['XGM','XGIMI'],['SV','SKYVIEW'],['MC','MAGCUBE'],['MXL','MAXELL'],['AUK','AUKEY'],['TKR','TAKARA'],['UNI','UNIC'],['BRT','BRITE'],['TOS','TOSHIBA'],['SNY','SONY'],['HS','HISENSE'],['NOBR','NO BRAND']],
-  'PR':     [['EPS','EPSON'],['HP','HP'],['CN','CANON'],['BP','BROTHER'],['FJT','FUJIFILM'],['ZBR','ZEBRA'],['TSC','TSC'],['KYO','KYOCERA'],['KDK','KODAK'],['PLT','PLOTTER'],['FGO','FARGO'],['IWR','IWARE'],['LAB','LABEL GENERIC']],
+  'NB':     [['AC','Acer'],['ADV','Advan'],['APL','Apple'],['AS','Asus'],['AV','Avita'],['AX','Axioo'],['BMAX','BMAX'],['CLF','Colorful'],['DL','Dell'],['GGB','Gigabyte'],['HP','HP'],['HW','Huawei'],['INF','Infinix'],['LN','Lenovo'],['MS','Microsoft'],['MSF','Microsoft Surface'],['MSI','MSI'],['RLM','Realme'],['SNY','Sony'],['SS','Samsung'],['TCN','Tecno'],['TOS','Toshiba'],['XMI','Xiaomi'],['ZYR','Zyrex']],
+  'PC-AIO': [['AC','Acer'],['APL','Apple'],['AS','Asus'],['BMAX','BMAX'],['GGB','Gigabyte'],['HP','HP'],['HW','Huawei'],['LN','Lenovo'],['MSI','MSI'],['ZYR','Zyrex']],
+  'PC-DES': [['AC','Acer'],['AS','Asus'],['AX','Axioo'],['BMAX','BMAX'],['DL','Dell'],['GGB','Gigabyte'],['HP','HP'],['HPE','HP Enterprise'],['INT','Intel NUC'],['LN','Lenovo'],['MSI','MSI'],['ZN','Zoan']],
+  'MT':     [['AC','Acer'],['AMG','Armaggeddon'],['AOC','AOC'],['AS','Asus'],['AT','Aten'],['AVS','AEVision'],['BQ','BenQ'],['CC','Coocaa'],['CG','Cube Gaming'],['DA','Digital Alliance'],['DH','Dahua'],['DL','Dell'],['EL','Enlight'],['FS','Forsa'],['HP','HP'],['HS','Hisense'],['LG','LG'],['LN','Lenovo'],['MH','MaxHub'],['MSI','MSI'],['NEC','NEC'],['PHL','Philips'],['POL','Polytron'],['PSN','Panasonic'],['SHP','Sharp'],['SS','Samsung'],['SW','Skyworth'],['TCL','TCL'],['TVS','TagVision'],['VR','Varro'],['VS','ViewSonic'],['WC','Wacom'],['XMI','Xiaomi'],['ZYR','Zyrex']],
+  'PJ':     [['AUK','Aukey'],['BQ','BenQ'],['EPS','Epson'],['HS','Hisense'],['IF','InFocus'],['MC','MagCube'],['MXL','Maxell'],['OPT','Optoma'],['PSN','Panasonic'],['SNY','Sony'],['SV','SkyView'],['TOS','Toshiba'],['UNI','Unic'],['VS','ViewSonic'],['XGM','Xgimi']],
+  'PJX':    [['BQ','BenQ'],['EPS','Epson'],['MC','MagCube'],['OPT','Optoma'],['VS','ViewSonic'],['XGM','Xgimi']],
+  'PR':     [['BRT','Brother'],['CN','Canon'],['EPS','Epson'],['FGO','Fargo'],['FJT','Fujitsu'],['HP','HP'],['HPR','HPRT'],['HTI','HiTi'],['KDK','Kodak'],['KYO','Kyocera'],['PLT','Plustek'],['PNT','Pantum'],['RCH','Ricoh'],['TSC','TSC'],['XPR','XPrinter'],['ZBR','Zebra']],
 };
 
 var KAT_LABELS = [
   ['NB','Notebook'],['PC-AIO','PC All-in-One'],['PC-DES','PC Desktop'],
-  ['MT','Monitor'],['PJ','Projector'],['PR','Printer'],
+  ['MT','Monitor'],['PJ','Projector'],['PJX','Acc. Projector'],['PR','Printer'],
 ];
 
+var SKU_CONNECTOR = 'https://connectoracc.dzoutlet.co.id';
+var SKU_API_KEY   = 'dzone-connector-secret-2026';
+
 function TanyaKodeSKUPage() {
+  var e2 = React.createElement;
   var _k = React.useState('NB'); var kat = _k[0]; var setKat = _k[1];
-  var _b = React.useState(''); var brand = _b[0]; var setBrand = _b[1];
-  var _cb = React.useState(''); var customBrand = _cb[0]; var setCustomBrand = _cb[1];
+  var _bi = React.useState(''); var brandInput = _bi[0]; var setBrandInput = _bi[1];
+  var _bs = React.useState(null); var brandSel = _bs[0]; var setBrandSel = _bs[1]; // { code, name } | null
+  var _bo = React.useState(false); var brandOpen = _bo[0]; var setBrandOpen = _bo[1];
   var _m = React.useState(''); var model = _m[0]; var setModel = _m[1];
-  var _c = React.useState(false); var copied = _c[0]; var setCopied = _c[1];
+  var _sec = React.useState(false); var isSecond = _sec[0]; var setIsSecond = _sec[1];
+  var _res = React.useState(null); var result = _res[0]; var setResult = _res[1]; // { baseSku, finalSku, suggestedSku, existing, isNew, isNewBrand }
+  var _chk = React.useState(false); var checking = _chk[0]; var setChecking = _chk[1];
+  var _err = React.useState(null); var checkErr = _err[0]; var setCheckErr = _err[1];
+  var _cp = React.useState(false); var copied = _cp[0]; var setCopied = _cp[1];
+  var brandRef = React.useRef(null);
 
-  var brands = SKU_BRANDS[kat] || [];
+  var allBrands = SKU_BRANDS[kat] || [];
 
-  React.useEffect(function() { setBrand(''); setCustomBrand(''); }, [kat]);
+  // Filter brands based on input
+  var filteredBrands = brandInput.trim()
+    ? allBrands.filter(function(p) {
+        var q = brandInput.trim().toLowerCase();
+        return p[0].toLowerCase().indexOf(q) !== -1 || p[1].toLowerCase().indexOf(q) !== -1;
+      })
+    : allBrands;
 
-  var effectiveBrand = brand === '__OTHER__' ? customBrand.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : brand;
-  var modelClean = model.trim().toUpperCase().replace(/\s+/g, '-');
-  var sku = (kat && effectiveBrand && modelClean) ? (kat + '-' + effectiveBrand + '-' + modelClean) : '';
+  React.useEffect(function() { setBrandInput(''); setBrandSel(null); setResult(null); setCheckErr(null); }, [kat]);
 
-  function copy() {
-    if (!sku) return;
-    navigator.clipboard.writeText(sku).then(function() {
-      setCopied(true);
-      setTimeout(function() { setCopied(false); }, 2000);
+  // Close dropdown when clicking outside
+  React.useEffect(function() {
+    function handle(ev) {
+      if (brandRef.current && !brandRef.current.contains(ev.target)) setBrandOpen(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return function() { document.removeEventListener('mousedown', handle); };
+  }, []);
+
+  var effectiveBrandCode = brandSel ? brandSel.code : brandInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  var effectiveBrandName = brandSel ? brandSel.name : (brandInput.trim() || '');
+  var isNewBrand = !brandSel && brandInput.trim().length > 0;
+  var modelClean = model.trim().toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9\-\/\.]/g, '');
+  var canCheck = kat && effectiveBrandCode && modelClean;
+
+  function selectBrand(code, name) {
+    setBrandSel({ code: code, name: name });
+    setBrandInput(name + ' (' + code + ')');
+    setBrandOpen(false);
+    setResult(null); setCheckErr(null);
+  }
+
+  function clearBrand() {
+    setBrandSel(null); setBrandInput(''); setBrandOpen(false); setResult(null); setCheckErr(null);
+  }
+
+  function handleBrandInput(val) {
+    setBrandInput(val); setBrandSel(null); setBrandOpen(true); setResult(null); setCheckErr(null);
+  }
+
+  function buildBaseSku() {
+    return kat + '-' + effectiveBrandCode + '-' + modelClean;
+  }
+
+  function nextVariantSku(baseSku, existingItems) {
+    // exact match = no variant suffix needed originally, but now taken
+    // find max variant number
+    var maxNum = 0;
+    var hasBase = false;
+    existingItems.forEach(function(item) {
+      var no = (item.no || '').toUpperCase();
+      if (no === baseSku.toUpperCase()) { hasBase = true; return; }
+      var suffix = no.slice(baseSku.length + 1); // after baseSku-
+      var n = parseInt(suffix, 10);
+      if (!isNaN(n) && n > maxNum) maxNum = n;
+    });
+    return baseSku + '-' + (maxNum + 1);
+  }
+
+  function doCheck() {
+    if (!canCheck) return;
+    var baseSku = buildBaseSku();
+    var secSuffix = isSecond ? '-SEC' : '';
+    setChecking(true); setResult(null); setCheckErr(null);
+    fetch(SKU_CONNECTOR + '/api/item/sku-check?basesku=' + encodeURIComponent(baseSku), {
+      headers: { 'X-API-Key': SKU_API_KEY }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d.ok) throw new Error(d.error || 'Gagal cek Accurate');
+        var existing = d.items || [];
+        var exactMatch = existing.find(function(i) { return (i.no || '').toUpperCase() === baseSku.toUpperCase(); });
+        var finalSku, suggestedSku;
+        if (existing.length === 0) {
+          // SKU baru, aman
+          finalSku = baseSku + secSuffix;
+          suggestedSku = null;
+        } else {
+          // Ada yang mirip — cek apakah perlu variant
+          var nextVariant = nextVariantSku(baseSku, existing);
+          finalSku = nextVariant + secSuffix;
+          suggestedSku = nextVariant;
+        }
+        setResult({ baseSku: baseSku, finalSku: finalSku, suggestedSku: suggestedSku, existing: existing, isNew: existing.length === 0, isNewBrand: isNewBrand });
+      })
+      .catch(function(e) { setCheckErr(e.message); })
+      .finally(function() { setChecking(false); });
+  }
+
+  function copy(text) {
+    navigator.clipboard.writeText(text).then(function() {
+      setCopied(true); setTimeout(function() { setCopied(false); }, 2000);
     });
   }
 
-  var e2 = React.createElement;
-  var inpStyle = { width: '100%', padding: '10px 14px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' };
+  var inpStyle = { width: '100%', padding: '10px 14px', background: 'var(--bg3)', border: '1px solid var(--border2)', borderRadius: 8, color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', outline: 'none' };
+  var lblStyle = { display: 'block', fontSize: 11, color: 'var(--text3)', marginBottom: 6, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' };
 
-  return e2('div', { style: { padding: '20px 24px', maxWidth: 560 } },
-    e2('h2', { style: { margin: '0 0 6px', fontSize: 18, fontWeight: 700 } }, '🏷️ Tanya Kode Barang'),
-    e2('p', { style: { margin: '0 0 24px', color: 'var(--text2)', fontSize: 13 } }, 'Pilih kategori, brand, dan ketik tipe/model untuk mendapatkan kode barang yang sesuai.'),
+  return e2('div', { style: { padding: '20px 24px', maxWidth: 600 } },
+    e2('h2', { style: { margin: '0 0 4px', fontSize: 18, fontWeight: 700 } }, '🏷️ Tanya Kode Barang'),
+    e2('p', { style: { margin: '0 0 24px', color: 'var(--text2)', fontSize: 13 } }, 'Generate SKU sesuai standar Digitalzone + cek duplikat ke Accurate.'),
 
-    e2('div', { style: { marginBottom: 16 } },
-      e2('label', { style: { display: 'block', fontSize: 12, color: 'var(--text3)', marginBottom: 6, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' } }, 'Kategori'),
-      e2('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+    // Kategori
+    e2('div', { style: { marginBottom: 18 } },
+      e2('label', { style: lblStyle }, 'Kategori'),
+      e2('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 7 } },
         KAT_LABELS.map(function(pair) {
-          var val = pair[0]; var label = pair[1];
+          var val = pair[0]; var lbl = pair[1];
           return e2('button', {
             key: val, onClick: function() { setKat(val); },
-            style: { padding: '7px 16px', borderRadius: 7, border: '1px solid var(--border2)', background: kat === val ? '#2563eb' : 'var(--bg2)', color: kat === val ? '#fff' : 'var(--text)', fontWeight: kat === val ? 700 : 400, cursor: 'pointer', fontSize: 12.5, transition: 'all 0.15s' }
-          }, label);
+            style: { padding: '7px 14px', borderRadius: 7, border: kat === val ? 'none' : '1px solid var(--border2)', background: kat === val ? '#2563eb' : 'var(--bg2)', color: kat === val ? '#fff' : 'var(--text)', fontWeight: kat === val ? 700 : 400, cursor: 'pointer', fontSize: 12.5, transition: 'all 0.12s' }
+          }, lbl);
         })
       )
     ),
 
-    e2('div', { style: { marginBottom: 16 } },
-      e2('label', { style: { display: 'block', fontSize: 12, color: 'var(--text3)', marginBottom: 6, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' } }, 'Brand'),
-      e2('select', {
-        value: brand, onChange: function(ev) { setBrand(ev.target.value); setCustomBrand(''); },
-        style: Object.assign({}, inpStyle, { cursor: 'pointer' })
-      },
-        e2('option', { value: '' }, '— Pilih Brand —'),
-        brands.map(function(pair) {
-          return e2('option', { key: pair[0], value: pair[0] }, pair[1] + ' (' + pair[0] + ')');
+    // Brand (searchable combobox)
+    e2('div', { style: { marginBottom: 18, position: 'relative' }, ref: brandRef },
+      e2('label', { style: lblStyle }, 'Brand'),
+      e2('div', { style: { position: 'relative' } },
+        e2('input', {
+          type: 'text',
+          placeholder: 'Ketik nama atau kode brand...',
+          value: brandInput,
+          onFocus: function() { setBrandOpen(true); },
+          onChange: function(ev) { handleBrandInput(ev.target.value); },
+          style: Object.assign({}, inpStyle, { paddingRight: 36 })
         }),
-        e2('option', { value: '__OTHER__' }, '— Merek Lain (ketik sendiri) —')
+        brandInput && e2('button', {
+          onClick: clearBrand,
+          style: { position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 16, padding: 0, lineHeight: 1 }
+        }, '×')
       ),
-      brand === '__OTHER__' && e2('input', {
-        type: 'text', placeholder: 'Ketik kode brand (2–6 huruf kapital, mis: GGB)',
-        value: customBrand, onChange: function(ev) { setCustomBrand(ev.target.value); },
-        style: Object.assign({}, inpStyle, { marginTop: 8, fontFamily: 'monospace', textTransform: 'uppercase' })
-      })
+      brandOpen && e2('div', {
+        style: { position: 'absolute', zIndex: 100, top: '100%', left: 0, right: 0, background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto', marginTop: 4 }
+      },
+        filteredBrands.length === 0
+          ? e2('div', { style: { padding: '16px', color: 'var(--text3)', fontSize: 13 } },
+              'Brand tidak ditemukan. Kode akan dibuat otomatis dari teks yang diketik.',
+              e2('br', null),
+              e2('span', { style: { fontSize: 11, color: '#f59e0b' } }, '⚠ Brand baru — perlu ditambahkan ke Master Brand.')
+            )
+          : filteredBrands.map(function(pair) {
+              return e2('div', {
+                key: pair[0],
+                onMouseDown: function(ev) { ev.preventDefault(); selectBrand(pair[0], pair[1]); },
+                style: { padding: '9px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, borderBottom: '1px solid var(--border)' }
+              },
+                e2('span', null, pair[1]),
+                e2('code', { style: { fontSize: 11, color: 'var(--text3)', background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 } }, pair[0])
+              );
+            })
+      )
     ),
 
-    e2('div', { style: { marginBottom: 24 } },
-      e2('label', { style: { display: 'block', fontSize: 12, color: 'var(--text3)', marginBottom: 6, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' } }, 'Tipe / Model'),
+    // Model
+    e2('div', { style: { marginBottom: 18 } },
+      e2('label', { style: lblStyle }, 'Tipe / Model / Part Number'),
       e2('input', {
-        type: 'text', placeholder: 'Contoh: X1503ZA atau 27GL850-B',
-        value: model, onChange: function(ev) { setModel(ev.target.value); },
+        type: 'text', placeholder: 'Contoh: A515-R0J0 atau 3440 atau 24G2SE/70',
+        value: model, onChange: function(ev) { setModel(ev.target.value); setResult(null); setCheckErr(null); },
         style: inpStyle
-      })
+      }),
+      e2('div', { style: { fontSize: 11, color: 'var(--text3)', marginTop: 5 } }, 'Jangan masukkan spesifikasi (RAM/SSD/processor/ukuran layar)')
     ),
 
-    sku
-      ? e2('div', { style: { background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '20px 24px' } },
-          e2('div', { style: { fontSize: 11, color: 'var(--text3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' } }, 'Kode SKU'),
-          e2('div', { style: { display: 'flex', alignItems: 'center', gap: 12 } },
-            e2('span', { style: { fontFamily: 'monospace', fontSize: 22, fontWeight: 700, color: '#22c55e', letterSpacing: '0.02em' } }, sku),
-            e2('button', {
-              onClick: copy,
-              style: { padding: '6px 16px', background: copied ? '#16a34a' : '#2563eb', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, cursor: 'pointer', fontWeight: 600, transition: 'background 0.2s' }
-            }, copied ? '✓ Copied!' : 'Copy')
-          ),
-          e2('div', { style: { marginTop: 12, fontSize: 12, color: 'var(--text3)' } },
-            'Format: ',
-            e2('code', { style: { background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 } }, kat + '-{BRAND}-{MODEL}')
-          )
+    // Kondisi
+    e2('div', { style: { marginBottom: 22 } },
+      e2('label', { style: lblStyle }, 'Kondisi'),
+      e2('div', { style: { display: 'flex', gap: 8 } },
+        e2('button', {
+          onClick: function() { setIsSecond(false); setResult(null); },
+          style: { padding: '7px 20px', borderRadius: 7, border: !isSecond ? 'none' : '1px solid var(--border2)', background: !isSecond ? '#2563eb' : 'var(--bg2)', color: !isSecond ? '#fff' : 'var(--text)', fontWeight: !isSecond ? 700 : 400, cursor: 'pointer', fontSize: 13 }
+        }, 'Baru'),
+        e2('button', {
+          onClick: function() { setIsSecond(true); setResult(null); },
+          style: { padding: '7px 20px', borderRadius: 7, border: isSecond ? 'none' : '1px solid var(--border2)', background: isSecond ? '#d97706' : 'var(--bg2)', color: isSecond ? '#fff' : 'var(--text)', fontWeight: isSecond ? 700 : 400, cursor: 'pointer', fontSize: 13 }
+        }, 'Second')
+      )
+    ),
+
+    // Preview SKU sebelum cek
+    canCheck && !result && e2('div', { style: { marginBottom: 16, background: 'var(--bg2)', border: '1px dashed var(--border2)', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: 'var(--text2)' } },
+      'Preview: ',
+      e2('code', { style: { fontFamily: 'monospace', fontWeight: 700, color: 'var(--text)', fontSize: 14 } }, buildBaseSku() + (isSecond ? '-SEC' : '')),
+      e2('span', { style: { fontSize: 11, color: 'var(--text3)', marginLeft: 8 } }, '(belum dicek duplikat)')
+    ),
+
+    // Tombol cek
+    e2('button', {
+      onClick: doCheck,
+      disabled: !canCheck || checking,
+      style: { width: '100%', padding: '12px', background: canCheck ? '#2563eb' : 'var(--bg3)', color: canCheck ? '#fff' : 'var(--text3)', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: canCheck ? 'pointer' : 'not-allowed', marginBottom: 20, transition: 'background 0.15s' }
+    }, checking ? '⏳ Mengecek ke Accurate...' : '🔍 Generate & Cek ke Accurate'),
+
+    checkErr && e2('div', { style: { padding: '12px 16px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 9, color: '#dc2626', fontSize: 13, marginBottom: 16 } }, '⚠️ ', checkErr),
+
+    // Hasil
+    result && e2('div', { style: { background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, padding: '20px 24px' } },
+
+      // SKU final
+      e2('div', { style: { marginBottom: 16 } },
+        e2('div', { style: { fontSize: 11, color: 'var(--text3)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 } },
+          result.isNew ? '✅ SKU Baru (Aman)' : '⚠️ Sudah Ada — Gunakan Variant'
+        ),
+        e2('div', { style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
+          e2('span', { style: { fontFamily: 'monospace', fontSize: 24, fontWeight: 800, color: result.isNew ? '#22c55e' : '#f59e0b', letterSpacing: '0.02em' } }, result.finalSku),
+          e2('button', {
+            onClick: function() { copy(result.finalSku); },
+            style: { padding: '6px 16px', background: copied ? '#16a34a' : '#2563eb', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, cursor: 'pointer', fontWeight: 600 }
+          }, copied ? '✓ Copied!' : 'Copy')
         )
-      : e2('div', { style: { background: 'var(--bg2)', border: '1px dashed var(--border2)', borderRadius: 12, padding: '32px 24px', textAlign: 'center', color: 'var(--text3)', fontSize: 13 } },
-          'Pilih kategori + brand + model untuk melihat kode SKU'
+      ),
+
+      // Breakdown
+      e2('div', { style: { fontSize: 12, color: 'var(--text3)', marginBottom: result.existing.length > 0 ? 14 : 0, display: 'flex', flexWrap: 'wrap', gap: 8 } },
+        e2('span', null, e2('b', null, kat), ' = ' + (KAT_LABELS.find(function(p) { return p[0] === kat; }) || [kat, kat])[1]),
+        e2('span', { style: { opacity: 0.4 } }, '·'),
+        e2('span', null, e2('b', null, effectiveBrandCode), ' = ' + effectiveBrandName),
+        e2('span', { style: { opacity: 0.4 } }, '·'),
+        e2('span', null, e2('b', null, modelClean), ' = Model'),
+        result.suggestedSku && [
+          e2('span', { style: { opacity: 0.4 } }, '·'),
+          e2('span', null, e2('b', null, result.finalSku.slice(result.suggestedSku.length)), ' = Nomor variant berikutnya')
+        ],
+        isSecond && [
+          e2('span', { style: { opacity: 0.4 } }, '·'),
+          e2('span', null, e2('b', null, '-SEC'), ' = Second')
+        ]
+      ),
+
+      // Existing items list
+      result.existing.length > 0 && e2('div', { style: { marginTop: 14 } },
+        e2('div', { style: { fontSize: 11, color: 'var(--text3)', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' } }, 'Sudah ada di Accurate (' + result.existing.length + ' item):'),
+        e2('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+          result.existing.map(function(item) {
+            return e2('div', {
+              key: item.no,
+              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', background: 'var(--bg3)', borderRadius: 6, fontSize: 12 }
+            },
+              e2('code', { style: { fontWeight: 700, fontFamily: 'monospace', color: '#dc2626' } }, item.no),
+              e2('span', { style: { color: 'var(--text3)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.name)
+            );
+          })
         )
+      ),
+
+      // New brand warning
+      result.isNewBrand && e2('div', { style: { marginTop: 14, padding: '10px 14px', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, fontSize: 12, color: '#92400e' } },
+        '⚠️ Brand baru: kode ',
+        e2('b', null, effectiveBrandCode),
+        ' belum ada di Master Brand. Harap tambahkan ke dokumen Master Brand Digitalzone.'
+      )
+    )
   );
 }
 
