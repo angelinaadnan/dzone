@@ -1806,7 +1806,7 @@ function App() {
             since.setMonth(since.getMonth() - monthsBack);
             // npwp_file & po_file di-exclude — di-load on-demand via loadOrderFiles (lazy)
             orderColsBase = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,start_location,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status,admin_photo';
-            orderColsNew = ',upgrade_items,downgrade_items,has_component_change,extra_couriers';
+            orderColsNew = ',upgrade_items,downgrade_items,has_component_change,extra_couriers,extra_techs';
             buildOrderQ = function buildOrderQ(cols) {
               var useExtraCourier = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
               var q = db.from('orders').select(cols).gte('created_at', since.toISOString()).order('created_at', {
@@ -2121,7 +2121,7 @@ function App() {
             }
             return _context10.abrupt("return");
           case 3:
-            cols = 'id,created_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,assigned_by,assigned_at,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo,linked_intake_id,cancel_reason,cancel_prev_status,cancel_requested_at'; // Semua role: filter 60 hari terakhir — filter per-kurir dilakukan di sisi klien
+            cols = 'id,created_at,task_type,description,destination,contact_name,contact_phone,assigned_courier,extra_couriers,assigned_by,assigned_at,status,created_by,created_by_role,goods_items,start_location,arrived_location,return_location,end_location,distance_km,completed_at,completed_by,completion_note,completion_photo,linked_intake_id,cancel_reason,cancel_prev_status,cancel_requested_at'; // Semua role: filter 60 hari terakhir — filter per-kurir dilakukan di sisi klien
             // supaya tidak ada risiko stale closure saat query, dan tugas lama tetap terlihat
             since60 = new Date();
             since60.setDate(since60.getDate() - 60);
@@ -21934,6 +21934,14 @@ function OpsAssign(_ref151) {
     _useState80 = _slicedToArray(_useState79, 2),
     addKurirPick = _useState80[0],
     setAddKurirPick = _useState80[1]; // {id: name}
+  var _useState79b = useState({}),
+    _useState80b = _slicedToArray(_useState79b, 2),
+    addTech = _useState80b[0],
+    setAddTech = _useState80b[1]; // {id: 'open'|null}
+  var _useState79c = useState({}),
+    _useState80c = _slicedToArray(_useState79c, 2),
+    addTechPick = _useState80c[0],
+    setAddTechPick = _useState80c[1]; // {id: name}
 
   var AssignCard = function AssignCard(_ref152) {
     var _o$goods4;
@@ -22786,7 +22794,7 @@ function OpsAssign(_ref151) {
         color: 'var(--teal)',
         marginTop: 3
       }
-    }, "\uD83D\uDD27 Teknisi: ", /*#__PURE__*/React.createElement("b", null, o.tech_name))), /*#__PURE__*/React.createElement("div", {
+    }, "\uD83D\uDD27 Teknisi: ", /*#__PURE__*/React.createElement("b", null, o.tech_name), (o.extra_techs || []).length > 0 && /*#__PURE__*/React.createElement("span", null, " \xB7 ", (o.extra_techs || []).join(' \xB7 ')))), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         flexDirection: 'column',
@@ -22807,6 +22815,14 @@ function OpsAssign(_ref151) {
         });
       }
     }, reassign[o.id] ? '▲ Tutup' : '⚙️ Ubah → Kurir Langsung'), /*#__PURE__*/React.createElement("button", {
+      className: "btn-secondary btn-sm",
+      style: { fontSize: 11, color: 'var(--green)' },
+      onClick: function onClick() {
+        setAddTech(function (a) { return _objectSpread(_objectSpread({}, a), {}, _defineProperty({}, o.id, a[o.id] ? null : 'open')); });
+        setReassign(function (r) { return _objectSpread(_objectSpread({}, r), {}, _defineProperty({}, o.id, null)); });
+        setAddTechPick(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, o.id, null)); });
+      }
+    }, addTech[o.id] ? '▲ Tutup' : '➕ Tambah Teknisi'), /*#__PURE__*/React.createElement("button", {
       className: "btn-secondary btn-sm",
       style: {
         fontSize: 11,
@@ -22945,7 +22961,37 @@ function OpsAssign(_ref151) {
           return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, o.id, null));
         });
       }
-    }, "\u2713 Ganti ke Teknisi ", reassignPick[o.id])));
+    }, "\u2713 Ganti ke Teknisi ", reassignPick[o.id])), addTech[o.id] === 'open' && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 12, borderTop: '1px solid var(--border)', background: 'rgba(34,197,94,0.06)', borderRadius: 8, padding: 12 }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 12, color: 'var(--green)', fontWeight: 700, marginBottom: 8 }
+    }, "\u2795 Tambah Teknisi"), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: 'var(--text2)', marginBottom: 10 }
+    }, "Teknisi utama: ", /*#__PURE__*/React.createElement("b", null, o.tech_name), (o.extra_techs || []).length > 0 && " \xB7 Sudah tambahan: " + (o.extra_techs || []).join(', ')), /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }
+    }, TEKNISI_LIST.filter(function (n) { return n !== o.tech_name && !(o.extra_techs || []).includes(n); }).map(function (n) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: n,
+        onClick: function onClick() { return setAddTechPick(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, o.id, n)); }); },
+        style: {
+          padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          background: addTechPick[o.id] === n ? 'var(--green)' : 'var(--bg3)',
+          border: "1px solid " + (addTechPick[o.id] === n ? 'var(--green)' : 'var(--border2)'),
+          color: addTechPick[o.id] === n ? '#fff' : 'var(--text2)'
+        }
+      }, "\uD83D\uDD27 ", n);
+    })), addTechPick[o.id] && /*#__PURE__*/React.createElement("button", {
+      className: "btn-green",
+      style: { width: '100%', padding: '9px', fontWeight: 700 },
+      onClick: function onClick() {
+        var newTech = addTechPick[o.id];
+        if (!window.confirm("Tambahkan " + newTech + " sebagai teknisi tambahan untuk " + o.customer_name + "?")) return;
+        var newExtra = [].concat(_toConsumableArray(o.extra_techs || []), [newTech]);
+        onUpdate(o.id, { extra_techs: newExtra, status_note: "Teknisi tambahan: " + newTech });
+        setAddTech(function (a) { return _objectSpread(_objectSpread({}, a), {}, _defineProperty({}, o.id, null)); });
+        setAddTechPick(function (p) { return _objectSpread(_objectSpread({}, p), {}, _defineProperty({}, o.id, null)); });
+      }
+    }, "\u2713 Tambahkan ", addTechPick[o.id]))));
   })));
 }
 
@@ -33077,7 +33123,15 @@ function TaskCard(_ref201) {
         assigned_at: null
       });
     }
-  }, "Batalkan")), assigning && /*#__PURE__*/React.createElement("div", {
+  }, "Batalkan"), /*#__PURE__*/React.createElement("button", {
+    className: "btn-secondary btn-sm",
+    style: { color: 'var(--green)' },
+    onClick: function onClick() {
+      setAddTaskKurir(function (v) { return !v; });
+      setAssigning(false);
+      setAddTaskKurirPick(null);
+    }
+  }, addTaskKurir ? '▲ Tutup' : '➕ Tambah Kurir')), assigning && /*#__PURE__*/React.createElement("div", {
     style: {
       width: '100%',
       display: 'flex',
@@ -33099,7 +33153,31 @@ function TaskCard(_ref201) {
         setAssigning(false);
       }
     }, n);
-  }))), showAssign && task.status === 'done' && task.completion_note && /*#__PURE__*/React.createElement("div", {
+  })), addTaskKurir && /*#__PURE__*/React.createElement("div", {
+    style: { width: '100%', marginTop: 8, background: 'rgba(34,197,94,0.05)', borderRadius: 8, padding: 10 }
+  }, /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--green)', fontWeight: 700, marginBottom: 6 } }, "\u2795 Tambah Kurir"),
+  /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: 'var(--text2)', marginBottom: 8 } }, "Kurir utama: ", /*#__PURE__*/React.createElement("b", null, task.assigned_courier), (task.extra_couriers || []).length > 0 && " \xB7 Sudah tambahan: " + (task.extra_couriers || []).join(', ')),
+  /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 } },
+    KURIR_LIST.filter(function(n) { return n !== task.assigned_courier && !(task.extra_couriers||[]).includes(n); }).map(function(n) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: n,
+        onClick: function() { setAddTaskKurirPick(function(p) { return p === n ? null : n; }); },
+        style: { padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+          background: addTaskKurirPick === n ? 'var(--green)' : 'var(--bg3)',
+          border: "1px solid " + (addTaskKurirPick === n ? 'var(--green)' : 'var(--border2)'),
+          color: addTaskKurirPick === n ? '#fff' : 'var(--text2)' }
+      }, "\uD83D\uDE9A ", n);
+    })
+  ), addTaskKurirPick && /*#__PURE__*/React.createElement("button", {
+    className: "btn-green",
+    style: { width: '100%', padding: '8px', fontWeight: 700 },
+    onClick: function() {
+      var newExtra = [].concat(_toConsumableArray(task.extra_couriers || []), [addTaskKurirPick]);
+      onUpdate(task.id, { extra_couriers: newExtra, status_note: "Kurir tambahan: " + addTaskKurirPick });
+      setAddTaskKurir(false);
+      setAddTaskKurirPick(null);
+    }
+  }, "\u2713 Tambahkan ", addTaskKurirPick)))), showAssign && task.status === 'done' && task.completion_note && /*#__PURE__*/React.createElement("div", {
     style: {
       paddingTop: 8,
       borderTop: '1px solid var(--border)',
