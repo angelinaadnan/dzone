@@ -47233,15 +47233,17 @@ var KAT_LABELS = [
 function TanyaKodeSKUPage() {
   var _k = React.useState('NB'); var kat = _k[0]; var setKat = _k[1];
   var _b = React.useState(''); var brand = _b[0]; var setBrand = _b[1];
+  var _cb = React.useState(''); var customBrand = _cb[0]; var setCustomBrand = _cb[1];
   var _m = React.useState(''); var model = _m[0]; var setModel = _m[1];
   var _c = React.useState(false); var copied = _c[0]; var setCopied = _c[1];
 
   var brands = SKU_BRANDS[kat] || [];
 
-  React.useEffect(function() { setBrand(''); }, [kat]);
+  React.useEffect(function() { setBrand(''); setCustomBrand(''); }, [kat]);
 
+  var effectiveBrand = brand === '__OTHER__' ? customBrand.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : brand;
   var modelClean = model.trim().toUpperCase().replace(/\s+/g, '-');
-  var sku = (kat && brand && modelClean) ? (kat + '-' + brand + '-' + modelClean) : '';
+  var sku = (kat && effectiveBrand && modelClean) ? (kat + '-' + effectiveBrand + '-' + modelClean) : '';
 
   function copy() {
     if (!sku) return;
@@ -47274,14 +47276,20 @@ function TanyaKodeSKUPage() {
     e2('div', { style: { marginBottom: 16 } },
       e2('label', { style: { display: 'block', fontSize: 12, color: 'var(--text3)', marginBottom: 6, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' } }, 'Brand'),
       e2('select', {
-        value: brand, onChange: function(ev) { setBrand(ev.target.value); },
+        value: brand, onChange: function(ev) { setBrand(ev.target.value); setCustomBrand(''); },
         style: Object.assign({}, inpStyle, { cursor: 'pointer' })
       },
         e2('option', { value: '' }, '— Pilih Brand —'),
         brands.map(function(pair) {
           return e2('option', { key: pair[0], value: pair[0] }, pair[1] + ' (' + pair[0] + ')');
-        })
-      )
+        }),
+        e2('option', { value: '__OTHER__' }, '— Merek Lain (ketik sendiri) —')
+      ),
+      brand === '__OTHER__' && e2('input', {
+        type: 'text', placeholder: 'Ketik kode brand (2–6 huruf kapital, mis: GGB)',
+        value: customBrand, onChange: function(ev) { setCustomBrand(ev.target.value); },
+        style: Object.assign({}, inpStyle, { marginTop: 8, fontFamily: 'monospace', textTransform: 'uppercase' })
+      })
     ),
 
     e2('div', { style: { marginBottom: 24 } },
