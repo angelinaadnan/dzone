@@ -1812,10 +1812,10 @@ function App() {
               var q = db.from('orders').select(cols).gte('created_at', since.toISOString()).order('created_at', {
                 ascending: false
               }).limit(500);
-              if (role === 'technician') q = q.or("tech_name.eq.".concat(userName, ",extra_techs.cs.[\"").concat(userName, "\"]"));else if (role === 'courier') {
+              if (role === 'technician') q = q.or("tech_name.eq.".concat(userName, ",extra_techs.cs.{").concat(userName, "}"));else if (role === 'courier') {
                 if (useExtraCourier) {
                   // Load orders where courier is primary OR in extra_couriers array
-                  q = q.or("courier_name.eq.".concat(userName, ",extra_couriers.cs.[\"").concat(userName, "\"]"));
+                  q = q.or("courier_name.eq.".concat(userName, ",extra_couriers.cs.{").concat(userName, "}"));
                 } else {
                   q = q.eq('courier_name', userName);
                 }
@@ -3763,7 +3763,7 @@ function App() {
   var PESAN_BARANG_ALLOWED_SALES = ['Aldi', 'Eliwaty', 'Tio'];
   var canAccessPesanBarang = ['admin', 'ops', 'admin_pembelian', 'admin_online', 'supervisor'].includes(role) || role === 'sales' && PESAN_BARANG_ALLOWED_SALES.includes(userName);
   var SALES_HARIAN_USERS = ['Angel', 'Liana', 'Santo', 'GITA'];
-  var ACCURATE_USERS = ['Angel', 'Liana', 'Santo', 'GITA'];
+  var ACCURATE_USERS = ['Angel', 'Liana', 'Santo', 'GITA', 'MAHESA'];
   var TANYA_SKU_ROLES = ['admin', 'ops', 'admin_online'];
   var accurateSection = ACCURATE_USERS.includes(userName) ? [
     { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
