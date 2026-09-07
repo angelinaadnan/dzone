@@ -1815,7 +1815,7 @@ function App() {
               if (role === 'technician') q = q.or("tech_name.eq.".concat(userName, ",extra_techs.cs.{").concat(userName, "}"));else if (role === 'courier') {
                 if (useExtraCourier) {
                   // Load orders where courier is primary OR in extra_couriers array
-                  q = q.or("courier_name.eq.".concat(userName, ",extra_couriers.cs.{").concat(userName, "}"));
+                  q = q.or("courier_name.eq.".concat(userName, ",extra_couriers.cs.[\"").concat(userName, "\"]"));
                 } else {
                   q = q.eq('courier_name', userName);
                 }
