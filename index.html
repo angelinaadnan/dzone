@@ -33181,7 +33181,7 @@ function TaskCard(_ref201) {
     style: { width: '100%', padding: '8px', fontWeight: 700 },
     onClick: function() {
       var newExtra = [].concat(_toConsumableArray(task.extra_couriers || []), [addTaskKurirPick]);
-      onUpdate(task.id, { extra_couriers: newExtra, status_note: "Kurir tambahan: " + addTaskKurirPick });
+      onUpdate(task.id, { extra_couriers: newExtra });
       setAddTaskKurir(false);
       setAddTaskKurirPick(null);
     }
