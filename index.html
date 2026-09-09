@@ -3763,7 +3763,7 @@ function App() {
   var PESAN_BARANG_ALLOWED_SALES = ['Aldi', 'Eliwaty', 'Tio'];
   var canAccessPesanBarang = ['admin', 'ops', 'admin_pembelian', 'admin_online', 'supervisor'].includes(role) || role === 'sales' && PESAN_BARANG_ALLOWED_SALES.includes(userName);
   var SALES_HARIAN_USERS = ['Angel', 'Liana', 'Santo', 'GITA'];
-  var ACCURATE_USERS = ['Angel', 'Liana', 'Santo', 'GITA', 'MAHESA'];
+  var ACCURATE_USERS = ['Angel', 'Liana', 'Santo', 'GITA', 'Lukas'];
   var TANYA_SKU_ROLES = ['admin', 'ops', 'admin_online'];
   var accurateSection = ACCURATE_USERS.includes(userName) ? [
     { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
@@ -47046,8 +47046,11 @@ function SantoDashboard() {
 function TarikPricelistPage() {
   var _s = React.useState(null); var status = _s[0]; var setStatus = _s[1];
   var _s2 = React.useState(false); var loading = _s2[0]; var setLoading = _s2[1];
+  var _sc = React.useState(null); var statusCek = _sc[0]; var setStatusCek = _sc[1];
+  var _lc = React.useState(false); var loadingCek = _lc[0]; var setLoadingCek = _lc[1];
   var CONNECTOR = 'https://connectoracc.dzoutlet.co.id';
   var API_KEY = 'dzone-connector-secret-2026';
+  var JADWAL = 'Otomatis 6x sehari: 09:40, 12:00, 15:00, 17:00, 19:00, 21:00 WIB';
 
   function trigger() {
     if (!window.confirm('Tarik pricelist dari Accurate dan update Google Sheet sekarang?')) return;
@@ -47062,7 +47065,21 @@ function TarikPricelistPage() {
       .finally(function() { setLoading(false); });
   }
 
-  var cs = { background: 'var(--surface)', borderRadius: 12, padding: '24px', border: '1px solid var(--border)', maxWidth: 480 };
+  function triggerCekNama() {
+    if (!window.confirm('Tarik CEK NAMA ke Google Sheet sekarang?')) return;
+    setLoadingCek(true); setStatusCek(null);
+    fetch(CONNECTOR + '/api/sheet/push-cek-nama', {
+      method: 'POST',
+      headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { setStatusCek({ ok: true, msg: d.message || JSON.stringify(d) }); })
+      .catch(function(e) { setStatusCek({ ok: false, msg: e.message }); })
+      .finally(function() { setLoadingCek(false); });
+  }
+
+  var cs = { background: 'var(--surface)', borderRadius: 12, padding: '24px', border: '1px solid var(--border)', maxWidth: 480, marginBottom: 16 };
+  var jadwalStyle = { fontSize: 12, color: 'var(--text3)', marginTop: 10 };
   return React.createElement('div', { style: { padding: '32px 24px' } },
     React.createElement('h2', { style: { fontSize: 18, fontWeight: 700, marginBottom: 8 } }, '🗒️ Tarik Pricelist'),
     React.createElement('p', { style: { color: 'var(--text2)', fontSize: 14, marginBottom: 24 } }, 'Ambil data harga terbaru dari Accurate dan update Google Sheet secara manual.'),
@@ -47075,9 +47092,24 @@ function TarikPricelistPage() {
         style: { padding: '10px 20px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }
       }, loading ? '⏳ Sedang proses...' : '🔄 Tarik Pricelist Sekarang'),
       status && React.createElement('div', {
-        style: { marginTop: 16, padding: '10px 14px', borderRadius: 8, background: status.ok ? '#f0fdf4' : '#fef2f2',
+        style: { marginTop: 12, padding: '10px 14px', borderRadius: 8, background: status.ok ? '#f0fdf4' : '#fef2f2',
           color: status.ok ? '#166534' : '#991b1b', fontSize: 13, border: '1px solid ' + (status.ok ? '#bbf7d0' : '#fecaca') }
-      }, status.ok ? '✅ ' : '❌ ', status.msg)
+      }, status.ok ? '✅ ' : '❌ ', status.msg),
+      React.createElement('div', { style: jadwalStyle }, '🕐 ' + JADWAL)
+    ),
+    React.createElement('div', { style: cs },
+      React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)', marginBottom: 16 } },
+        'Tarik data CEK NAMA (PT ADL + Group) ke Google Sheet secara manual.'
+      ),
+      React.createElement('button', {
+        onClick: triggerCekNama, disabled: loadingCek,
+        style: { padding: '10px 20px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: loadingCek ? 'not-allowed' : 'pointer', opacity: loadingCek ? 0.7 : 1 }
+      }, loadingCek ? '⏳ Sedang proses...' : '🔍 Tarik CEK NAMA Sekarang'),
+      statusCek && React.createElement('div', {
+        style: { marginTop: 12, padding: '10px 14px', borderRadius: 8, background: statusCek.ok ? '#f0fdf4' : '#fef2f2',
+          color: statusCek.ok ? '#166534' : '#991b1b', fontSize: 13, border: '1px solid ' + (statusCek.ok ? '#bbf7d0' : '#fecaca') }
+      }, statusCek.ok ? '✅ ' : '❌ ', statusCek.msg),
+      React.createElement('div', { style: jadwalStyle }, '🕐 ' + JADWAL)
     )
   );
 }
