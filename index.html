@@ -47062,8 +47062,8 @@ function TarikPricelistPage() {
       headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' }
     })
       .then(function(r) { return r.json(); })
-      .then(function(d) { setStatus({ ok: true, msg: d.message || JSON.stringify(d) }); })
-      .catch(function(e) { setStatus({ ok: false, msg: e.message }); })
+      .then(function(d) { if (d.error) { setStatus({ ok: false, msg: '❌ Gagal: ' + d.error }); } else { setStatus({ ok: true, msg: '✅ Selesai! Pricelist berhasil diperbarui di Google Sheet.' }); } })
+      .catch(function(e) { setStatus({ ok: false, msg: '❌ Gagal: ' + (e.message || 'Koneksi ke connector gagal') }); })
       .finally(function() { setLoading(false); });
   }
 
@@ -47075,8 +47075,8 @@ function TarikPricelistPage() {
       headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' }
     })
       .then(function(r) { return r.json(); })
-      .then(function(d) { setStatusCek({ ok: true, msg: d.message || JSON.stringify(d) }); })
-      .catch(function(e) { setStatusCek({ ok: false, msg: e.message }); })
+      .then(function(d) { if (d.error) { setStatusCek({ ok: false, msg: '❌ Gagal: ' + d.error }); } else { setStatusCek({ ok: true, msg: '✅ Selesai! CEK NAMA berhasil diperbarui di Google Sheet.' }); } })
+      .catch(function(e) { setStatusCek({ ok: false, msg: '❌ Gagal: ' + (e.message || 'Koneksi ke connector gagal') }); })
       .finally(function() { setLoadingCek(false); });
   }
 
@@ -47088,8 +47088,8 @@ function TarikPricelistPage() {
       headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' }
     })
       .then(function(r) { return r.json(); })
-      .then(function(d) { setStatusSN({ ok: true, msg: d.message || 'Dimulai.' }); })
-      .catch(function(e) { setStatusSN({ ok: false, msg: e.message }); })
+      .then(function(d) { if (d.error) { setStatusSN({ ok: false, msg: '❌ Gagal: ' + d.error }); } else { setStatusSN({ ok: true, msg: '✅ Selesai! SN Sellout sedang ditarik ke Google Sheets (~5-10 menit).' }); } })
+      .catch(function(e) { setStatusSN({ ok: false, msg: '❌ Gagal: ' + (e.message || 'Koneksi ke connector gagal') }); })
       .finally(function() { setLoadingSN(false); });
   }
 
