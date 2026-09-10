@@ -47048,6 +47048,8 @@ function TarikPricelistPage() {
   var _s2 = React.useState(false); var loading = _s2[0]; var setLoading = _s2[1];
   var _sc = React.useState(null); var statusCek = _sc[0]; var setStatusCek = _sc[1];
   var _lc = React.useState(false); var loadingCek = _lc[0]; var setLoadingCek = _lc[1];
+  var _ss = React.useState(null); var statusSN = _ss[0]; var setStatusSN = _ss[1];
+  var _ls = React.useState(false); var loadingSN = _ls[0]; var setLoadingSN = _ls[1];
   var CONNECTOR = 'https://connectoracc.dzoutlet.co.id';
   var API_KEY = 'dzone-connector-secret-2026';
   var JADWAL = 'Otomatis 6x sehari: 09:40, 12:00, 15:00, 17:00, 19:00, 21:00 WIB';
@@ -47076,6 +47078,19 @@ function TarikPricelistPage() {
       .then(function(d) { setStatusCek({ ok: true, msg: d.message || JSON.stringify(d) }); })
       .catch(function(e) { setStatusCek({ ok: false, msg: e.message }); })
       .finally(function() { setLoadingCek(false); });
+  }
+
+  function triggerSNSellout() {
+    if (!window.confirm('Tarik SN Sellout (semua brand) ke Google Sheets sekarang?\n\nProses berjalan di background ~5-10 menit. Tidak ada yang double karena sudah dijaga otomatis.')) return;
+    setLoadingSN(true); setStatusSN(null);
+    fetch(CONNECTOR + '/api/sheet/pull-sn-sellout', {
+      method: 'POST',
+      headers: { 'X-API-Key': API_KEY, 'Content-Type': 'application/json' }
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { setStatusSN({ ok: true, msg: d.message || 'Dimulai.' }); })
+      .catch(function(e) { setStatusSN({ ok: false, msg: e.message }); })
+      .finally(function() { setLoadingSN(false); });
   }
 
   var cs = { background: 'var(--surface)', borderRadius: 12, padding: '24px', border: '1px solid var(--border)', maxWidth: 480, marginBottom: 16 };
@@ -47110,6 +47125,20 @@ function TarikPricelistPage() {
           color: statusCek.ok ? '#166534' : '#991b1b', fontSize: 13, border: '1px solid ' + (statusCek.ok ? '#bbf7d0' : '#fecaca') }
       }, statusCek.ok ? '✅ ' : '❌ ', statusCek.msg),
       React.createElement('div', { style: jadwalStyle }, '🕐 ' + JADWAL)
+    ),
+    React.createElement('div', { style: cs },
+      React.createElement('div', { style: { fontSize: 13, color: 'var(--text2)', marginBottom: 16 } },
+        'Tarik SN penjualan unit (AXIOO, ZYREX, ACER, HP, LENOVO, ASUS, CANON) ke Google Sheets. Tidak ada data yang dobel — sudah dijaga otomatis.'
+      ),
+      React.createElement('button', {
+        onClick: triggerSNSellout, disabled: loadingSN,
+        style: { padding: '10px 20px', background: '#059669', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: loadingSN ? 'not-allowed' : 'pointer', opacity: loadingSN ? 0.7 : 1 }
+      }, loadingSN ? '⏳ Memulai...' : '🗂️ Tarik SN Sellout Sekarang'),
+      statusSN && React.createElement('div', {
+        style: { marginTop: 12, padding: '10px 14px', borderRadius: 8, background: statusSN.ok ? '#f0fdf4' : '#fef2f2',
+          color: statusSN.ok ? '#166534' : '#991b1b', fontSize: 13, border: '1px solid ' + (statusSN.ok ? '#bbf7d0' : '#fecaca') }
+      }, statusSN.ok ? '✅ ' : '❌ ', statusSN.msg),
+      React.createElement('div', { style: jadwalStyle }, '🕐 Otomatis: setiap Jumat + tgl 1 (+ tiap Mac nyala)')
     )
   );
 }
