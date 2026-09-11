@@ -3770,7 +3770,6 @@ function App() {
     { id: 'sales_harian', icon: '📈', label: 'Sales Harian', _inSection: 'accurate' },
     { id: 'tarik_pricelist', icon: '🗒️', label: 'Tarik Pricelist', _inSection: 'accurate' },
     { id: 'revisi_kode_pelanggan', icon: '🔧', label: 'Revisi Kode Pelanggan', _inSection: 'accurate' },
-    { id: 'cek_kode_barang', icon: '🔍', label: 'Cek Kode Barang', _inSection: 'accurate' },
     { id: 'tanya_kode_sku', icon: '🏷️', label: 'Tanya Kode Barang', _inSection: 'accurate' },
   ] : (TANYA_SKU_ROLES.includes(role) ? [
     { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
@@ -4243,7 +4242,7 @@ function App() {
     userName: userName,
     role: role,
     demoMode: demoMode
-  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null), page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(TarikPricelistPage, null), page === 'revisi_kode_pelanggan' && /*#__PURE__*/React.createElement(RevisiKodePelangganPage, null), page === 'cek_kode_barang' && /*#__PURE__*/React.createElement(CekKodeBarangPage, null), page === 'tanya_kode_sku' && /*#__PURE__*/React.createElement(TanyaKodeSKUPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
+  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null), page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(TarikPricelistPage, null), page === 'revisi_kode_pelanggan' && /*#__PURE__*/React.createElement(RevisiKodePelangganPage, null), page === 'tanya_kode_sku' && /*#__PURE__*/React.createElement(TanyaKodeSKUPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
     order: selectedOrder,
     onClose: function onClose() {
       return setSelectedOrder(null);
@@ -47139,139 +47138,6 @@ function TarikPricelistPage() {
           color: statusSN.ok ? '#166534' : '#991b1b', fontSize: 13, border: '1px solid ' + (statusSN.ok ? '#bbf7d0' : '#fecaca') }
       }, statusSN.ok ? '✅ ' : '❌ ', statusSN.msg),
       React.createElement('div', { style: jadwalStyle }, '🕐 Otomatis: setiap Jumat + tgl 1 (+ tiap Mac nyala)')
-    )
-  );
-}
-
-// ─── CEK KODE BARANG PAGE ──────────────────────────────────────────
-var CKB_CONNECTOR = 'https://connectoracc.dzoutlet.co.id';
-var CKB_API_KEY   = 'dzone-connector-secret-2026';
-
-function CekKodeBarangPage() {
-  var _e = React.useState('adl'); var entity = _e[0]; var setEntity = _e[1];
-  var _d = React.useState(null); var data = _d[0]; var setData = _d[1];
-  var _l = React.useState(false); var loading = _l[0]; var setLoading = _l[1];
-  var _er = React.useState(null); var err = _er[0]; var setErr = _er[1];
-  var _rs = React.useState({}); var rowStatus = _rs[0]; var setRowStatus = _rs[1];
-  var _ed = React.useState({}); var editCode = _ed[0]; var setEditCode = _ed[1];
-
-  function loadAudit(ent, force) {
-    var e = ent || entity;
-    setLoading(true); setErr(null); setData(null); setRowStatus({}); setEditCode({});
-    var url = CKB_CONNECTOR + '/api/items/audit?entity=' + e + (force ? '&refresh=1' : '');
-    fetch(url, { headers: { 'X-API-Key': CKB_API_KEY } })
-      .then(function(r) { return r.json(); })
-      .then(function(d) { if (d.error) throw new Error(d.error); setData(d); })
-      .catch(function(e) { setErr(e.message); })
-      .finally(function() { setLoading(false); });
-  }
-
-  React.useEffect(function() { loadAudit('adl', false); }, []);
-
-  function switchEntity(e) { setEntity(e); loadAudit(e, false); }
-
-  function fixOne(item) {
-    var kode = editCode[item.id] !== undefined ? editCode[item.id] : item.usulan;
-    if (!kode || kode === '—') return;
-    setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'loading'}); });
-    fetch(CKB_CONNECTOR + '/api/items/' + item.id + '/recode?entity=' + entity, {
-      method: 'PUT',
-      headers: { 'X-API-Key': CKB_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newCode: kode.trim() })
-    })
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d.error) throw new Error(d.error);
-        setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'done'}); });
-      })
-      .catch(function(e) {
-        setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'error:' + e.message}); });
-      });
-  }
-
-  var e2 = React.createElement;
-  var st = { fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' };
-
-  var items = (data && data.wrong) || [];
-  var visible = items.filter(function(r) { var s = rowStatus[r.id]; return s !== 'done' && s !== 'skip'; });
-
-  return e2('div', { style: { padding: '20px 24px', maxWidth: 1100 } },
-    e2('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 } },
-      e2('h2', { style: { margin: 0, fontSize: 18, fontWeight: 700 } }, '🔍 Cek Kode Barang'),
-      e2('button', {
-        onClick: function() { loadAudit(entity, true); },
-        style: { marginLeft: 'auto', padding: '5px 14px', background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }
-      }, '↺ Refresh')
-    ),
-    e2('div', { style: { display: 'flex', gap: 8, marginBottom: 16 } },
-      ['PT ADL', 'GROUP'].map(function(label, i) {
-        var val = i === 0 ? 'adl' : 'group';
-        return e2('button', {
-          key: val, onClick: function() { switchEntity(val); },
-          style: { padding: '6px 18px', borderRadius: 8, border: '1px solid var(--border)', background: entity === val ? '#2563eb' : 'var(--bg2)', color: entity === val ? '#fff' : 'var(--text)', fontWeight: entity === val ? 700 : 400, cursor: 'pointer', fontSize: 13 }
-        }, label);
-      })
-    ),
-    loading && e2('div', { style: { padding: 40, textAlign: 'center', color: 'var(--text3)' } }, 'Memuat data audit…'),
-    err && e2('div', { style: { padding: 16, background: '#fef2f2', borderRadius: 8, color: '#dc2626', fontSize: 13 } }, '❌ ', err),
-    !loading && data && e2('div', null,
-      e2('div', { style: { marginBottom: 12, fontSize: 13, color: 'var(--text2)' } },
-        'Dari ', e2('b', null, data.total), ' item aktif — ditemukan ',
-        e2('b', { style: { color: visible.length ? '#dc2626' : '#16a34a' } }, visible.length + ' kode ngaco'),
-        ' yang perlu dicek',
-        data.cached ? e2('span', { style: { fontSize: 11, marginLeft: 8, color: 'var(--text3)' } }, '(dari cache)') : null
-      ),
-      visible.length === 0
-        ? e2('div', { style: { padding: 32, textAlign: 'center', color: '#16a34a', fontSize: 14, background: 'var(--bg2)', borderRadius: 10 } }, '✅ Semua kode barang sudah sesuai format!')
-        : e2('div', { style: { overflowX: 'auto', borderRadius: 10, border: '1px solid var(--border)' } },
-            e2('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12.5 } },
-              e2('thead', null,
-                e2('tr', null,
-                  ['Kode Sekarang', 'Nama Barang', 'Kode Usulan', 'Aksi'].map(function(h) {
-                    return e2('th', { key: h, style: { padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--text3)', fontWeight: 600, borderBottom: '1px solid var(--border)', background: 'var(--bg)', whiteSpace: 'nowrap' } }, h);
-                  })
-                )
-              ),
-              e2('tbody', null,
-                items.map(function(item) {
-                  var s = rowStatus[item.id];
-                  if (s === 'done' || s === 'skip') return null;
-                  var isLoading = s === 'loading';
-                  var isErr = s && s.startsWith('error:');
-                  var curEdit = editCode[item.id] !== undefined ? editCode[item.id] : item.usulan;
-                  return e2('tr', { key: item.id, style: { borderBottom: '1px solid var(--border)', opacity: isLoading ? 0.5 : 1, background: isErr ? '#fef2f220' : '' } },
-                    e2('td', { style: Object.assign({}, st, { padding: '8px 12px', color: '#dc2626' }) }, item.no,
-                      e2('div', { style: { fontSize: 10, color: 'var(--text3)', fontFamily: 'inherit' } }, 'ID: ', item.id)
-                    ),
-                    e2('td', { style: { padding: '8px 12px', fontSize: 12, maxWidth: 280 } }, item.name),
-                    e2('td', { style: { padding: '8px 12px' } },
-                      item.canFix
-                        ? e2('input', {
-                            value: curEdit,
-                            onChange: function(ev) { setEditCode(function(prev) { return Object.assign({}, prev, {[item.id]: ev.target.value}); }); },
-                            style: { fontFamily: 'monospace', fontSize: 12, color: '#16a34a', background: 'transparent', border: '1px solid var(--border)', borderRadius: 5, padding: '3px 7px', width: 220 }
-                          })
-                        : e2('span', { style: Object.assign({}, st, { color: '#f59e0b' }) }, item.usulan === '—' ? '⚠ Perlu dicek manual' : item.usulan)
-                    ),
-                    e2('td', { style: { padding: '8px 12px', whiteSpace: 'nowrap' } },
-                      isErr
-                        ? e2('span', { style: { color: '#dc2626', fontSize: 11 } }, '❌ ', s.slice(6))
-                        : e2(React.Fragment, null,
-                            item.canFix && e2('button', {
-                              onClick: function() { fixOne(item); }, disabled: isLoading,
-                              style: { padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', marginRight: 4 }
-                            }, isLoading ? '...' : '✓ Fix'),
-                            e2('button', {
-                              onClick: function() { setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'skip'}); }); },
-                              style: { padding: '4px 8px', background: 'var(--bg)', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, cursor: 'pointer' }
-                            }, 'Skip')
-                          )
-                    )
-                  );
-                })
-              )
-            )
-          )
     )
   );
 }
