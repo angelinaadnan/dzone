@@ -3769,7 +3769,7 @@ function App() {
     { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
     { id: 'sales_harian', icon: '📈', label: 'Sales Harian', _inSection: 'accurate' },
     { id: 'tarik_pricelist', icon: '🗒️', label: 'Tarik Pricelist', _inSection: 'accurate' },
-    { id: 'revisi_kode_pelanggan', icon: '🔧', label: 'Revisi Kode Pelanggan', _inSection: 'accurate' },
+    { id: 'revisi_kode_pelanggan', icon: '🔧', label: 'Revisi Data Accurate', _inSection: 'accurate' },
     { id: 'tanya_kode_sku', icon: '🏷️', label: 'Tanya Kode Barang', _inSection: 'accurate' },
   ] : (TANYA_SKU_ROLES.includes(role) ? [
     { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
@@ -47457,10 +47457,18 @@ var RKP_API_KEY   = 'dzone-connector-secret-2026';
 
 function RevisiKodePelangganPage() {
   var _e = React.useState('adl'); var entity = _e[0]; var setEntity = _e[1];
+
+  // ── Kode Pelanggan state ──────────────────────────────────────────────
   var _d = React.useState(null); var data = _d[0]; var setData = _d[1];
   var _l = React.useState(false); var loading = _l[0]; var setLoading = _l[1];
   var _er = React.useState(null); var err = _er[0]; var setErr = _er[1];
   var _rs = React.useState({}); var rowStatus = _rs[0]; var setRowStatus = _rs[1];
+
+  // ── Kategori Item state ───────────────────────────────────────────────
+  var _cd = React.useState(null); var catData = _cd[0]; var setCatData = _cd[1];
+  var _cl = React.useState(false); var catLoading = _cl[0]; var setCatLoading = _cl[1];
+  var _ce = React.useState(null); var catErr = _ce[0]; var setCatErr = _ce[1];
+  var _crs = React.useState({}); var catRowStatus = _crs[0]; var setCatRowStatus = _crs[1];
 
   function loadAudit(ent, force) {
     var e = ent || entity;
@@ -47473,10 +47481,26 @@ function RevisiKodePelangganPage() {
       .finally(function() { setLoading(false); });
   }
 
-  React.useEffect(function() { loadAudit('adl', false); }, []);
+  function loadCatAudit(ent, force) {
+    var e = ent || entity;
+    setCatLoading(true); setCatErr(null); setCatData(null); setCatRowStatus({});
+    var url = RKP_CONNECTOR + '/api/items/category-audit?entity=' + e + (force ? '&refresh=1' : '');
+    fetch(url, { headers: { 'X-API-Key': RKP_API_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { if (d.error) throw new Error(d.error); setCatData(d); })
+      .catch(function(e) { setCatErr(e.message); })
+      .finally(function() { setCatLoading(false); });
+  }
 
-  function switchEntity(e) { setEntity(e); loadAudit(e, false); }
+  React.useEffect(function() { loadAudit('adl', false); loadCatAudit('adl', false); }, []);
 
+  function switchEntity(e) {
+    setEntity(e);
+    loadAudit(e, false);
+    loadCatAudit(e, false);
+  }
+
+  // ── Fix kode pelanggan ────────────────────────────────────────────────
   function fixOne(item, section) {
     setRowStatus(function(prev) { return Object.assign({}, prev, {[item.id + section]: 'loading'}); });
     var body = { customerNo: item.usulan, workPhone: item.wpBaru, mobilePhone: item.mpBaru };
@@ -47508,6 +47532,38 @@ function RevisiKodePelangganPage() {
     next();
   }
 
+  // ── Fix kategori item ─────────────────────────────────────────────────
+  function fixCatOne(item) {
+    setCatRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'loading'}); });
+    return fetch(RKP_CONNECTOR + '/api/items/' + item.id + '/recategorize?entity=' + entity, {
+      method: 'PUT',
+      headers: { 'X-API-Key': RKP_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newCategory: item.kategoriUsulan })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) throw new Error(d.error);
+        setCatRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'done'}); });
+      })
+      .catch(function(e) {
+        setCatRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'error:' + e.message}); });
+      });
+  }
+
+  function fixAllCat(items) {
+    var pending = items.filter(function(r) { var s = catRowStatus[r.id]; return s !== 'done' && s !== 'skip'; });
+    if (!pending.length) return;
+    if (!window.confirm('Update kategori semua ' + pending.length + ' item sekarang?')) return;
+    var idx = 0;
+    function next() {
+      if (idx >= pending.length) return;
+      var item = pending[idx++];
+      fixCatOne(item).then(function() { setTimeout(next, 350); });
+    }
+    next();
+  }
+
+  // ── Sub-components ────────────────────────────────────────────────────
   function RKPTable(props) {
     var items = props.items; var section = props.section;
     var visible = items.filter(function(r) { var s = rowStatus[r.id + section]; return s !== 'done' && s !== 'skip'; });
@@ -47583,20 +47639,79 @@ function RevisiKodePelangganPage() {
     );
   }
 
+  function CatTable(props) {
+    var items = props.items;
+    var visible = items.filter(function(r) { var s = catRowStatus[r.id]; return s !== 'done' && s !== 'skip'; });
+    var doneCount = items.filter(function(r) { return catRowStatus[r.id] === 'done'; }).length;
+    if (!items.length) return React.createElement('div', { style: { padding: '20px 16px', color: 'var(--text3)', fontSize: 13 } }, '✅ Tidak ada item yang perlu direvisi');
+    return React.createElement('div', null,
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)' } },
+        React.createElement('span', { style: { fontSize: 12, color: 'var(--text2)', flex: 1 } },
+          React.createElement('b', { style: { color: doneCount === items.length ? '#16a34a' : '#dc2626' } }, visible.length + ' tersisa'),
+          ' dari ', items.length,
+          doneCount > 0 ? (' | ✓ ' + doneCount + ' selesai') : ''
+        ),
+        React.createElement('button', {
+          onClick: function() { fixAllCat(items); }, disabled: !visible.length || catLoading,
+          style: { padding: '5px 14px', background: visible.length ? '#2563eb' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: visible.length ? 'pointer' : 'not-allowed' }
+        }, '⚡ Fix Semua (' + visible.length + ')')
+      ),
+      React.createElement('div', { style: { overflowX: 'auto' } },
+        React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12.5 } },
+          React.createElement('thead', null,
+            React.createElement('tr', null,
+              ['Kode Item', 'Nama Barang', 'Kategori Sekarang', 'Kategori Usulan', 'Aksi'].map(function(h) {
+                return React.createElement('th', { key: h, style: { padding: '7px 12px', textAlign: 'left', fontSize: 11, color: 'var(--text3)', fontWeight: 600, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', background: 'var(--bg)' } }, h);
+              })
+            )
+          ),
+          React.createElement('tbody', null,
+            items.map(function(item) {
+              var st = catRowStatus[item.id];
+              if (st === 'done' || st === 'skip') return null;
+              var isLoading = st === 'loading';
+              var isErr = st && st.startsWith('error:');
+              return React.createElement('tr', { key: item.id, style: { borderBottom: '1px solid var(--border)', opacity: isLoading ? 0.5 : 1, background: isErr ? '#fef2f2' : '' } },
+                React.createElement('td', { style: { padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, whiteSpace: 'nowrap' } }, item.no),
+                React.createElement('td', { style: { padding: '7px 12px', fontWeight: 500, maxWidth: 280 } }, item.name),
+                React.createElement('td', { style: { padding: '7px 12px', fontSize: 11, color: '#dc2626', whiteSpace: 'nowrap' } }, item.kategoriSekarang),
+                React.createElement('td', { style: { padding: '7px 12px', fontSize: 11, color: '#16a34a', fontWeight: 600, whiteSpace: 'nowrap' } }, '→ ', item.kategoriUsulan),
+                React.createElement('td', { style: { padding: '7px 12px', whiteSpace: 'nowrap' } },
+                  isErr
+                    ? React.createElement('span', { style: { color: '#dc2626', fontSize: 11 } }, '❌ ', st.slice(6))
+                    : React.createElement(React.Fragment, null,
+                        React.createElement('button', {
+                          onClick: function() { fixCatOne(item); },
+                          disabled: isLoading,
+                          style: { padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', marginRight: 4 }
+                        }, isLoading ? '...' : '✓ Fix'),
+                        React.createElement('button', {
+                          onClick: function() { setCatRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'skip'}); }); },
+                          disabled: isLoading,
+                          style: { padding: '4px 8px', background: 'var(--bg)', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, cursor: 'pointer' }
+                        }, 'Skip')
+                      )
+                )
+              );
+            })
+          )
+        )
+      )
+    );
+  }
+
   var formatSalah = data ? (data.formatSalah || []) : [];
   var adaHP = data ? (data.adaHP || []) : [];
+  var catWrong = catData ? (catData.wrong || []) : [];
 
   return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 1100, margin: '0 auto' } },
+
+    // ── Header + entity tabs ──────────────────────────────────────────
     React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
-      React.createElement('h2', { style: { fontSize: 18, fontWeight: 700, margin: 0, flex: 1 } }, '🔧 Revisi Kode Pelanggan'),
-      data && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, data.cachedAt ? new Date(data.cachedAt).toLocaleString('id-ID') : '—'),
-      React.createElement('button', {
-        onClick: function() { loadAudit(entity, true); }, disabled: loading,
-        style: { padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, cursor: 'pointer', color: 'var(--text1)' }
-      }, loading ? '⏳' : '🔄 Refresh')
+      React.createElement('h2', { style: { fontSize: 18, fontWeight: 700, margin: 0, flex: 1 } }, '🔧 Revisi Data Accurate')
     ),
 
-    React.createElement('div', { style: { display: 'flex', gap: 6, marginBottom: 20 } },
+    React.createElement('div', { style: { display: 'flex', gap: 6, marginBottom: 24 } },
       ['adl', 'group'].map(function(e) {
         return React.createElement('button', {
           key: e, onClick: function() { switchEntity(e); },
@@ -47605,35 +47720,78 @@ function RevisiKodePelangganPage() {
       })
     ),
 
-    loading && React.createElement('div', { style: { padding: 60, textAlign: 'center', color: 'var(--text3)' } },
-      React.createElement('div', null, '⏳ Mengambil data dari Accurate...'),
-      React.createElement('div', { style: { fontSize: 11, marginTop: 8 } }, 'Proses ini memerlukan ~30–60 detik')
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 1 — Revisi Kode Pelanggan
+    // ══════════════════════════════════════════════════════════════════
+    React.createElement('div', { style: { marginBottom: 32 } },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 } },
+        React.createElement('h3', { style: { fontSize: 15, fontWeight: 700, margin: 0, flex: 1 } }, '👤 Revisi Kode Pelanggan'),
+        data && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, data.cachedAt ? new Date(data.cachedAt).toLocaleString('id-ID') : '—'),
+        React.createElement('button', {
+          onClick: function() { loadAudit(entity, true); }, disabled: loading,
+          style: { padding: '5px 11px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', color: 'var(--text1)' }
+        }, loading ? '⏳' : '🔄 Refresh')
+      ),
+
+      loading && React.createElement('div', { style: { padding: 40, textAlign: 'center', color: 'var(--text3)' } },
+        React.createElement('div', null, '⏳ Mengambil data dari Accurate...'),
+        React.createElement('div', { style: { fontSize: 11, marginTop: 8 } }, 'Proses ini memerlukan ~30–60 detik')
+      ),
+
+      err && React.createElement('div', { style: { padding: 16, color: '#dc2626', background: '#fef2f2', borderRadius: 10, border: '1px solid #fca5a5', marginBottom: 16 } }, '⚠️ ', err),
+
+      data && !loading && React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 14 } },
+        React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
+          React.createElement('div', { style: { padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', alignItems: 'center', gap: 8 } },
+            React.createElement('span', { style: { fontSize: 14, fontWeight: 700 } }, '📱 Format Nomor Salah'),
+            React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, '— kode pelanggan dimulai 0... atau +62... seharusnya 62...'),
+            React.createElement('span', { style: { marginLeft: 'auto', background: formatSalah.length ? '#dc2626' : '#16a34a', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 } }, formatSalah.length)
+          ),
+          React.createElement(RKPTable, { items: formatSalah, section: 'A' })
+        ),
+
+        React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
+          React.createElement('div', { style: { padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', alignItems: 'center', gap: 8 } },
+            React.createElement('span', { style: { fontSize: 14, fontWeight: 700 } }, '📋 Kode NC/GC — Ada Nomor HP'),
+            React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, '— kode pelanggan masih NC/GC tapi sudah ada nomor HP di Accurate'),
+            React.createElement('span', { style: { marginLeft: 'auto', background: adaHP.length ? '#dc2626' : '#16a34a', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 } }, adaHP.length)
+          ),
+          React.createElement(RKPTable, { items: adaHP, section: 'B' })
+        ),
+
+        React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)', textAlign: 'right' } },
+          'Total customer ', entity === 'adl' ? 'PT ADL' : 'GROUP', ': ', (data.total || 0).toLocaleString('id-ID')
+        )
+      )
     ),
 
-    err && React.createElement('div', { style: { padding: 16, color: '#dc2626', background: '#fef2f2', borderRadius: 10, border: '1px solid #fca5a5', marginBottom: 16 } }, '⚠️ ', err),
-
-    data && !loading && React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 20 } },
-
-      React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
-        React.createElement('div', { style: { padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', alignItems: 'center', gap: 8 } },
-          React.createElement('span', { style: { fontSize: 14, fontWeight: 700 } }, '📱 Format Nomor Salah'),
-          React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, '— kode pelanggan dimulai 0... atau +62... seharusnya 62...'),
-          React.createElement('span', { style: { marginLeft: 'auto', background: formatSalah.length ? '#dc2626' : '#16a34a', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 } }, formatSalah.length)
-        ),
-        React.createElement(RKPTable, { items: formatSalah, section: 'A' })
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 2 — Revisi Kategori Item
+    // ══════════════════════════════════════════════════════════════════
+    React.createElement('div', null,
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 } },
+        React.createElement('h3', { style: { fontSize: 15, fontWeight: 700, margin: 0, flex: 1 } }, '📦 Revisi Kategori Item'),
+        catData && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } }, catData.cached !== undefined ? (catData.cached ? 'cache' : 'fresh') : ''),
+        React.createElement('button', {
+          onClick: function() { loadCatAudit(entity, true); }, disabled: catLoading,
+          style: { padding: '5px 11px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', color: 'var(--text1)' }
+        }, catLoading ? '⏳' : '🔄 Refresh')
       ),
 
-      React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
-        React.createElement('div', { style: { padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', alignItems: 'center', gap: 8 } },
-          React.createElement('span', { style: { fontSize: 14, fontWeight: 700 } }, '📋 Kode NC/GC — Ada Nomor HP'),
-          React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, '— kode pelanggan masih NC/GC tapi sudah ada nomor HP di Accurate'),
-          React.createElement('span', { style: { marginLeft: 'auto', background: adaHP.length ? '#dc2626' : '#16a34a', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 } }, adaHP.length)
-        ),
-        React.createElement(RKPTable, { items: adaHP, section: 'B' })
+      catLoading && React.createElement('div', { style: { padding: 40, textAlign: 'center', color: 'var(--text3)' } },
+        React.createElement('div', null, '⏳ Memeriksa kategori item...'),
+        React.createElement('div', { style: { fontSize: 11, marginTop: 8 } }, 'Proses ini memerlukan beberapa detik')
       ),
 
-      React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)', textAlign: 'right' } },
-        'Total customer ', entity === 'adl' ? 'PT ADL' : 'GROUP', ': ', (data.total || 0).toLocaleString('id-ID')
+      catErr && React.createElement('div', { style: { padding: 16, color: '#dc2626', background: '#fef2f2', borderRadius: 10, border: '1px solid #fca5a5', marginBottom: 16 } }, '⚠️ ', catErr),
+
+      catData && !catLoading && React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
+        React.createElement('div', { style: { padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', alignItems: 'center', gap: 8 } },
+          React.createElement('span', { style: { fontSize: 14, fontWeight: 700 } }, '🏷️ Kategori Tidak Sesuai'),
+          React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, '— item terdeteksi ada di kategori yang salah berdasarkan kode/nama'),
+          React.createElement('span', { style: { marginLeft: 'auto', background: catWrong.length ? '#dc2626' : '#16a34a', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 } }, catWrong.length)
+        ),
+        React.createElement(CatTable, { items: catWrong })
       )
     )
   );
