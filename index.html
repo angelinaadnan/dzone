@@ -5552,7 +5552,11 @@ function AbsensiPage(_ref46) {
           var mine = data.find(function(d) { return d.user_name === userName; });
           setMyFaceDescriptor(mine && mine.descriptor ? new Float32Array(mine.descriptor) : null);
         } else {
-          setMyFaceDescriptor(null);
+          // Supervisor: fetch descriptor sendiri secara terpisah (query utama skip descriptor biar tidak berat)
+          db.from('face_descriptors').select('descriptor').eq('user_name', userName).maybeSingle()
+            .then(function(r) {
+              setMyFaceDescriptor(r.data && r.data.descriptor ? new Float32Array(r.data.descriptor) : null);
+            }).catch(function() { setMyFaceDescriptor(null); });
         }
       })
       .catch(function() { setMyFaceDescriptor(null); });
@@ -5716,7 +5720,7 @@ function AbsensiPage(_ref46) {
     })), !(myToday !== null && myToday !== void 0 && myToday.check_in) && /*#__PURE__*/React.createElement("button", {
       className: "btn-green btn-sm",
       onClick: function onClick() {
-        if (myFaceDescriptor === null) { showToast('⚠ Wajah belum didaftarkan. Hubungi admin untuk reset pendaftaran.', 'error'); return; }
+        if (myFaceDescriptor === null && !canViewAll) { showToast('⚠ Wajah belum didaftarkan. Hubungi admin untuk reset pendaftaran.', 'error'); return; }
         if (myFaceDescriptor === 'loading') return;
         return setShowCamera('in');
       },
@@ -6598,7 +6602,7 @@ function AbsensiPage(_ref46) {
       fontWeight: 700
     },
     onClick: function onClick() {
-      if (myFaceDescriptor === null) { showToast('⚠ Wajah belum didaftarkan. Hubungi admin untuk reset pendaftaran.', 'error'); return; }
+      if (myFaceDescriptor === null && !canViewAll) { showToast('⚠ Wajah belum didaftarkan. Hubungi admin untuk reset pendaftaran.', 'error'); return; }
       if (myFaceDescriptor === 'loading') return;
       return setShowCamera('in');
     },
