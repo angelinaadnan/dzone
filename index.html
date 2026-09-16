@@ -31517,7 +31517,7 @@ function OpsDashboard(_ref192) {
       });
     });
     (courierTasks || []).filter(function (t) {
-      return t.assigned_courier === name && t.status === 'done' && (t.completed_at || t.updated_at || '').startsWith(today);
+      return (t.assigned_courier === name || (t.extra_couriers || []).includes(name)) && t.status === 'done' && (t.completed_at || t.updated_at || '').startsWith(today);
     }).sort(function (a, b) {
       return new Date(a.completed_at || a.updated_at) - new Date(b.completed_at || b.updated_at);
     }).forEach(function (t) {
@@ -31613,7 +31613,7 @@ function OpsDashboard(_ref192) {
       });
     });
     (courierTasks || []).filter(function (t) {
-      return t.assigned_courier === name && (t.status === 'on_the_way' || t.status === 'returning');
+      return (t.assigned_courier === name || (t.extra_couriers || []).includes(name)) && (t.status === 'on_the_way' || t.status === 'returning');
     }).forEach(function (t) {
       return items.push({
         label: t.task_type,
@@ -31622,7 +31622,7 @@ function OpsDashboard(_ref192) {
       });
     });
     (courierTasks || []).filter(function (t) {
-      return t.assigned_courier === name && t.status === 'arrived';
+      return (t.assigned_courier === name || (t.extra_couriers || []).includes(name)) && t.status === 'arrived';
     }).forEach(function (t) {
       return items.push({
         label: t.task_type,
@@ -31633,7 +31633,7 @@ function OpsDashboard(_ref192) {
 
     // ── ANTRI GILIRAN ──
     (courierTasks || []).filter(function (t) {
-      return t.assigned_courier === name && t.status === 'assigned';
+      return (t.assigned_courier === name || (t.extra_couriers || []).includes(name)) && t.status === 'assigned';
     }).forEach(function (t) {
       return items.push({
         label: t.task_type,
