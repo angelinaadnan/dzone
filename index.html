@@ -1805,7 +1805,7 @@ function App() {
             since = new Date();
             since.setMonth(since.getMonth() - monthsBack);
             // npwp_file & po_file di-exclude — di-load on-demand via loadOrderFiles (lazy)
-            orderColsBase = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,start_location,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status,admin_photo';
+            orderColsBase = 'id,created_at,date,sales_name,customer_name,customer_address,customer_phone,faktur_pajak,npwp,has_po,po_number,goods,info_tambahan,invoice_materai,delivery_method,goods_ready,goods_status,payment_status,status,status_history,tracking,assigned_to,courier_name,in_transit,delivery_photo,distance_km,start_location,end_location,delivered_at,faktur_checked,faktur_checked_at,faktur_checked_by,invoice_number,source_type,source_branch,tech_name,tech_note,tech_note_edits,tech_photo,tech_photos,tech_components,tech_components_verified,revisions,cancel_reason,cancel_prev_status,admin_photo,admin_photos';
             orderColsNew = ',upgrade_items,downgrade_items,has_component_change,extra_couriers,extra_techs';
             buildOrderQ = function buildOrderQ(cols) {
               var useExtraCourier = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
@@ -19106,7 +19106,8 @@ function AdminInvoicing(_ref136) {
                 status: 'invoiced',
                 status_note: "Invoice ".concat(invoiceNum[o.id], " dibuat"),
                 invoice_number: invoiceNum[o.id],
-                admin_photo: invPhotoUrl || null
+                admin_photo: invPhotoUrl || null,
+                admin_photos: invPhotoUrl ? [invPhotoUrl] : []
               });
             case 7:
             case "end":
@@ -19224,7 +19225,8 @@ function AdminOnlineInvoicing(_ref140) {
             revUpdates = getRevisionUpdates(o);
             base = _objectSpread({
               invoice_number: invoiceNum[o.id],
-              admin_photo: url || null
+              admin_photo: url || null,
+              admin_photos: url ? [url] : []
             }, revUpdates);
             if (route === 'tech') {
               onUpdate(o.id, _objectSpread(_objectSpread({}, base), {}, {
@@ -46119,6 +46121,64 @@ function OrderDetailModal(_ref278) {
     savingInvoice = _React$useState506[0],
     setSavingInvoice = _React$useState506[1];
   var canEditInvoice = role === 'admin';
+  var canEditAdminPhoto = ['admin', 'ops'].includes(role);
+  var _React$useState507 = React.useState([]),
+    _React$useState508 = _slicedToArray(_React$useState507, 2),
+    newAdminPhotos = _React$useState508[0],
+    setNewAdminPhotos = _React$useState508[1];
+  var _React$useState509 = React.useState(false),
+    _React$useState510 = _slicedToArray(_React$useState509, 2),
+    savingAdminPhoto = _React$useState510[0],
+    setSavingAdminPhoto = _React$useState510[1];
+  var existingAdminPhotos = (order.admin_photos && order.admin_photos.length > 0) ? order.admin_photos : (order.admin_photo ? [order.admin_photo] : []);
+  var handleNewAdminPhoto = function(e) {
+    var files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    var remaining = 3 - existingAdminPhotos.length;
+    if (remaining <= 0) { alert('Sudah 3 foto. Hapus dulu salah satu.'); return; }
+    files.slice(0, remaining).forEach(function(file) {
+      var reader = new FileReader();
+      reader.onloadend = function() {
+        setNewAdminPhotos(function(prev) { return prev.length < remaining ? prev.concat([reader.result]) : prev; });
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+  var removeExistingAdminPhoto = function(idx) {
+    if (!window.confirm('Hapus foto ini?')) return;
+    var updated = existingAdminPhotos.filter(function(_, i) { return i !== idx; });
+    onUpdate(order.id, { admin_photos: updated, admin_photo: updated[0] || null });
+  };
+  var saveNewAdminPhotos = /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee_ap() {
+    var uploaded, i, url, merged;
+    return _regeneratorRuntime().wrap(function _callee_ap$(_ctx_ap) {
+      while (1) switch (_ctx_ap.prev = _ctx_ap.next) {
+        case 0:
+          setSavingAdminPhoto(true);
+          uploaded = [];
+          i = 0;
+        case 3:
+          if (!(i < newAdminPhotos.length)) { _ctx_ap.next = 10; break; }
+          _ctx_ap.next = 6;
+          return uploadPhoto(newAdminPhotos[i], 'invoice');
+        case 6:
+          url = _ctx_ap.sent;
+          if (url) uploaded.push(url);
+          i++;
+          _ctx_ap.next = 3;
+          break;
+        case 10:
+          merged = existingAdminPhotos.concat(uploaded).slice(0, 3);
+          onUpdate(order.id, { admin_photos: merged, admin_photo: merged[0] || null });
+          setNewAdminPhotos([]);
+          setSavingAdminPhoto(false);
+          break;
+        case 15:
+        case 'end': return _ctx_ap.stop();
+      }
+    }, _callee_ap);
+  }));
   var saveInvoice = /*#__PURE__*/function () {
     var _ref279 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee113() {
       return _regeneratorRuntime().wrap(function _callee113$(_context115) {
@@ -46718,25 +46778,54 @@ function OrderDetailModal(_ref278) {
         color: 'var(--text3)'
       }
     }, "by ", h.by)));
-  })), order.admin_photo && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("hr", {
+  })), (existingAdminPhotos.length > 0 || canEditAdminPhoto) && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("hr", {
     className: "divider"
   }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 600,
-      marginBottom: 10
-    }
-  }, "Foto Bukti Admin"), /*#__PURE__*/React.createElement("img", {
-    src: order.admin_photo,
-    style: {
-      width: '100%',
-      borderRadius: 10,
-      maxHeight: 260,
-      objectFit: 'cover',
-      cursor: 'pointer'
-    },
-    alt: "bukti admin",
-    onClick: function() { window.open(order.admin_photo, '_blank'); }
-  })), (order.tech_photos && order.tech_photos.length > 0 ? order.tech_photos : [order.tech_photo]).filter(Boolean).length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("hr", {
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 600 }
+  }, "Foto Bukti Admin", existingAdminPhotos.length > 1 && /*#__PURE__*/React.createElement("span", {
+    style: { fontWeight: 400, fontSize: 12, color: 'var(--text2)', marginLeft: 6 }
+  }, "(", existingAdminPhotos.length, " foto)")), canEditAdminPhoto && existingAdminPhotos.length < 3 && /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: 12, color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }
+  }, "+ Tambah Foto", /*#__PURE__*/React.createElement("input", {
+    type: "file", accept: "image/*", multiple: true, style: { display: 'none' },
+    onChange: handleNewAdminPhoto
+  }))), existingAdminPhotos.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: newAdminPhotos.length > 0 ? 10 : 0 }
+  }, existingAdminPhotos.map(function(src, idx) {
+    return /*#__PURE__*/React.createElement("div", { key: idx, style: { position: 'relative', flex: '1 1 calc(50% - 4px)', minWidth: 120 } },
+      /*#__PURE__*/React.createElement("img", {
+        src: src,
+        style: { width: '100%', borderRadius: 8, maxHeight: 200, objectFit: 'cover', cursor: 'pointer', display: 'block' },
+        alt: "bukti admin ".concat(idx + 1),
+        onClick: function() { window.open(src, '_blank'); }
+      }),
+      canEditAdminPhoto && /*#__PURE__*/React.createElement("button", {
+        onClick: function() { removeExistingAdminPhoto(idx); },
+        style: { position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, padding: '2px 7px', cursor: 'pointer' }
+      }, "Hapus")
+    );
+  })), newAdminPhotos.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--text2)', marginBottom: 6 } }, "Preview foto baru:"),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 } },
+      newAdminPhotos.map(function(src, idx) {
+        return /*#__PURE__*/React.createElement("div", { key: idx, style: { position: 'relative', flex: '1 1 calc(50% - 4px)', minWidth: 120 } },
+          /*#__PURE__*/React.createElement("img", { src: src, style: { width: '100%', borderRadius: 8, maxHeight: 160, objectFit: 'cover', display: 'block', opacity: 0.85 } }),
+          /*#__PURE__*/React.createElement("button", {
+            onClick: function() { setNewAdminPhotos(function(p) { return p.filter(function(_, i) { return i !== idx; }); }); },
+            style: { position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, padding: '2px 7px', cursor: 'pointer' }
+          }, "✕")
+        );
+      })
+    ),
+    /*#__PURE__*/React.createElement("button", {
+      className: "btn-green btn-sm",
+      disabled: savingAdminPhoto,
+      onClick: saveNewAdminPhotos,
+      style: { width: '100%' }
+    }, savingAdminPhoto ? '⏳ Menyimpan...' : '✅ Simpan Foto Baru')
+  )), (order.tech_photos && order.tech_photos.length > 0 ? order.tech_photos : [order.tech_photo]).filter(Boolean).length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("hr", {
     className: "divider"
   }), /*#__PURE__*/React.createElement("div", {
     style: {
