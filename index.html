@@ -214,17 +214,23 @@ function compressImage(base64DataUrl) {
   });
 }
 
-// Upload data URL yang sudah dikompres — pakai fetch() native (non-blocking, lebih ringan dari atob loop)
+// Upload data URL yang sudah dikompres — atob() cepat untuk <500KB, tidak bisa hang seperti fetch()
 function uploadAlreadyCompressedPhoto(dataUrl, folder) {
   if (!db || !dataUrl || !dataUrl.startsWith('data:')) return Promise.resolve(null);
-  return fetch(dataUrl).then(function(r) { return r.blob(); }).then(function(blob) {
+  try {
+    var b64 = dataUrl.split(',')[1];
+    var bstr = atob(b64), n = bstr.length, u8 = new Uint8Array(n);
+    for (var i = 0; i < n; i++) u8[i] = bstr.charCodeAt(i);
+    var blob = new Blob([u8], { type: 'image/jpeg' });
     var name = (folder || 'misc') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.jpg';
-    return db.storage.from('photos').upload(name, blob, { contentType: 'image/jpeg', upsert: false })
+    var uploadPromise = db.storage.from('photos').upload(name, blob, { contentType: 'image/jpeg', upsert: false })
       .then(function(r) {
         if (r.error) return null;
         return db.storage.from('photos').getPublicUrl(name).data.publicUrl;
       });
-  }).catch(function() { return null; });
+    var timeout = new Promise(function(resolve) { setTimeout(function() { resolve(null); }, 45000); });
+    return Promise.race([uploadPromise, timeout]).catch(function() { return null; });
+  } catch(e) { return Promise.resolve(null); }
 }
 // Semua foto di-upload ke bucket 'photos', database hanya simpan URL.
 // Jika upload gagal, fallback ke base64 (tidak crash).
