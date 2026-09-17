@@ -176,8 +176,8 @@ try {
 // Kompres gambar sebelum upload — kurangi ukuran file dari kamera HP (bisa 10-15 MB)
 // menjadi max ~300-500 KB. Pakai Canvas API bawaan browser.
 function compressImage(base64DataUrl) {
-  var maxPx = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1280;
-  var quality = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0.82;
+  var maxPx = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 900;
+  var quality = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0.70;
   return new Promise(function (resolve) {
     if (!base64DataUrl || !base64DataUrl.startsWith('data:')) {
       resolve(base64DataUrl);
