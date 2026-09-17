@@ -214,6 +214,24 @@ function compressImage(base64DataUrl) {
   });
 }
 
+// Upload data URL yang sudah dikompres langsung (tanpa recompress/fetch overhead)
+function uploadAlreadyCompressedPhoto(dataUrl, folder) {
+  return new Promise(function(resolve) {
+    if (!db || !dataUrl || !dataUrl.startsWith('data:')) { resolve(null); return; }
+    try {
+      var b64 = dataUrl.split(',')[1];
+      var bstr = atob(b64), n = bstr.length, u8 = new Uint8Array(n);
+      for (var i = 0; i < n; i++) u8[i] = bstr.charCodeAt(i);
+      var blob = new Blob([u8], { type: 'image/jpeg' });
+      var name = (folder || 'misc') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.jpg';
+      db.storage.from('photos').upload(name, blob, { contentType: 'image/jpeg', upsert: false })
+        .then(function(r) {
+          if (r.error) { resolve(null); return; }
+          resolve(db.storage.from('photos').getPublicUrl(name).data.publicUrl);
+        }).catch(function() { resolve(null); });
+    } catch(e) { resolve(null); }
+  });
+}
 // Semua foto di-upload ke bucket 'photos', database hanya simpan URL.
 // Jika upload gagal, fallback ke base64 (tidak crash).
 function uploadPhoto(_x) {
@@ -46136,25 +46154,25 @@ function OrderDetailModal(_ref278) {
     if (!files.length) return;
     var remaining = 3 - existingAdminPhotos.length;
     if (remaining <= 0) { alert('Sudah 3 foto. Hapus dulu salah satu.'); return; }
-    files.slice(0, remaining).forEach(function(file) {
-      var blobUrl = URL.createObjectURL(file);
-      var img = new Image();
-      img.onload = function() {
-        URL.revokeObjectURL(blobUrl);
-        var maxPx = 900, w = img.width, h = img.height;
-        if (w > maxPx || h > maxPx) {
-          if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
-          else { w = Math.round(w * maxPx / h); h = maxPx; }
-        }
-        var canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        var compressed = canvas.toDataURL('image/jpeg', 0.70);
-        setNewAdminPhotos(function(prev) { return prev.length < remaining ? prev.concat([compressed]) : prev; });
-      };
-      img.onerror = function() { URL.revokeObjectURL(blobUrl); };
-      img.src = blobUrl;
-    });
+    // Process satu per satu agar tidak OOM jika pilih banyak foto besar
+    (function processNext(idx) {
+      if (idx >= files.length || idx >= remaining) return;
+      var file = files[idx];
+      // createImageBitmap decode off main thread, resize sebelum masuk JS heap
+      createImageBitmap(file, { resizeWidth: 800, resizeQuality: 'medium' })
+        .then(function(bitmap) {
+          var canvas = document.createElement('canvas');
+          canvas.width = bitmap.width; canvas.height = bitmap.height;
+          canvas.getContext('2d').drawImage(bitmap, 0, 0);
+          bitmap.close(); // bebaskan raw bitmap segera
+          var compressed = canvas.toDataURL('image/jpeg', 0.65);
+          setNewAdminPhotos(function(prev) {
+            return prev.length < remaining ? prev.concat([compressed]) : prev;
+          });
+          processNext(idx + 1);
+        })
+        .catch(function() { processNext(idx + 1); });
+    })(0);
     e.target.value = '';
   };
   var removeExistingAdminPhoto = function(idx) {
@@ -46173,7 +46191,7 @@ function OrderDetailModal(_ref278) {
         case 3:
           if (!(i < newAdminPhotos.length)) { _ctx_ap.next = 10; break; }
           _ctx_ap.next = 6;
-          return uploadPhoto(newAdminPhotos[i], 'invoice');
+          return uploadAlreadyCompressedPhoto(newAdminPhotos[i], 'invoice');
         case 6:
           url = _ctx_ap.sent;
           if (url) uploaded.push(url);
