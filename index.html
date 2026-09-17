@@ -214,23 +214,17 @@ function compressImage(base64DataUrl) {
   });
 }
 
-// Upload data URL yang sudah dikompres langsung (tanpa recompress/fetch overhead)
+// Upload data URL yang sudah dikompres — pakai fetch() native (non-blocking, lebih ringan dari atob loop)
 function uploadAlreadyCompressedPhoto(dataUrl, folder) {
-  return new Promise(function(resolve) {
-    if (!db || !dataUrl || !dataUrl.startsWith('data:')) { resolve(null); return; }
-    try {
-      var b64 = dataUrl.split(',')[1];
-      var bstr = atob(b64), n = bstr.length, u8 = new Uint8Array(n);
-      for (var i = 0; i < n; i++) u8[i] = bstr.charCodeAt(i);
-      var blob = new Blob([u8], { type: 'image/jpeg' });
-      var name = (folder || 'misc') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.jpg';
-      db.storage.from('photos').upload(name, blob, { contentType: 'image/jpeg', upsert: false })
-        .then(function(r) {
-          if (r.error) { resolve(null); return; }
-          resolve(db.storage.from('photos').getPublicUrl(name).data.publicUrl);
-        }).catch(function() { resolve(null); });
-    } catch(e) { resolve(null); }
-  });
+  if (!db || !dataUrl || !dataUrl.startsWith('data:')) return Promise.resolve(null);
+  return fetch(dataUrl).then(function(r) { return r.blob(); }).then(function(blob) {
+    var name = (folder || 'misc') + '/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.jpg';
+    return db.storage.from('photos').upload(name, blob, { contentType: 'image/jpeg', upsert: false })
+      .then(function(r) {
+        if (r.error) return null;
+        return db.storage.from('photos').getPublicUrl(name).data.publicUrl;
+      });
+  }).catch(function() { return null; });
 }
 // Semua foto di-upload ke bucket 'photos', database hanya simpan URL.
 // Jika upload gagal, fallback ke base64 (tidak crash).
@@ -46158,20 +46152,40 @@ function OrderDetailModal(_ref278) {
     (function processNext(idx) {
       if (idx >= files.length || idx >= remaining) return;
       var file = files[idx];
+      function onCompressed(dataUrl) {
+        setNewAdminPhotos(function(prev) {
+          return prev.length < remaining ? prev.concat([dataUrl]) : prev;
+        });
+        processNext(idx + 1);
+      }
       // createImageBitmap decode off main thread, resize sebelum masuk JS heap
       createImageBitmap(file, { resizeWidth: 800, resizeQuality: 'medium' })
         .then(function(bitmap) {
           var canvas = document.createElement('canvas');
           canvas.width = bitmap.width; canvas.height = bitmap.height;
           canvas.getContext('2d').drawImage(bitmap, 0, 0);
-          bitmap.close(); // bebaskan raw bitmap segera
-          var compressed = canvas.toDataURL('image/jpeg', 0.65);
-          setNewAdminPhotos(function(prev) {
-            return prev.length < remaining ? prev.concat([compressed]) : prev;
-          });
-          processNext(idx + 1);
+          bitmap.close();
+          onCompressed(canvas.toDataURL('image/jpeg', 0.65));
         })
-        .catch(function() { processNext(idx + 1); });
+        .catch(function() {
+          // Fallback: pakai createObjectURL + image kecil jika resizeWidth tidak support
+          var blobUrl = URL.createObjectURL(file);
+          var img = new Image();
+          img.onload = function() {
+            URL.revokeObjectURL(blobUrl);
+            var maxPx = 600, w = img.width, h = img.height;
+            if (w > maxPx || h > maxPx) {
+              if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
+              else { w = Math.round(w * maxPx / h); h = maxPx; }
+            }
+            var c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            c.getContext('2d').drawImage(img, 0, 0, w, h);
+            onCompressed(c.toDataURL('image/jpeg', 0.60));
+          };
+          img.onerror = function() { URL.revokeObjectURL(blobUrl); processNext(idx + 1); };
+          img.src = blobUrl;
+        });
     })(0);
     e.target.value = '';
   };
