@@ -3734,9 +3734,12 @@ function App() {
             showToast('Error: ' + error.message, 'error');
             return _context35.abrupt("return", null);
           case 26:
-            _context35.next = 28;
-            return loadOrders();
-          case 28:
+            setOrders(function (prev) {
+              return prev.map(function (o) {
+                return o.id === id ? data || updated : o;
+              });
+            });
+            if ((selectedOrder === null || selectedOrder === void 0 ? void 0 : selectedOrder.id) === id) setSelectedOrder(data || updated);
             showToast('Status updated!');
             return _context35.abrupt("return", data);
           case 30:
