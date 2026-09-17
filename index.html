@@ -46170,9 +46170,15 @@ function OrderDetailModal(_ref278) {
       // createImageBitmap decode off main thread, resize sebelum masuk JS heap
       createImageBitmap(file, { resizeWidth: 800, resizeQuality: 'medium' })
         .then(function(bitmap) {
+          var maxPx = 800, bw = bitmap.width, bh = bitmap.height;
+          var w = bw, h = bh;
+          if (w > maxPx || h > maxPx) {
+            if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
+            else { w = Math.round(w * maxPx / h); h = maxPx; }
+          }
           var canvas = document.createElement('canvas');
-          canvas.width = bitmap.width; canvas.height = bitmap.height;
-          canvas.getContext('2d').drawImage(bitmap, 0, 0);
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
           bitmap.close();
           onCompressed(canvas.toDataURL('image/jpeg', 0.65));
         })
