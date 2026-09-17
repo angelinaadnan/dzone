@@ -46139,7 +46139,9 @@ function OrderDetailModal(_ref278) {
     files.slice(0, remaining).forEach(function(file) {
       var reader = new FileReader();
       reader.onloadend = function() {
-        setNewAdminPhotos(function(prev) { return prev.length < remaining ? prev.concat([reader.result]) : prev; });
+        compressImage(reader.result, 900, 0.70).then(function(compressed) {
+          setNewAdminPhotos(function(prev) { return prev.length < remaining ? prev.concat([compressed]) : prev; });
+        });
       };
       reader.readAsDataURL(file);
     });
