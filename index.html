@@ -46137,13 +46137,23 @@ function OrderDetailModal(_ref278) {
     var remaining = 3 - existingAdminPhotos.length;
     if (remaining <= 0) { alert('Sudah 3 foto. Hapus dulu salah satu.'); return; }
     files.slice(0, remaining).forEach(function(file) {
-      var reader = new FileReader();
-      reader.onloadend = function() {
-        compressImage(reader.result, 900, 0.70).then(function(compressed) {
-          setNewAdminPhotos(function(prev) { return prev.length < remaining ? prev.concat([compressed]) : prev; });
-        });
+      var blobUrl = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function() {
+        URL.revokeObjectURL(blobUrl);
+        var maxPx = 900, w = img.width, h = img.height;
+        if (w > maxPx || h > maxPx) {
+          if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
+          else { w = Math.round(w * maxPx / h); h = maxPx; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        var compressed = canvas.toDataURL('image/jpeg', 0.70);
+        setNewAdminPhotos(function(prev) { return prev.length < remaining ? prev.concat([compressed]) : prev; });
       };
-      reader.readAsDataURL(file);
+      img.onerror = function() { URL.revokeObjectURL(blobUrl); };
+      img.src = blobUrl;
     });
     e.target.value = '';
   };
