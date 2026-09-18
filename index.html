@@ -3747,6 +3747,7 @@ function App() {
             });
             if ((selectedOrder === null || selectedOrder === void 0 ? void 0 : selectedOrder.id) === id) setSelectedOrder(data || updated);
             showToast('Status updated!');
+            if (updates.status) loadOrders();
             return _context35.abrupt("return", data);
           case 30:
           case "end":
