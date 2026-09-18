@@ -31679,7 +31679,7 @@ function OpsDashboard(_ref192) {
     });
     (branchRequests || []).forEach(function (r) {
       (r.trips || []).filter(function (t) {
-        return t.courier === name && t.status !== 'delivered' && (t.status === 'pending' || t.in_transit);
+        return t.courier === name && t.status !== 'delivered' && t.status !== 'cancelled' && (t.status === 'pending' || t.in_transit);
       }).forEach(function (t) {
         return items.push({
           label: 'Antar ke ' + r.branch_name,
