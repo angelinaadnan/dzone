@@ -1951,7 +1951,7 @@ function App() {
             since.setMonth(since.getMonth() - monthsBack);
             siQ = db.from('service_intakes').select('*').gte('created_at', since.toISOString()).order('created_at', {
               ascending: false
-            }).limit(300); // Filter per-user untuk role non-admin
+            }).limit(['admin', 'ops', 'supervisor'].includes(role) ? 600 : 300); // Filter per-user untuk role non-admin
             if (role === 'technician') siQ = siQ.eq('tech_assigned', userName);else if (role === 'courier') siQ = siQ.or("assigned_courier.eq.".concat(userName, ",sc_delivery_courier.eq.").concat(userName, ",sc_pickup_courier.eq.").concat(userName));
             _context7.next = 10;
             return siQ;
