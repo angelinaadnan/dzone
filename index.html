@@ -1977,7 +1977,20 @@ function App() {
             showToast('Error service intakes: ' + error.message, 'error');
             return _context7.abrupt("return");
           case 20:
-            if (data) setServiceIntakes(data);
+            if (data && role === 'courier') {
+              // Supplementary: ambil semua pending return milik courier ini tanpa batas tanggal
+              db.from('service_intakes').select('*').eq('assigned_courier', userName).in('return_status', ['assigned', 'in_delivery']).then(function(pr) {
+                if (pr.data && pr.data.length) {
+                  var ids = new Set(data.map(function(d) { return d.id; }));
+                  var extra = pr.data.filter(function(r) { return !ids.has(r.id); });
+                  setServiceIntakes(extra.length ? [].concat(_toConsumableArray(data), _toConsumableArray(extra)) : data);
+                } else {
+                  setServiceIntakes(data);
+                }
+              }).catch(function() { setServiceIntakes(data); });
+            } else {
+              if (data) setServiceIntakes(data);
+            }
           case 21:
           case "end":
             return _context7.stop();
