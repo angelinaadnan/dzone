@@ -1876,8 +1876,24 @@ function App() {
             setLoading(false);
             return _context5.abrupt("return");
           case 29:
-            if (data) setOrders(data);
-            setLoading(false);
+            if (data && role === 'courier') {
+              // Supplementary: semua order pending kurir ini tanpa batas tanggal
+              var _oColsAll = orderColsBase + orderColsNew;
+              db.from('orders').select(_oColsAll)
+                .or("courier_name.eq.".concat(userName, ",extra_couriers.cs.[\"").concat(userName, "\"]"))
+                .not('status', 'in', '(delivered,cancelled)')
+                .then(function(pr) {
+                  if (pr.data && pr.data.length) {
+                    var ids = new Set(data.map(function(d) { return d.id; }));
+                    var extra = pr.data.filter(function(r) { return !ids.has(r.id); });
+                    setOrders(extra.length ? [].concat(_toConsumableArray(data), _toConsumableArray(extra)) : data);
+                  } else { setOrders(data); }
+                  setLoading(false);
+                }).catch(function() { setOrders(data); setLoading(false); });
+            } else {
+              if (data) setOrders(data);
+              setLoading(false);
+            }
           case 31:
           case "end":
             return _context5.stop();
@@ -1978,16 +1994,25 @@ function App() {
             return _context7.abrupt("return");
           case 20:
             if (data && role === 'courier') {
-              // Supplementary: ambil semua pending return milik courier ini tanpa batas tanggal
-              db.from('service_intakes').select('*').eq('assigned_courier', userName).in('return_status', ['assigned', 'in_delivery']).then(function(pr) {
-                if (pr.data && pr.data.length) {
-                  var ids = new Set(data.map(function(d) { return d.id; }));
-                  var extra = pr.data.filter(function(r) { return !ids.has(r.id); });
-                  setServiceIntakes(extra.length ? [].concat(_toConsumableArray(data), _toConsumableArray(extra)) : data);
-                } else {
-                  setServiceIntakes(data);
-                }
-              }).catch(function() { setServiceIntakes(data); });
+              // Supplementary: semua servisan pending kurir ini (jemput, antar SC, ambil SC, antar balik) tanpa batas tanggal
+              db.from('service_intakes').select('*')
+                .or("courier_name.eq.".concat(userName, ",sc_delivery_courier.eq.").concat(userName, ",sc_pickup_courier.eq.").concat(userName, ",assigned_courier.eq.").concat(userName))
+                .then(function(pr) {
+                  if (pr.data && pr.data.length) {
+                    var ids = new Set(data.map(function(d) { return d.id; }));
+                    var extra = pr.data.filter(function(s) {
+                      if (ids.has(s.id)) return false;
+                      if (s.courier_name === userName && s.status === 'received') return true;
+                      if (s.sc_delivery_courier === userName && s.status === 'to_service_center') return true;
+                      if (s.sc_pickup_courier === userName && s.status === 'sc_pickup_assigned') return true;
+                      if (s.assigned_courier === userName && (s.return_status === 'assigned' || s.return_status === 'in_delivery')) return true;
+                      return false;
+                    });
+                    setServiceIntakes(extra.length ? [].concat(_toConsumableArray(data), _toConsumableArray(extra)) : data);
+                  } else {
+                    setServiceIntakes(data);
+                  }
+                }).catch(function() { setServiceIntakes(data); });
             } else {
               if (data) setServiceIntakes(data);
             }
@@ -2183,7 +2208,21 @@ function App() {
             showToast('Error tasks: ' + error.message, 'error');
             return _context10.abrupt("return");
           case 19:
-            if (data) setCourierTasks(data);
+            if (data && role === 'courier') {
+              // Supplementary: semua tugas pending kurir ini tanpa batas tanggal
+              db.from('courier_tasks').select(cols)
+                .or("assigned_courier.eq.".concat(userName, ",extra_couriers.cs.[\"").concat(userName, "\"]"))
+                .not('status', 'in', '(done,cancelled)')
+                .then(function(pr) {
+                  if (pr.data && pr.data.length) {
+                    var ids = new Set(data.map(function(d) { return d.id; }));
+                    var extra = pr.data.filter(function(r) { return !ids.has(r.id); });
+                    setCourierTasks(extra.length ? [].concat(_toConsumableArray(data), _toConsumableArray(extra)) : data);
+                  } else { setCourierTasks(data); }
+                }).catch(function() { setCourierTasks(data); });
+            } else {
+              if (data) setCourierTasks(data);
+            }
           case 20:
           case "end":
             return _context10.stop();
