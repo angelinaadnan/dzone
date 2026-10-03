@@ -21116,6 +21116,78 @@ function OpsKurirHistory(_ref_okh) {
           : React.createElement("b", { style: { color: 'var(--accent2)' } }, gpsKmTotal !== null ? gpsKmTotal : totalKm, " km"),
         checkins.filter(function(c){ return !(c.note||'').startsWith('▶'); }).length > 0 ? React.createElement("span", { style: { color: 'var(--text3)', marginLeft: 8 } }, "(", checkins.filter(function(c){ return !(c.note||'').startsWith('▶'); }).length, " titik GPS)") : null
       ),
+      // ── Rute Perjalanan (leg-by-leg) ────────────────────────────────
+      (function() {
+        // Group history by Jakarta date
+        var jakartaDay = function(ts) {
+          if (!ts) return null;
+          var d = new Date(new Date(ts).getTime() + 7 * 3600000);
+          return d.toISOString().slice(0, 10);
+        };
+        var days = [];
+        history.forEach(function(o) {
+          var d = jakartaDay(o.delivered_at);
+          if (d && !days.includes(d)) days.push(d);
+        });
+        return React.createElement("div", {
+          style: { marginBottom: 16, background: 'var(--card)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }
+        },
+          React.createElement("div", { style: { padding: '10px 16px', fontWeight: 700, fontSize: 13, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 } },
+            "🗺 Rute Perjalanan"
+          ),
+          days.map(function(day) {
+            var dayItems = history.filter(function(o) { return jakartaDay(o.delivered_at) === day; });
+            var dayLabel = new Date(day + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            var typeIcon = function(t) { return t === 'order' ? '📦' : t === 'task' ? '📋' : t === 'servis' ? '🛠' : t === 'trip' ? '🏢' : '🛒'; };
+            var typeColor = function(t) { return t === 'order' ? 'var(--accent)' : t === 'task' ? 'var(--orange)' : t === 'servis' ? '#a855f7' : t === 'trip' ? '#14b8a6' : 'var(--amber)'; };
+            return React.createElement("div", { key: day, style: { padding: '10px 16px', borderBottom: '1px solid var(--border)' } },
+              days.length > 1 && React.createElement("div", { style: { fontSize: 11, color: 'var(--text3)', marginBottom: 8, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 } }, dayLabel),
+              // Start node
+              React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 8 } },
+                React.createElement("div", { style: { width: 10, height: 10, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 } }),
+                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: 'var(--green)' } }, "Kantor / Start")
+              ),
+              dayItems.map(function(o, i) {
+                var jam = o.delivered_at ? new Date(new Date(o.delivered_at).getTime() + 7*3600000).toISOString().slice(11,16) : '--:--';
+                var toLink = o.end_location && (o.end_location.lat || o.end_location.latitude)
+                  ? 'https://maps.google.com?q=' + (o.end_location.lat||o.end_location.latitude) + ',' + (o.end_location.lng||o.end_location.longitude) : null;
+                return React.createElement(React.Fragment, { key: i },
+                  // Connector line + km
+                  React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 0, paddingLeft: 12 } },
+                    React.createElement("div", { style: { width: 2, height: 24, background: 'var(--border2)', marginRight: 6 } }),
+                    o.distance_km ? React.createElement("span", { style: { fontSize: 11, color: 'var(--accent2)', fontWeight: 700 } }, "↓ ", o.distance_km, " km") : React.createElement("span", { style: { fontSize: 11, color: 'var(--text3)' } }, "↓")
+                  ),
+                  // Stop node
+                  React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 10, paddingLeft: 8 } },
+                    React.createElement("div", { style: { width: 10, height: 10, borderRadius: '50%', background: typeColor(o._type), flexShrink: 0, marginTop: 3 } }),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                      React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
+                        React.createElement("span", { style: { fontSize: 10, color: 'var(--text3)', fontVariantNumeric: 'tabular-nums' } }, jam),
+                        React.createElement("span", null, typeIcon(o._type)),
+                        toLink
+                          ? React.createElement("a", { href: toLink, target: '_blank', style: { fontSize: 12, fontWeight: 700, color: 'var(--text)', textDecoration: 'none' } },
+                              i + 1 + ". " + (o.customer_name || '-'))
+                          : React.createElement("span", { style: { fontSize: 12, fontWeight: 700 } }, i + 1 + ". " + (o.customer_name || '-')),
+                        o.customer_address ? React.createElement("span", { style: { fontSize: 11, color: 'var(--text3)' } }, "· " + o.customer_address.slice(0, 50)) : null
+                      )
+                    )
+                  )
+                );
+              }),
+              // End connector
+              React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 0, paddingLeft: 12 } },
+                React.createElement("div", { style: { width: 2, height: 18, background: 'var(--border2)', marginRight: 6 } }),
+                React.createElement("span", { style: { fontSize: 11, color: 'var(--text3)' } }, "↩ kembali")
+              ),
+              React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 8 } },
+                React.createElement("div", { style: { width: 10, height: 10, borderRadius: '50%', border: '2px solid var(--green)', flexShrink: 0 } }),
+                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: 'var(--text2)' } }, "Kantor / Selesai")
+              )
+            );
+          })
+        );
+      })(),
+      // ── Detail aktivitas (existing cards) ───────────────────────────
       history.map(function(o, i) {
         var jam = o.delivered_at ? new Date(o.delivered_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
         var toLink = o.end_location && (o.end_location.lat || o.end_location.latitude)
