@@ -2452,7 +2452,23 @@ function App() {
             showToast('Error purchase orders: ' + error.message, 'error');
             return _context14.abrupt("return");
           case 16:
-            if (data) setPurchaseOrders(data);
+            if (data) {
+              if (data.length < 1000) {
+                setPurchaseOrders(data);
+              } else {
+                // Paginate to load all remaining orders beyond first 1000
+                (function fetchRest(acc, off) {
+                  db.from('purchase_orders').select(poCols)
+                    .order('created_at', { ascending: false })
+                    .range(off, off + 999)
+                    .then(function(r2) {
+                      var combined = acc.concat(r2.data || []);
+                      if (r2.data && r2.data.length === 1000) { fetchRest(combined, off + 1000); }
+                      else { setPurchaseOrders(combined); }
+                    }).catch(function() { setPurchaseOrders(acc); });
+                })(data, 1000);
+              }
+            }
           case 17:
           case "end":
             return _context14.stop();
