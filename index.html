@@ -10542,7 +10542,7 @@ function SupervisorOrders(_ref77) {
         /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { fontSize: 10 }, onClick: function(){ setDlOpen2(function(p){ return Object.assign({},p,_defineProperty({},o.id,null)); }); } }, "\u2190 Ganti")
       ),
       /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 } }, "Foto bukti pengambilan (wajib):"),
-      /*#__PURE__*/React.createElement("input", { type: "file", accept: "image/*", capture: "environment", style: { fontSize: 11, width: '100%', marginBottom: 6 }, onChange: function(e){ var f=e.target.files[0]; if(f){ var rd=new FileReader(); rd.onloadend=function(){ setSelfPic2(function(p){ return Object.assign({},p,_defineProperty({},o.id,rd.result)); }); }; rd.readAsDataURL(f); } } }),
+      /*#__PURE__*/React.createElement("input", { type: "file", accept: "image/*", style: { fontSize: 11, width: '100%', marginBottom: 6 }, onChange: function(e){ var f=e.target.files[0]; if(f){ var rd=new FileReader(); rd.onloadend=function(){ setSelfPic2(function(p){ return Object.assign({},p,_defineProperty({},o.id,rd.result)); }); }; rd.readAsDataURL(f); } } }),
       /*#__PURE__*/React.createElement("button", { className: "btn-green btn-sm", style: { width: '100%' }, disabled: !selfPic2[o.id]||dlSaving2[o.id]==='self', onClick: function(){ confirmSelfOps(o); } }, dlSaving2[o.id]==='self'?'Menyimpan...':'\u2705 Konfirmasi Pengambilan')
     )));
   }), filtered.length > PAGE_SIZE && /*#__PURE__*/React.createElement("div", {
@@ -17662,7 +17662,6 @@ function MyOrders(_ref131) {
     }, "*")), /*#__PURE__*/React.createElement("input", {
       type: "file",
       accept: "image/*",
-      capture: "environment",
       onChange: function onChange(e) {
         var f = e.target.files[0];
         if (!f) return;
@@ -19147,7 +19146,6 @@ function AdminInvoicing(_ref136) {
     })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", null, "Foto Bukti"), /*#__PURE__*/React.createElement("input", {
       type: "file",
       accept: "image/*",
-      capture: "environment",
       onChange: function onChange(e) {
         return handlePhoto(o.id, e);
       }
@@ -20396,7 +20394,7 @@ function AdminOnlineOrders(_ref144) {
         style: { fontSize: 11, color: 'var(--text3)', fontWeight: 600 }
       }, "\uD83D\uDCF8 Foto bukti serah terima (wajib):"),
       /*#__PURE__*/React.createElement("input", {
-        type: 'file', accept: 'image/*', capture: 'environment',
+        type: 'file', accept: 'image/*',
         style: { fontSize: 11 },
         onChange: function(e) {
           var f = e.target.files && e.target.files[0];
@@ -20655,7 +20653,7 @@ function AdminOnlineOrders(_ref144) {
         /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, color: 'var(--text3)', fontWeight: 600 } }, '📸 Foto bukti serah terima (wajib):'),
         /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { fontSize: 10 }, onClick: function(){ setPengirimanOpen(function(p){ return Object.assign({},p,_defineProperty({},o.id,'choose')); }); } }, '🔄 Ganti Metode')
       ),
-      /*#__PURE__*/React.createElement("input", { type: 'file', accept: 'image/*', capture: 'environment', style: { fontSize: 11 }, onChange: function(e){ var f=e.target.files&&e.target.files[0]; if(f){ var _rd2=new FileReader(); _rd2.onloadend=function(){ setPickupSerahFile(function(p){ return Object.assign({},p,_defineProperty({},o.id,_rd2.result)); }); }; _rd2.readAsDataURL(f); } } }),
+      /*#__PURE__*/React.createElement("input", { type: 'file', accept: 'image/*', style: { fontSize: 11 }, onChange: function(e){ var f=e.target.files&&e.target.files[0]; if(f){ var _rd2=new FileReader(); _rd2.onloadend=function(){ setPickupSerahFile(function(p){ return Object.assign({},p,_defineProperty({},o.id,_rd2.result)); }); }; _rd2.readAsDataURL(f); } } }),
       /*#__PURE__*/React.createElement("button", { className: "btn-primary btn-sm", disabled: !pickupSerahFile[o.id]||pickupSerahSaving[o.id], style: { fontSize: 12, opacity: pickupSerahFile[o.id]?1:0.5 }, onClick: function(){ if(!pickupSerahFile[o.id]){alert('Upload foto bukti dulu');return;} if(!window.confirm('Konfirmasi barang sudah diserahkan ke '+(o.customer_name||'customer')+'?'))return; setPickupSerahSaving(function(p){return Object.assign({},p,_defineProperty({},o.id,true));}); uploadPhoto(pickupSerahFile[o.id],'delivery').then(function(url){return onUpdate(o.id,{status:'delivered',delivered_at:new Date().toISOString(),assigned_to:'self_pickup',delivery_photo:url||null,status_note:'Diserahkan langsung (pickup sendiri)'});}).then(function(){setPickupSerahSaving(function(p){return Object.assign({},p,_defineProperty({},o.id,false));});}).catch(function(){setPickupSerahSaving(function(p){return Object.assign({},p,_defineProperty({},o.id,false));});}); } }, pickupSerahSaving[o.id]?'Menyimpan...':'✅ Konfirmasi Serah Terima')
     ) : /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
       o.delivery_method && /*#__PURE__*/React.createElement("div", { style: { width: '100%', fontSize: 11, color: 'var(--text3)', marginBottom: 2 } }, '📦 Metode saat ini: ', /*#__PURE__*/React.createElement("b", null, o.delivery_method), ' — ganti:'),
@@ -21921,7 +21919,6 @@ function OpsTechReady(_ref149) {
     }, "Upload foto customer / penerima memegang barang (wajib)"), /*#__PURE__*/React.createElement("input", {
       type: "file",
       accept: "image/*",
-      capture: "environment",
       onChange: function onChange(e) {
         return handleSelfPhoto(o.id, e);
       },
@@ -22267,7 +22264,6 @@ function OpsAssign(_ref151) {
     }, "*")), /*#__PURE__*/React.createElement("input", {
       type: "file",
       accept: "image/*",
-      capture: "environment",
       onChange: function onChange(e) {
         var f = e.target.files[0];
         if (!f) return;
@@ -22511,7 +22507,6 @@ function OpsAssign(_ref151) {
     }, "\uD83D\uDCF7 Foto saat customer mengambil barang (wajib)"), /*#__PURE__*/React.createElement("input", {
       type: "file",
       accept: "image/*",
-      capture: "environment",
       onChange: function onChange(e) {
         var f = e.target.files[0];
         if (!f) return;
@@ -23673,7 +23668,6 @@ function CourierDeliveries(_ref155) {
     }, "Foto customer / penerima memegang barang \u2014 wajib ada"), /*#__PURE__*/React.createElement("input", {
       type: "file",
       accept: "image/*",
-      capture: "environment",
       onChange: function onChange(e) {
         return handlePhotoChange(o.id, e);
       }
@@ -26728,7 +26722,7 @@ function AdminOnlineTechRequest(_ref167) {
     }, /*#__PURE__*/React.createElement("label", {
       style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 }
     }, "\uD83D\uDCF8 Foto Bukti Resi (opsional)"), /*#__PURE__*/React.createElement("input", {
-      type: "file", accept: "image/*", capture: "environment",
+      type: "file", accept: "image/*",
       onChange: function onChange(e) { return handleReturnPhoto(si.id, e); }
     }), returnPhoto[si.id] && /*#__PURE__*/React.createElement("img", {
       src: returnPhoto[si.id],
@@ -26792,7 +26786,7 @@ function AdminOnlineTechRequest(_ref167) {
     }, /*#__PURE__*/React.createElement("label", {
       style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 }
     }, "\uD83D\uDCF8 Foto Bukti Pengambilan (opsional)"), /*#__PURE__*/React.createElement("input", {
-      type: "file", accept: "image/*", capture: "environment",
+      type: "file", accept: "image/*",
       onChange: function onChange(e) { return handleReturnPhoto(si.id, e); }
     }), returnPhoto[si.id] && /*#__PURE__*/React.createElement("img", {
       src: returnPhoto[si.id],
@@ -33566,7 +33560,6 @@ function TaskCard(_ref201) {
   }, "Wajib sebelum lanjut"), /*#__PURE__*/React.createElement("input", {
     type: "file",
     accept: "image/*",
-    capture: "environment",
     onChange: handlePhoto
   }), photo && /*#__PURE__*/React.createElement("img", {
     src: photo,
@@ -33644,7 +33637,6 @@ function TaskCard(_ref201) {
   }, "Wajib sebelum selesai"), /*#__PURE__*/React.createElement("input", {
     type: "file",
     accept: "image/*",
-    capture: "environment",
     onChange: handlePhoto
   }), photo && /*#__PURE__*/React.createElement("img", {
     src: photo,
@@ -33775,7 +33767,6 @@ function TaskCard(_ref201) {
   }, "Wajib sebelum selesai"), /*#__PURE__*/React.createElement("input", {
     type: "file",
     accept: "image/*",
-    capture: "environment",
     onChange: handlePhoto
   }), photo && /*#__PURE__*/React.createElement("img", {
     src: photo,
@@ -35329,7 +35320,6 @@ function CourierJobTasks(_ref207) {
       }, "Foto customer memegang barang \u2014 wajib"), /*#__PURE__*/React.createElement("input", {
         type: "file",
         accept: "image/*",
-        capture: "environment",
         onChange: function onChange(e) {
           return handleOrderPhoto(o.id, e);
         }
@@ -35547,7 +35537,6 @@ function CourierJobTasks(_ref207) {
       }, "Foto barang saat pengambilan \u2014 wajib"), /*#__PURE__*/React.createElement("input", {
         type: "file",
         accept: "image/*",
-        capture: "environment",
         onChange: function onChange(e) {
           return handleSIPhoto('sup_' + po.id + '_' + p.no, e);
         }
@@ -35849,7 +35838,6 @@ function CourierJobTasks(_ref207) {
       }, "*")), /*#__PURE__*/React.createElement("input", {
         type: "file",
         accept: "image/*",
-        capture: "environment",
         onChange: function onChange(e) {
           return handleBranchPhoto(bk, e);
         }
@@ -36138,7 +36126,6 @@ function CourierJobTasks(_ref207) {
       }, "Foto unit saat pengambilan \u2014 wajib"), /*#__PURE__*/React.createElement("input", {
         type: "file",
         accept: "image/*",
-        capture: "environment",
         onChange: function onChange(e) {
           return handleSIPhoto(k, e);
         }
@@ -36387,7 +36374,6 @@ function CourierJobTasks(_ref207) {
       }, "*")), /*#__PURE__*/React.createElement("input", {
         type: "file",
         accept: "image/*",
-        capture: "environment",
         onChange: function onChange(e) {
           return handleSIPhoto(_k, e);
         }
@@ -36698,7 +36684,6 @@ function CourierJobTasks(_ref207) {
       }, "*")), /*#__PURE__*/React.createElement("input", {
         type: "file",
         accept: "image/*",
-        capture: "environment",
         onChange: function onChange(e) {
           return handleSIPhoto(_k2, e);
         }
@@ -36970,7 +36955,6 @@ function CourierJobTasks(_ref207) {
       }, _s7.source_type === 'branch' ? 'Foto saat menyerahkan ke cabang — wajib' : 'Foto customer memegang barang — wajib'), /*#__PURE__*/React.createElement("input", {
         type: "file",
         accept: "image/*",
-        capture: "environment",
         onChange: function onChange(e) {
           return handleSIPhoto(retKey, e);
         }
@@ -42581,7 +42565,6 @@ function ServiceIntakeForm(_ref261) {
   }, /*#__PURE__*/React.createElement("label", null, "Foto Serah Terima Barang"), /*#__PURE__*/React.createElement("input", {
     type: "file",
     accept: "image/*",
-    capture: "environment",
     onChange: handlePhoto
   }), form.handover_photo && /*#__PURE__*/React.createElement("img", {
     src: form.handover_photo,
@@ -43531,7 +43514,6 @@ function CourierService(_ref265) {
     }, "*")), /*#__PURE__*/React.createElement("input", {
       type: "file",
       accept: "image/*",
-      capture: "environment",
       onChange: function onChange(e) {
         return handlePhoto('sc_' + si.id, e);
       }
@@ -43609,7 +43591,6 @@ function CourierService(_ref265) {
     }, /*#__PURE__*/React.createElement("label", null, "Foto Bukti Pengambilan"), /*#__PURE__*/React.createElement("input", {
       type: "file",
       accept: "image/*",
-      capture: "environment",
       onChange: function onChange(e) {
         return handlePhoto('scp_' + si.id, e);
       }
@@ -43669,7 +43650,6 @@ function CourierService(_ref265) {
     }, /*#__PURE__*/React.createElement("label", null, "Foto Bukti Pengantaran"), /*#__PURE__*/React.createElement("input", {
       type: "file",
       accept: "image/*",
-      capture: "environment",
       onChange: function onChange(e) {
         return handlePhoto('ret_' + si.id, e);
       }
@@ -43975,7 +43955,7 @@ function ReturnBatalBox(_ref271) {
   var photoInput = function(label, val, setter) {
     return /*#__PURE__*/React.createElement("div", { style: { marginBottom: 10 } },
       /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, color: 'var(--text2)', display: 'block', marginBottom: 4 } }, "\uD83D\uDCF7 " + label + " (wajib):"),
-      /*#__PURE__*/React.createElement("input", { type: 'file', accept: 'image/*', capture: 'environment', style: { fontSize: 11, width: '100%' },
+      /*#__PURE__*/React.createElement("input", { type: 'file', accept: 'image/*', style: { fontSize: 11, width: '100%' },
         onChange: function(e) {
           var f = e.target.files[0];
           if (!f) return;
@@ -44896,7 +44876,6 @@ function ServiceCardOps(_ref272) {
   }, "*")), /*#__PURE__*/React.createElement("input", {
     type: "file",
     accept: "image/*",
-    capture: "environment",
     onChange: handleDonePhoto,
     style: {
       marginBottom: 8
@@ -45571,7 +45550,6 @@ function ServiceCardOps(_ref272) {
   }, "Upload Foto Bukti Cek OK"), /*#__PURE__*/React.createElement("input", {
     type: "file",
     accept: "image/*",
-    capture: "environment",
     onChange: handleDonePhoto,
     style: {
       marginBottom: 8
@@ -45807,7 +45785,6 @@ function ServiceCardOps(_ref272) {
   }, "Foto customer / penerima memegang barang (wajib)"), /*#__PURE__*/React.createElement("input", {
     type: "file",
     accept: "image/*",
-    capture: "environment",
     onChange: handleSelfPhoto,
     style: {
       marginBottom: 8
@@ -45988,7 +45965,6 @@ function ServiceCardOps(_ref272) {
   }, "Upload foto saat customer / penerima mengambil barang (wajib)"), /*#__PURE__*/React.createElement("input", {
     type: "file",
     accept: "image/*",
-    capture: "environment",
     onChange: handleSelfPhoto,
     style: {
       marginBottom: 8
