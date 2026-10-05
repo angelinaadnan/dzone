@@ -391,12 +391,12 @@ function _uploadDocument() {
           return _context117.abrupt("return", null);
         case 6:
           _context117.prev = 6;
-          isPdf = file.type.includes('pdf');
-          ext = isPdf ? 'pdf' : file.type.includes('png') ? 'png' : 'jpg';
+          isPdf = file.type && file.type.includes('pdf');
+          ext = isPdf ? 'pdf' : (file.type && file.type.includes('png')) ? 'png' : 'jpg';
           name = "".concat(folder, "/").concat(Date.now(), "_").concat(Math.random().toString(36).slice(2, 8), ".").concat(ext);
           _context117.next = 12;
           return db.storage.from('photos').upload(name, file, {
-            contentType: file.type,
+            contentType: file.type || 'image/jpeg',
             upsert: false
           });
         case 12:
@@ -20400,7 +20400,7 @@ function AdminOnlineOrders(_ref144) {
         style: { fontSize: 11 },
         onChange: function(e) {
           var f = e.target.files && e.target.files[0];
-          if (f) setPickupSerahFile(function(p) { return Object.assign({}, p, _defineProperty({}, o.id, f)); });
+          if (f) { var _rd = new FileReader(); _rd.onloadend = function(){ setPickupSerahFile(function(p){ return Object.assign({},p,_defineProperty({},o.id,_rd.result)); }); }; _rd.readAsDataURL(f); }
         }
       }),
       /*#__PURE__*/React.createElement("button", {
@@ -20655,7 +20655,7 @@ function AdminOnlineOrders(_ref144) {
         /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, color: 'var(--text3)', fontWeight: 600 } }, '📸 Foto bukti serah terima (wajib):'),
         /*#__PURE__*/React.createElement("button", { className: "btn-secondary btn-sm", style: { fontSize: 10 }, onClick: function(){ setPengirimanOpen(function(p){ return Object.assign({},p,_defineProperty({},o.id,'choose')); }); } }, '🔄 Ganti Metode')
       ),
-      /*#__PURE__*/React.createElement("input", { type: 'file', accept: 'image/*', capture: 'environment', style: { fontSize: 11 }, onChange: function(e){ var f=e.target.files&&e.target.files[0]; if(f) setPickupSerahFile(function(p){ return Object.assign({},p,_defineProperty({},o.id,f)); }); } }),
+      /*#__PURE__*/React.createElement("input", { type: 'file', accept: 'image/*', capture: 'environment', style: { fontSize: 11 }, onChange: function(e){ var f=e.target.files&&e.target.files[0]; if(f){ var _rd2=new FileReader(); _rd2.onloadend=function(){ setPickupSerahFile(function(p){ return Object.assign({},p,_defineProperty({},o.id,_rd2.result)); }); }; _rd2.readAsDataURL(f); } } }),
       /*#__PURE__*/React.createElement("button", { className: "btn-primary btn-sm", disabled: !pickupSerahFile[o.id]||pickupSerahSaving[o.id], style: { fontSize: 12, opacity: pickupSerahFile[o.id]?1:0.5 }, onClick: function(){ if(!pickupSerahFile[o.id]){alert('Upload foto bukti dulu');return;} if(!window.confirm('Konfirmasi barang sudah diserahkan ke '+(o.customer_name||'customer')+'?'))return; setPickupSerahSaving(function(p){return Object.assign({},p,_defineProperty({},o.id,true));}); uploadPhoto(pickupSerahFile[o.id],'delivery').then(function(url){return onUpdate(o.id,{status:'delivered',delivered_at:new Date().toISOString(),assigned_to:'self_pickup',delivery_photo:url||null,status_note:'Diserahkan langsung (pickup sendiri)'});}).then(function(){setPickupSerahSaving(function(p){return Object.assign({},p,_defineProperty({},o.id,false));});}).catch(function(){setPickupSerahSaving(function(p){return Object.assign({},p,_defineProperty({},o.id,false));});}); } }, pickupSerahSaving[o.id]?'Menyimpan...':'✅ Konfirmasi Serah Terima')
     ) : /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
       o.delivery_method && /*#__PURE__*/React.createElement("div", { style: { width: '100%', fontSize: 11, color: 'var(--text3)', marginBottom: 2 } }, '📦 Metode saat ini: ', /*#__PURE__*/React.createElement("b", null, o.delivery_method), ' — ganti:'),
@@ -21062,7 +21062,19 @@ function OpsKurirHistory(_ref_okh) {
         for (var _gi = 1; _gi < _gpsOnly.length; _gi++) {
           var _fa = _gpsOnly[_gi-1], _tb = _gpsOnly[_gi];
           var _km = 0;
-          if (_fa.lat && _tb.lat) { try { _km = parseFloat(((await getRoadDistanceKm(parseFloat(_fa.lat),parseFloat(_fa.lng),parseFloat(_tb.lat),parseFloat(_tb.lng)))||0).toFixed(2)); } catch(e){} }
+          if (_fa.lat && _tb.lat) {
+            try {
+              // Cek cache OSRM dulu (sudah terisi saat History Kurir dibuka) — no network call
+              var _fv = function(v){ return parseFloat(v).toFixed(5); };
+              var _ck = _fv(parseFloat(_fa.lng))+','+_fv(parseFloat(_fa.lat))+';'+_fv(parseFloat(_tb.lng))+','+_fv(parseFloat(_tb.lat));
+              if (_osrmCache[_ck] !== undefined) {
+                _km = parseFloat(_osrmCache[_ck].toFixed(2));
+              } else {
+                // Fallback: haversine × 1.55 (dikalibrasi dari data OSRM Gilang Agu)
+                _km = parseFloat((distanceKm(parseFloat(_fa.lat),parseFloat(_fa.lng),parseFloat(_tb.lat),parseFloat(_tb.lng))*1.55).toFixed(2));
+              }
+            } catch(e){}
+          }
           var _jam = _tb.created_at ? new Date(_tb.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : '-';
           var _fromLbl = _cn(_fa.note)||'Titik '+_gi;
           var _toLbl = _cn(_tb.note);
