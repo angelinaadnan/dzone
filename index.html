@@ -24030,7 +24030,21 @@ function CourierSummary(_ref159) {
   }).forEach(function (s) {
     return actKm += s.pickup_distance_km || 0;
   });
-  var totalKm = parseFloat(Math.max(gpsKm, actKm).toFixed(1));
+  // Hitung leg pulang: end_location stop terakhir → check-in terakhir hari itu
+  var allDayEvents = timeline.filter(function(e) { return e.lat && e.lng && e._t !== 'gps'; })
+    .sort(function(a, b) { return new Date(a._time) - new Date(b._time); });
+  var lastEvent = allDayEvents.length > 0 ? allDayEvents[allDayEvents.length - 1] : null;
+  var lastCheckin = keyCheckins.length > 0 ? keyCheckins[keyCheckins.length - 1] : null;
+  var returnLegKm = 0;
+  if (lastEvent && lastCheckin && lastCheckin.lat && lastCheckin.lng) {
+    var _retKey = _gOsrmKey({lat: lastEvent.lat, lng: lastEvent.lng}, {lat: lastCheckin.lat, lng: lastCheckin.lng});
+    var _retCached = _osrmCache && _osrmCache[_retKey];
+    returnLegKm = _retCached !== undefined
+      ? parseFloat(_retCached.toFixed(2))
+      : parseFloat((distanceKm(lastEvent.lat, lastEvent.lng, parseFloat(lastCheckin.lat), parseFloat(lastCheckin.lng)) * 1.55).toFixed(2));
+  }
+  var routeKm = actKm > 0 ? parseFloat((actKm + returnLegKm).toFixed(1)) : 0;
+  var totalKm = parseFloat((routeKm > 0 ? routeKm : gpsKm).toFixed(1));
   var bbmEst = Math.round(totalKm * FUEL);
   var firstTime = timeline.length > 0 ? fmtTime(timeline[0]._time) : null;
   var lastTime = timeline.length > 1 ? fmtTime(timeline[timeline.length - 1]._time) : null;
@@ -24051,37 +24065,67 @@ function CourierSummary(_ref159) {
     }[e._t] || '';
   };
   var exportExcelCS = function() {
-    if (keyCheckins.length < 2) return;
-    // _xls: strip emoji & non-BMP chars that corrupt SheetJS 0.16.9
     var _xls = function(s) {
       return (s || '').replace(/[\uD800-\uDFFF]|[^\u0000-\uFFFF]/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim();
     };
+    var fmtJam = function(ts) { return ts ? new Date(new Date(ts).getTime()+7*3600000).toISOString().slice(11,16) : '-'; };
+    var mapsLink = function(lat,lng) { return (lat && lng) ? 'https://maps.google.com?q='+lat+','+lng : ''; };
+    // Build ordered stops: activities sorted by time
+    var stops = [];
+    dayOrders.sort(function(a,b){ return new Date(a.delivered_at)-new Date(b.delivered_at); })
+      .forEach(function(o){
+        stops.push({ tipe:'Order', nama: o.customer_name||'', jam: o.delivered_at,
+          toLat: o.end_location&&o.end_location.lat, toLng: o.end_location&&o.end_location.lng,
+          fromLat: o.start_location&&o.start_location.lat, fromLng: o.start_location&&o.start_location.lng,
+          km: o.distance_km||0 });
+      });
+    dayTasks.sort(function(a,b){ return new Date(a.completed_at)-new Date(b.completed_at); })
+      .forEach(function(t){
+        stops.push({ tipe:'Tugas', nama: t.destination||t.description||'', jam: t.completed_at,
+          toLat: t.end_location&&t.end_location.lat, toLng: t.end_location&&t.end_location.lng,
+          fromLat: t.start_location&&t.start_location.lat, fromLng: t.start_location&&t.start_location.lng,
+          km: t.distance_km||0 });
+      });
+    stops.sort(function(a,b){ return new Date(a.jam)-new Date(b.jam); });
     var rows = [];
-    for (var _gi = 1; _gi < keyCheckins.length; _gi++) {
-      var _fa = keyCheckins[_gi - 1], _tb = keyCheckins[_gi];
-      var segKm = getGpsSegDist(_fa, _tb);
-      var _jam = _tb.created_at ? new Date(_tb.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
-      var fromLink = _fa.lat ? 'https://maps.google.com?q=' + parseFloat(_fa.lat) + ',' + parseFloat(_fa.lng) : '';
-      var toLink2 = _tb.lat ? 'https://maps.google.com?q=' + parseFloat(_tb.lat) + ',' + parseFloat(_tb.lng) : '';
+    var prevName = 'Kantor (Dusit)';
+    var prevLat = keyCheckins.length>0 ? keyCheckins[0].lat : null;
+    var prevLng = keyCheckins.length>0 ? keyCheckins[0].lng : null;
+    stops.forEach(function(s) {
       rows.push({
-        'Tgl': selDate,
-        'Kurir': courierName,
-        'Dari': _xls(cleanNote(_fa.note)) || ('Titik ' + _gi),
-        'Link Dari': fromLink,
-        'Ke': _xls(cleanNote(_tb.note)) || ('Titik ' + (_gi + 1)),
-        'Link Tujuan': toLink2,
-        'KM Via Jalan (OSRM)': parseFloat((segKm || 0).toFixed(2)),
-        'Tipe': 'GPS',
-        'Jam Tiba di Tujuan': _jam
+        'Tgl': selDate, 'Kurir': courierName,
+        'Dari': _xls(prevName),
+        'Link Dari': mapsLink(prevLat, prevLng),
+        'Ke': _xls(s.nama),
+        'Link Tujuan': mapsLink(s.toLat, s.toLng),
+        'KM Via Jalan (OSRM)': parseFloat((s.km||0).toFixed(2)),
+        'Tipe': s.tipe,
+        'Jam Tiba di Tujuan': fmtJam(s.jam)
+      });
+      prevName = s.nama; prevLat = s.toLat; prevLng = s.toLng;
+    });
+    // Leg pulang ke kantor
+    var _lastCkEx = keyCheckins.length>0 ? keyCheckins[keyCheckins.length-1] : null;
+    if (_lastCkEx && stops.length>0) {
+      var _lastStop = stops[stops.length-1];
+      var _retKey2 = _gOsrmKey({lat:_lastStop.toLat,lng:_lastStop.toLng},{lat:_lastCkEx.lat,lng:_lastCkEx.lng});
+      var _retC2 = _osrmCache && _osrmCache[_retKey2];
+      var _retKm2 = _retC2 !== undefined ? parseFloat(_retC2.toFixed(2))
+        : parseFloat((distanceKm(parseFloat(_lastStop.toLat),parseFloat(_lastStop.toLng),parseFloat(_lastCkEx.lat),parseFloat(_lastCkEx.lng))*1.55).toFixed(2));
+      rows.push({ 'Tgl': selDate, 'Kurir': courierName,
+        'Dari': _xls(_lastStop.nama), 'Link Dari': mapsLink(_lastStop.toLat,_lastStop.toLng),
+        'Ke': 'Kantor (Dusit)', 'Link Tujuan': mapsLink(_lastCkEx.lat,_lastCkEx.lng),
+        'KM Via Jalan (OSRM)': _retKm2, 'Tipe': 'Pulang', 'Jam Tiba di Tujuan': fmtJam(_lastCkEx.created_at)
       });
     }
-    var _sumGps = rows.reduce(function(s, r) { return s + (r['KM Via Jalan (OSRM)'] || 0); }, 0);
-    rows.push({ 'Tgl': '', 'Kurir': '', 'Dari': '', 'Link Dari': '', 'Ke': 'TOTAL GPS', 'Link Tujuan': '', 'KM Via Jalan (OSRM)': parseFloat(_sumGps.toFixed(2)), 'Tipe': '', 'Jam Tiba di Tujuan': '' });
+    var _sum = rows.reduce(function(s,r){ return s+(r['KM Via Jalan (OSRM)']||0); },0);
+    rows.push({ 'Tgl':'','Kurir':'','Dari':'','Link Dari':'','Ke':'TOTAL','Link Tujuan':'','KM Via Jalan (OSRM)':parseFloat(_sum.toFixed(2)),'Tipe':'','Jam Tiba di Tujuan':'' });
+    if (!rows.length || rows.length === 1) { alert('Belum ada data pengiriman hari ini'); return; }
     try {
       var ws = XLSX.utils.json_to_sheet(rows);
       var wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Summary');
-      XLSX.writeFile(wb, 'summary_' + courierName.replace(/ /g,'_') + '_' + selDate + '.xlsx');
+      XLSX.utils.book_append_sheet(wb, ws, 'Rute');
+      XLSX.writeFile(wb, 'rute_' + courierName.replace(/ /g,'_') + '_' + selDate + '.xlsx');
     } catch(e) { alert('Export error: ' + e.message); }
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -28737,7 +28781,9 @@ function CourierCheckinPanel(_ref186) {
     checkins = _ref186.checkins,
     onCheckin = _ref186.onCheckin,
     _ref186$pendingChecki = _ref186.pendingCheckins,
-    pendingCheckins = _ref186$pendingChecki === void 0 ? [] : _ref186$pendingChecki;
+    pendingCheckins = _ref186$pendingChecki === void 0 ? [] : _ref186$pendingChecki,
+    orders = _ref186.orders,
+    courierTasks = _ref186.courierTasks;
   var _React$useState289 = React.useState(false),
     _React$useState290 = _slicedToArray(_React$useState289, 2),
     loading = _React$useState290[0],
@@ -28802,9 +28848,31 @@ function CourierCheckinPanel(_ref186) {
       });
     });
   }, [sorted.length]);
-  var totalKm = 0;
-  for (var i = 1; i < sorted.length; i++) totalKm += getSegDist(sorted[i - 1], sorted[i]);
-  totalKm = parseFloat(totalKm.toFixed(1));
+  // Hitung actKm dari distance_km per order/task hari ini (metode sama dengan Summary)
+  var _actKm = 0;
+  var jakartaToday = new Date(new Date().getTime() + 7*3600000).toISOString().slice(0,10);
+  var _mToday = function(ts) { if (!ts) return false; var d = new Date(new Date(ts).getTime()+7*3600000).toISOString().slice(0,10); return d === jakartaToday; };
+  (orders || []).filter(function(o){ return o.courier_name === courierName && o.status === 'delivered' && _mToday(o.delivered_at); })
+    .forEach(function(o){ _actKm += o.distance_km || 0; });
+  (courierTasks || []).filter(function(t){ return t.assigned_courier === courierName && t.status === 'done' && _mToday(t.completed_at); })
+    .forEach(function(t){ _actKm += t.distance_km || 0; });
+  // Leg pulang: end_location order terakhir → check-in terakhir hari ini
+  var _lastOrder = (orders || []).filter(function(o){ return o.courier_name===courierName && o.status==='delivered' && _mToday(o.delivered_at) && o.end_location && o.end_location.lat; })
+    .sort(function(a,b){ return new Date(a.delivered_at)-new Date(b.delivered_at); }).slice(-1)[0];
+  var _lastCk = sorted.length > 0 ? sorted[sorted.length-1] : null;
+  var _retKm = 0;
+  if (_lastOrder && _lastCk && _lastCk.lat) {
+    var _rk = _osrmCacheKey({lat:_lastOrder.end_location.lat,lng:_lastOrder.end_location.lng},{lat:_lastCk.lat,lng:_lastCk.lng});
+    var _rc = _osrmCache && _osrmCache[_rk];
+    _retKm = _rc !== undefined ? parseFloat(_rc.toFixed(2))
+      : parseFloat((distanceKm(parseFloat(_lastOrder.end_location.lat),parseFloat(_lastOrder.end_location.lng),parseFloat(_lastCk.lat),parseFloat(_lastCk.lng))*1.55).toFixed(2));
+  }
+  var _gpsChainKm = 0;
+  for (var i = 1; i < sorted.length; i++) _gpsChainKm += getSegDist(sorted[i - 1], sorted[i]);
+  // Pakai actKm+retKm kalau ada data delivery, fallback ke GPS chain
+  var totalKm = _actKm > 0
+    ? parseFloat((_actKm + _retKm).toFixed(1))
+    : parseFloat(_gpsChainKm.toFixed(1));
 
   // Cek permission GPS sekali saat mount
   React.useEffect(function () {
@@ -34825,7 +34893,9 @@ function CourierJobTasks(_ref207) {
     courierName: courierName,
     checkins: checkins,
     onCheckin: onCheckin,
-    pendingCheckins: pendingCheckins
+    pendingCheckins: pendingCheckins,
+    orders: orders,
+    courierTasks: tasks
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
