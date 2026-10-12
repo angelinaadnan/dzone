@@ -34199,6 +34199,18 @@ function CourierJobTasks(_ref207) {
     _React$useState360 = _slicedToArray(_React$useState359, 2),
     siPhotos = _React$useState360[0],
     setSiPhotos = _React$useState360[1];
+  var _kmBannerKey = 'km_banner_collapsed_' + courierName;
+  var _React$useState_kmb = React.useState(function() { try { return localStorage.getItem(_kmBannerKey) !== '0'; } catch(e) { return true; } }),
+    _React$useState_kmb2 = _slicedToArray(_React$useState_kmb, 2),
+    kmBannerCollapsed = _React$useState_kmb2[0],
+    setKmBannerCollapsed = _React$useState_kmb2[1];
+  var toggleKmBanner = function() {
+    setKmBannerCollapsed(function(prev) {
+      var next = !prev;
+      try { localStorage.setItem(_kmBannerKey, next ? '1' : '0'); } catch(e) {}
+      return next;
+    });
+  };
   // Order deliveries
   var _React$useState361 = React.useState({}),
     _React$useState362 = _slicedToArray(_React$useState361, 2),
@@ -34897,6 +34909,75 @@ function CourierJobTasks(_ref207) {
     orders: orders,
     courierTasks: tasks
   }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      border: '1.5px solid #F0B429',
+      borderRadius: 10,
+      marginBottom: 14,
+      overflow: 'hidden',
+      background: kmBannerCollapsed ? 'transparent' : '#FFF8E6'
+    }
+  },
+    React.createElement("div", {
+      onClick: toggleKmBanner,
+      style: {
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 12px', cursor: 'pointer',
+        background: kmBannerCollapsed ? 'rgba(240,180,41,0.10)' : '#FFF8E6',
+        userSelect: 'none'
+      }
+    },
+      React.createElement("span", { style: { fontSize: 15 } }, "\uD83D\uDCCB"),
+      React.createElement("span", { style: { flex: 1, fontSize: 13, fontWeight: 600, color: '#78450C' } }, "Cara Hitung KM Kamu"),
+      React.createElement("span", { style: { fontSize: 11, color: '#D97706', transform: kmBannerCollapsed ? 'rotate(-90deg)' : 'none', display: 'inline-block', transition: 'transform 0.2s' } }, "\u25BC")
+    ),
+    !kmBannerCollapsed && React.createElement("div", {
+      style: { padding: '0 14px 14px', fontSize: 12.5, color: '#78450C', lineHeight: 1.6 }
+    },
+      React.createElement("div", { style: { marginBottom: 8 } }, "KM dihitung berdasarkan ", React.createElement("strong", null, "urutan pengirimanmu"), ", bukan dari berapa kali kamu tekan GPS."),
+      React.createElement("div", {
+        style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, margin: '10px 0', fontSize: 11 }
+      },
+        ...[
+          { label: 'Dusit', home: true }, null,
+          { label: 'Stop A' }, null,
+          { label: 'Stop B' }, null,
+          { label: 'Stop C' }, null,
+          { label: 'Dusit', home: true }
+        ].map(function(item, i) {
+          if (item === null) return React.createElement("span", { key: i, style: { color: '#D97706', fontWeight: 700 } }, "\u2192");
+          return React.createElement("span", { key: i, style: {
+            background: item.home ? '#F0B429' : '#fff',
+            border: '1.5px solid #F0B429',
+            borderRadius: 6, padding: '3px 8px', fontWeight: 600,
+            color: item.home ? '#fff' : '#78450C'
+          }}, item.label);
+        })
+      ),
+      React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+        [
+          ["1", React.createElement("span", null, React.createElement("strong", null, "Klik Mulai"), " \u2014 sistem catat lokasi berangkat")],
+          ["2", React.createElement("span", null, React.createElement("strong", null, "Foto serah terima"), " di tujuan \u2014 sistem catat lokasi tiba & hitung jarak")],
+          ["3", React.createElement("span", null, "Ulangi untuk setiap pengiriman berikutnya")],
+          ["4", React.createElement("span", null, React.createElement("strong", null, "Check-in di Dusit"), " saat pulang \u2014 jarak dari titik terakhir ke Dusit ditambahkan otomatis")]
+        ].map(function(s) {
+          return React.createElement("div", { key: s[0], style: { display: 'flex', gap: 8, alignItems: 'flex-start' } },
+            React.createElement("span", { style: {
+              background: '#D97706', color: '#fff', borderRadius: '50%',
+              width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1
+            }}, s[0]),
+            React.createElement("span", { style: { fontSize: 12, lineHeight: 1.5 } }, s[1])
+          );
+        })
+      ),
+      React.createElement("div", {
+        style: {
+          marginTop: 10, padding: '7px 10px', background: 'rgba(255,255,255,0.55)',
+          borderRadius: 7, borderLeft: '3px solid #F0B429', fontSize: 11.5
+        }
+      }, "Angka KM yang muncul = total jarak pengirimanmu hari ini, sudah termasuk perjalanan pulang ke Dusit.")
+    )
+  ), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       justifyContent: 'space-between',
