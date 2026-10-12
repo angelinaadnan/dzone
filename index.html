@@ -23938,9 +23938,17 @@ function CourierSummary(_ref159) {
   var _gsk = function _gsk(a, b) {
     return "".concat(parseFloat(a.lat).toFixed(4), "_").concat(parseFloat(a.lng).toFixed(4), "_").concat(parseFloat(b.lat).toFixed(4), "_").concat(parseFloat(b.lng).toFixed(4));
   };
+  var _gOsrmKey = function _gOsrmKey(a, b) {
+    var fv = function(v){ return parseFloat(v).toFixed(5); };
+    return fv(parseFloat(a.lng))+','+fv(parseFloat(a.lat))+';'+fv(parseFloat(b.lng))+','+fv(parseFloat(b.lat));
+  };
   var getGpsSegDist = function getGpsSegDist(a, b) {
     var _gpsSegKm$_gsk;
-    return !(a !== null && a !== void 0 && a.lat) || !(b !== null && b !== void 0 && b.lat) ? 0 : (_gpsSegKm$_gsk = gpsSegKm[_gsk(a, b)]) !== null && _gpsSegKm$_gsk !== void 0 ? _gpsSegKm$_gsk : parseFloat((distanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng)) * 1.2).toFixed(2));
+    if (!(a !== null && a !== void 0 && a.lat) || !(b !== null && b !== void 0 && b.lat)) return 0;
+    if ((_gpsSegKm$_gsk = gpsSegKm[_gsk(a, b)]) !== null && _gpsSegKm$_gsk !== void 0) return _gpsSegKm$_gsk;
+    var _cached = _osrmCache && _osrmCache[_gOsrmKey(a, b)];
+    if (_cached !== undefined) return parseFloat(_cached.toFixed(2));
+    return parseFloat((distanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng)) * 1.55).toFixed(2));
   };
 
   // Compute leg km between consecutive points with GPS
@@ -28764,15 +28772,23 @@ function CourierCheckinPanel(_ref186) {
   })));
   var sorted = _toConsumableArray(allItems).sort(function (a, b) {
     return new Date(a.created_at || a._queuedAt) - new Date(b.created_at || b._queuedAt);
-  });
+  }).filter(function(c) { return !(c.note || '').startsWith('▶'); });
 
   // OSRM per-segment distances
   var _sk = function _sk(a, b) {
     return "".concat(parseFloat(a.lat).toFixed(4), "_").concat(parseFloat(a.lng).toFixed(4), "_").concat(parseFloat(b.lat).toFixed(4), "_").concat(parseFloat(b.lng).toFixed(4));
   };
+  var _osrmCacheKey = function _osrmCacheKey(a, b) {
+    var fv = function(v){ return parseFloat(v).toFixed(5); };
+    return fv(parseFloat(a.lng))+','+fv(parseFloat(a.lat))+';'+fv(parseFloat(b.lng))+','+fv(parseFloat(b.lat));
+  };
   var getSegDist = function getSegDist(a, b) {
     var _segKm$_sk;
-    return !(a !== null && a !== void 0 && a.lat) || !(b !== null && b !== void 0 && b.lat) ? 0 : (_segKm$_sk = segKm[_sk(a, b)]) !== null && _segKm$_sk !== void 0 ? _segKm$_sk : parseFloat((distanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng)) * 1.2).toFixed(2));
+    if (!(a !== null && a !== void 0 && a.lat) || !(b !== null && b !== void 0 && b.lat)) return 0;
+    if ((_segKm$_sk = segKm[_sk(a, b)]) !== null && _segKm$_sk !== void 0) return _segKm$_sk;
+    var _cached = _osrmCache && _osrmCache[_osrmCacheKey(a, b)];
+    if (_cached !== undefined) return parseFloat(_cached.toFixed(2));
+    return parseFloat((distanceKm(parseFloat(a.lat), parseFloat(a.lng), parseFloat(b.lat), parseFloat(b.lng)) * 1.55).toFixed(2));
   };
   React.useEffect(function () {
     sorted.forEach(function (c, i) {
