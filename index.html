@@ -28783,7 +28783,9 @@ function CourierCheckinPanel(_ref186) {
     _ref186$pendingChecki = _ref186.pendingCheckins,
     pendingCheckins = _ref186$pendingChecki === void 0 ? [] : _ref186$pendingChecki,
     orders = _ref186.orders,
-    courierTasks = _ref186.courierTasks;
+    courierTasks = _ref186.courierTasks,
+    _ref186$preActKm = _ref186.precomputedActKm,
+    precomputedActKm = _ref186$preActKm === void 0 ? null : _ref186$preActKm;
   var _React$useState289 = React.useState(false),
     _React$useState290 = _slicedToArray(_React$useState289, 2),
     loading = _React$useState290[0],
@@ -28848,14 +28850,18 @@ function CourierCheckinPanel(_ref186) {
       });
     });
   }, [sorted.length]);
-  // Hitung actKm dari distance_km per order/task hari ini (metode sama dengan Summary)
-  var _actKm = 0;
+  // actKm: pakai precomputedActKm dari CourierJobTasks (sudah include semua tipe: order/task/branch/PO/SI)
+  // agar angka sama persis dengan Summary Perjalanan
   var jakartaToday = new Date(new Date().getTime() + 7*3600000).toISOString().slice(0,10);
   var _mToday = function(ts) { if (!ts) return false; var d = new Date(new Date(ts).getTime()+7*3600000).toISOString().slice(0,10); return d === jakartaToday; };
-  (orders || []).filter(function(o){ return o.courier_name === courierName && o.status === 'delivered' && _mToday(o.delivered_at); })
-    .forEach(function(o){ _actKm += o.distance_km || 0; });
-  (courierTasks || []).filter(function(t){ return t.assigned_courier === courierName && t.status === 'done' && _mToday(t.completed_at); })
-    .forEach(function(t){ _actKm += t.distance_km || 0; });
+  var _actKm = precomputedActKm !== null ? precomputedActKm : (function() {
+    var km = 0;
+    (orders || []).filter(function(o){ return o.courier_name === courierName && o.status === 'delivered' && _mToday(o.delivered_at); })
+      .forEach(function(o){ km += o.distance_km || 0; });
+    (courierTasks || []).filter(function(t){ return t.assigned_courier === courierName && t.status === 'done' && _mToday(t.completed_at); })
+      .forEach(function(t){ km += t.distance_km || 0; });
+    return km;
+  })();
   // Leg pulang: end_location order terakhir → check-in terakhir hari ini
   var _lastOrder = (orders || []).filter(function(o){ return o.courier_name===courierName && o.status==='delivered' && _mToday(o.delivered_at) && o.end_location && o.end_location.lat; })
     .sort(function(a,b){ return new Date(a.delivered_at)-new Date(b.delivered_at); }).slice(-1)[0];
@@ -34907,7 +34913,8 @@ function CourierJobTasks(_ref207) {
     onCheckin: onCheckin,
     pendingCheckins: pendingCheckins,
     orders: orders,
-    courierTasks: tasks
+    courierTasks: tasks,
+    precomputedActKm: todayKm
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       border: '1.5px solid #F0B429',
