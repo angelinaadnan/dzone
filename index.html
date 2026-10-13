@@ -24070,7 +24070,7 @@ function CourierSummary(_ref159) {
     };
     var fmtJam = function(ts) { return ts ? new Date(new Date(ts).getTime()+7*3600000).toISOString().slice(11,16) : '-'; };
     var mapsLink = function(lat,lng) { return (lat && lng) ? 'https://maps.google.com?q='+lat+','+lng : ''; };
-    // Build ordered stops: activities sorted by time
+    // Build ordered stops: semua tipe aktivitas sorted by time
     var stops = [];
     dayOrders.sort(function(a,b){ return new Date(a.delivered_at)-new Date(b.delivered_at); })
       .forEach(function(o){
@@ -24085,6 +24085,54 @@ function CourierSummary(_ref159) {
           toLat: t.end_location&&t.end_location.lat, toLng: t.end_location&&t.end_location.lng,
           fromLat: t.start_location&&t.start_location.lat, fromLng: t.start_location&&t.start_location.lng,
           km: t.distance_km||0 });
+      });
+    // Branch trips
+    (branchRequests||[]).forEach(function(r){
+      (r.trips||[]).filter(function(t){ return t.courier===courierName && t.status==='delivered' && mD(t.delivered_at); })
+        .forEach(function(t){
+          stops.push({ tipe:'Cabang', nama: r.branch_name||'', jam: t.delivered_at,
+            toLat: t.end_location&&t.end_location.lat, toLng: t.end_location&&t.end_location.lng,
+            fromLat: t.start_location&&t.start_location.lat, fromLng: t.start_location&&t.start_location.lng,
+            km: t.distance_km||0 });
+        });
+    });
+    // PO pickups
+    (purchaseOrders||[]).forEach(function(po){
+      (po.pickups||[]).filter(function(p){ return p.courier===courierName && p.status==='done' && mD(p.done_at); })
+        .forEach(function(p){
+          stops.push({ tipe:'Ambil PO', nama: po.supplier_name||'', jam: p.done_at,
+            toLat: p.end_location&&p.end_location.lat, toLng: p.end_location&&p.end_location.lng,
+            fromLat: p.start_location&&p.start_location.lat, fromLng: p.start_location&&p.start_location.lng,
+            km: p.distance_km||0 });
+        });
+    });
+    // Service intakes
+    si.filter(function(s){ return s.sc_delivery_courier===courierName && mD(s.sc_delivered_at); })
+      .forEach(function(s){
+        stops.push({ tipe:'Servisan Antar SC', nama: s.customer_name||'', jam: s.sc_delivered_at,
+          toLat: s.sc_end_location&&s.sc_end_location.lat, toLng: s.sc_end_location&&s.sc_end_location.lng,
+          fromLat: s.sc_start_location&&s.sc_start_location.lat, fromLng: s.sc_start_location&&s.sc_start_location.lng,
+          km: s.sc_distance_km||0 });
+      });
+    si.filter(function(s){ return s.sc_pickup_courier===courierName && mD(s.sc_picked_up_at); })
+      .forEach(function(s){
+        stops.push({ tipe:'Ambil dari SC', nama: s.customer_name||'', jam: s.sc_picked_up_at,
+          toLat: s.sc_end_location&&s.sc_end_location.lat, toLng: s.sc_end_location&&s.sc_end_location.lng,
+          fromLat: s.sc_start_location&&s.sc_start_location.lat, fromLng: s.sc_start_location&&s.sc_start_location.lng,
+          km: s.scp_distance_km||0 });
+      });
+    si.filter(function(s){ return s.assigned_courier===courierName && s.return_status==='returned' && mD(s.returned_at); })
+      .forEach(function(s){
+        stops.push({ tipe:'Servisan Balik', nama: s.customer_name||'', jam: s.returned_at,
+          toLat: s.return_end_location&&s.return_end_location.lat, toLng: s.return_end_location&&s.return_end_location.lng,
+          fromLat: s.return_start_location&&s.return_start_location.lat, fromLng: s.return_start_location&&s.return_start_location.lng,
+          km: s.return_distance_km||0 });
+      });
+    si.filter(function(s){ return s.courier_name===courierName && s.courier_picked_up && mD(s.courier_picked_up_at); })
+      .forEach(function(s){
+        stops.push({ tipe:'Jemput Servisan', nama: s.customer_name||'', jam: s.courier_picked_up_at,
+          toLat: null, toLng: null, fromLat: null, fromLng: null,
+          km: s.pickup_distance_km||0 });
       });
     stops.sort(function(a,b){ return new Date(a.jam)-new Date(b.jam); });
     var rows = [];
