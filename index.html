@@ -24135,36 +24135,36 @@ function CourierSummary(_ref159) {
           km: s.pickup_distance_km||0 });
       });
     stops.sort(function(a,b){ return new Date(a.jam)-new Date(b.jam); });
+    if (keyCheckins.length < 2) { alert('Belum ada data GPS hari ini'); return; }
     var rows = [];
-    var _dusitLat = keyCheckins.length>0 ? keyCheckins[0].lat : null;
-    var _dusitLng = keyCheckins.length>0 ? keyCheckins[0].lng : null;
-    var _dusitLink = mapsLink(_dusitLat, _dusitLng);
-    // Hub-and-spoke: tiap stop = berangkat (Dusit→stop) + pulang (stop→Dusit)
-    stops.forEach(function(s) {
-      var _km = parseFloat((s.km||0).toFixed(2));
-      var _stopLink = mapsLink(s.toLat, s.toLng);
-      // Berangkat: Dusit → tujuan
+    // GPS-based legs: tiap consecutive check-in pair = 1 leg nyata
+    for (var _gi = 1; _gi < keyCheckins.length; _gi++) {
+      var _gPrev = keyCheckins[_gi - 1];
+      var _gCurr = keyCheckins[_gi];
+      var _gKm = parseFloat(getGpsSegDist(_gPrev, _gCurr).toFixed(2));
+      // Cari aktivitas yang waktunya paling dekat dengan check-in ini (max 8 menit)
+      var _gCurrMs = new Date(_gCurr.created_at).getTime();
+      var _gMatch = null;
+      stops.forEach(function(s) {
+        if (!s.jam) return;
+        var _diff = Math.abs(new Date(s.jam).getTime() - _gCurrMs);
+        if (_diff < 8 * 60 * 1000 && (!_gMatch || _diff < Math.abs(new Date(_gMatch.jam).getTime() - _gCurrMs))) {
+          _gMatch = s;
+        }
+      });
+      var _toName = _gMatch ? _gMatch.nama : (cleanNote(_gCurr.note) || 'Titik GPS');
+      var _fromName = cleanNote(_gPrev.note) || 'Kantor';
       rows.push({
         'Tgl': selDate, 'Kurir': courierName,
-        'Dari': 'Kantor (Dusit)', 'Link Dari': _dusitLink,
-        'Ke': _xls(s.nama), 'Link Tujuan': _stopLink,
-        'KM': _km, 'Arah': 'Berangkat',
-        'Tipe': s.tipe, 'Jam': fmtJam(s.jam)
+        'Dari': _xls(_fromName), 'Link Dari': mapsLink(_gPrev.lat, _gPrev.lng),
+        'Ke': _xls(_toName), 'Link Tujuan': mapsLink(_gCurr.lat, _gCurr.lng),
+        'KM': _gKm,
+        'Tipe': _gMatch ? _gMatch.tipe : 'GPS',
+        'Jam': fmtJam(_gCurr.created_at)
       });
-      // Pulang: tujuan → Dusit (km sama — estimasi simetris)
-      rows.push({
-        'Tgl': selDate, 'Kurir': courierName,
-        'Dari': _xls(s.nama), 'Link Dari': _stopLink,
-        'Ke': 'Kantor (Dusit)', 'Link Tujuan': _dusitLink,
-        'KM': _km, 'Arah': 'Pulang',
-        'Tipe': s.tipe, 'Jam': ''
-      });
-    });
-    var _sumOneWay = stops.reduce(function(s,r){ return s+(r.km||0); },0);
-    var _sumTotal = _sumOneWay * 2;
-    rows.push({ 'Tgl':'','Kurir':'','Dari':'','Link Dari':'','Ke':'Total KM (PP)','Link Tujuan':'','KM':parseFloat(_sumTotal.toFixed(2)),'Arah':'','Tipe':'','Jam':'' });
-    rows.push({ 'Tgl':'','Kurir':'','Dari':'','Link Dari':'','Ke':'Total KM (1 Arah)','Link Tujuan':'','KM':parseFloat(_sumOneWay.toFixed(2)),'Arah':'','Tipe':'','Jam':'' });
-    if (stops.length === 0) { alert('Belum ada data pengiriman hari ini'); return; }
+    }
+    var _sumGps = rows.reduce(function(s,r){ return s+(r['KM']||0); },0);
+    rows.push({ 'Tgl':'','Kurir':'','Dari':'','Link Dari':'','Ke':'TOTAL KM','Link Tujuan':'','KM':parseFloat(_sumGps.toFixed(2)),'Tipe':'','Jam':'' });
     try {
       var ws = XLSX.utils.json_to_sheet(rows);
       var wb = XLSX.utils.book_new();
