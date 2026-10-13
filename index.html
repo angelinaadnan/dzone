@@ -23973,7 +23973,7 @@ function CourierSummary(_ref159) {
     return o.courier_name === courierName && mD(o.delivered_at || o.updated_at) && o.status === 'delivered';
   });
   var dayTasks = (courierTasks || []).filter(function (t) {
-    return t.assigned_courier === courierName && t.status === 'done' && mD(t.completed_at || t.updated_at);
+    return t.assigned_courier === courierName && (t.status === 'done' || (t.status === 'in_service' && t.distance_km)) && mD(t.completed_at || t.updated_at);
   });
   React.useEffect(function () {
     keyCheckins.forEach(function (c, i) {
@@ -32671,10 +32671,15 @@ function WalkInServiceModal(_ref199) {
             case 7:
               savedIntake = _context80.sent;
               _context80.next = 10;
+              var _siPickupKm = (task.start_location && task.arrived_location)
+                ? parseFloat((distanceKm(parseFloat(task.start_location.lat), parseFloat(task.start_location.lng), parseFloat(task.arrived_location.lat), parseFloat(task.arrived_location.lng)) * 1.55).toFixed(2))
+                : 0;
               return onUpdateTask(task.id, {
                 status: 'in_service',
                 linked_intake_id: (savedIntake === null || savedIntake === void 0 ? void 0 : savedIntake.id) || null,
-                completion_note: "\uD83D\uDD27 Form tanda terima dibuat (".concat(data.customer_name, ") \u2014 menunggu service selesai")
+                completion_note: "\uD83D\uDD27 Form tanda terima dibuat (".concat(data.customer_name, ") \u2014 menunggu service selesai"),
+                distance_km: _siPickupKm || null,
+                completed_at: (task.arrived_location && task.arrived_location.time) ? task.arrived_location.time : new Date().toISOString()
               });
             case 10:
               onClose();
@@ -34783,6 +34788,10 @@ function CourierJobTasks(_ref207) {
   doneTasks.forEach(function (t) {
     return todayKm += t.distance_km || 0;
   });
+  // Urus Servisan in_service: barang sudah diambil kurir, completed_at ter-set saat form tanda terima dibuat
+  (myTasks || []).filter(function(t) {
+    return t.status === 'in_service' && t.distance_km && (t.completed_at || '').startsWith(today);
+  }).forEach(function(t) { todayKm += t.distance_km || 0; });
   (orders || []).filter(function (o) {
     return o.courier_name === courierName && o.status === 'delivered' && (o.delivered_at || '').startsWith(today);
   }).forEach(function (o) {
