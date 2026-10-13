@@ -24044,7 +24044,8 @@ function CourierSummary(_ref159) {
       : parseFloat((distanceKm(lastEvent.lat, lastEvent.lng, parseFloat(lastCheckin.lat), parseFloat(lastCheckin.lng)) * 1.55).toFixed(2));
   }
   var routeKm = actKm > 0 ? parseFloat((actKm + returnLegKm).toFixed(1)) : 0;
-  var totalKm = parseFloat((routeKm > 0 ? routeKm : gpsKm).toFixed(1));
+  // Prioritaskan GPS chain (sama dengan GPS box & Excel), fallback ke actKm+return
+  var totalKm = parseFloat((gpsKm > 0 ? gpsKm : routeKm).toFixed(1));
   var bbmEst = Math.round(totalKm * FUEL);
   var firstTime = timeline.length > 0 ? fmtTime(timeline[0]._time) : null;
   var lastTime = timeline.length > 1 ? fmtTime(timeline[timeline.length - 1]._time) : null;
@@ -28919,10 +28920,10 @@ function CourierCheckinPanel(_ref186) {
   }
   var _gpsChainKm = 0;
   for (var i = 1; i < sorted.length; i++) _gpsChainKm += getSegDist(sorted[i - 1], sorted[i]);
-  // Pakai actKm+retKm kalau ada data delivery, fallback ke GPS chain
-  var totalKm = _actKm > 0
-    ? parseFloat((_actKm + _retKm).toFixed(1))
-    : parseFloat(_gpsChainKm.toFixed(1));
+  // Prioritaskan GPS chain (sama dengan Summary Perjalanan & Excel), fallback actKm kalau GPS belum ada
+  var totalKm = _gpsChainKm > 0
+    ? parseFloat(_gpsChainKm.toFixed(1))
+    : parseFloat(_actKm.toFixed(1));
 
   // Cek permission GPS sekali saat mount
   React.useEffect(function () {
