@@ -3622,6 +3622,10 @@ function App() {
             return loadAttendance();
           case 22:
             showToast('✅ Absensi tersimpan!');
+            // Auto GPS check-in di base untuk kurir saat absen masuk — supaya leg pertama (Dusit→tujuan) tercatat di GPS chain
+            if (role === 'courier' && data && data.check_in_lat && data.check_in_lng) {
+              saveCheckin({ courier_name: data.user_name, lat: data.check_in_lat, lng: data.check_in_lng, note: 'Mulai kerja' });
+            }
             return _context32.abrupt("return", data);
           case 24:
           case "end":
@@ -23989,6 +23993,21 @@ function CourierSummary(_ref159) {
   }, [selDate, keyCheckins.length]);
   var gpsKm = 0;
   for (var i = 1; i < keyCheckins.length; i++) gpsKm += getGpsSegDist(keyCheckins[i - 1], keyCheckins[i]);
+  // Safety-net: kalau check-in pertama ada di lokasi pengiriman (bukan base/Dusit),
+  // leg berangkat dari Dusit hilang dari GPS chain → tambahkan km stored aktivitas pertama
+  if (keyCheckins.length > 0) {
+    var _ck0Ms = new Date(keyCheckins[0].created_at).getTime();
+    var _ck0Match = null;
+    dayOrders.filter(function(o){ return o.delivered_at; }).forEach(function(o){
+      var d = Math.abs(new Date(o.delivered_at).getTime() - _ck0Ms);
+      if (d < 8*60*1000 && (!_ck0Match || d < Math.abs(new Date(_ck0Match.jam).getTime()-_ck0Ms))) _ck0Match = {jam:o.delivered_at, km:o.distance_km||0};
+    });
+    dayTasks.filter(function(t){ return t.completed_at; }).forEach(function(t){
+      var d = Math.abs(new Date(t.completed_at).getTime() - _ck0Ms);
+      if (d < 8*60*1000 && (!_ck0Match || d < Math.abs(new Date(_ck0Match.jam).getTime()-_ck0Ms))) _ck0Match = {jam:t.completed_at, km:t.distance_km||0};
+    });
+    if (_ck0Match && _ck0Match.km > 0) gpsKm += _ck0Match.km;
+  }
   var actKm = 0;
   dayTasks.forEach(function (t) {
     return actKm += t.distance_km || 0;
@@ -24137,13 +24156,35 @@ function CourierSummary(_ref159) {
       });
     stops.sort(function(a,b){ return new Date(a.jam)-new Date(b.jam); });
     if (keyCheckins.length < 2) { alert('Belum ada data GPS hari ini'); return; }
+    // Helper: cari stop yang waktunya paling dekat dengan check-in (max 8 menit)
+    var _matchStopAt = function(ck) {
+      var ckMs = new Date(ck.created_at).getTime();
+      var m = null;
+      stops.forEach(function(s) {
+        if (!s.jam) return;
+        var d = Math.abs(new Date(s.jam).getTime()-ckMs);
+        if (d < 8*60*1000 && (!m || d < Math.abs(new Date(m.jam).getTime()-ckMs))) m = s;
+      });
+      return m;
+    };
     var rows = [];
+    // Safety-net: kalau check-in pertama di lokasi pengiriman (bukan base), tambahkan leg berangkat dari base
+    var _xFirstCkStop = _matchStopAt(keyCheckins[0]);
+    if (_xFirstCkStop && _xFirstCkStop.km > 0) {
+      rows.push({
+        'Tgl': selDate, 'Kurir': courierName,
+        'Dari': 'Kantor (Dusit)', 'Link Dari': '',
+        'Ke': _xls(_xFirstCkStop.nama), 'Link Tujuan': mapsLink(_xFirstCkStop.toLat, _xFirstCkStop.toLng),
+        'KM': parseFloat(_xFirstCkStop.km.toFixed(2)),
+        'Tipe': _xFirstCkStop.tipe, 'Jam': fmtJam(_xFirstCkStop.jam)
+      });
+    }
     // GPS-based legs: tiap consecutive check-in pair = 1 leg nyata
     for (var _gi = 1; _gi < keyCheckins.length; _gi++) {
       var _gPrev = keyCheckins[_gi - 1];
       var _gCurr = keyCheckins[_gi];
       var _gKm = parseFloat(getGpsSegDist(_gPrev, _gCurr).toFixed(2));
-      // Cari aktivitas yang waktunya paling dekat dengan check-in ini (max 8 menit)
+      if (_gKm < 0.1) continue; // skip check-in duplikat di lokasi sama
       var _gCurrMs = new Date(_gCurr.created_at).getTime();
       var _gMatch = null;
       stops.forEach(function(s) {
@@ -24154,7 +24195,9 @@ function CourierSummary(_ref159) {
         }
       });
       var _toName = _gMatch ? _gMatch.nama : (cleanNote(_gCurr.note) || 'Titik GPS');
-      var _fromName = cleanNote(_gPrev.note) || 'Kantor';
+      // "Dari": pakai nama stop kalau _gPrev ada di lokasi pengiriman, kalau tidak fallback ke note/Kantor
+      var _prevStop = _matchStopAt(_gPrev);
+      var _fromName = _prevStop ? _prevStop.nama : (cleanNote(_gPrev.note) || 'Kantor (Dusit)');
       rows.push({
         'Tgl': selDate, 'Kurir': courierName,
         'Dari': _xls(_fromName), 'Link Dari': mapsLink(_gPrev.lat, _gPrev.lng),
@@ -28920,6 +28963,20 @@ function CourierCheckinPanel(_ref186) {
   }
   var _gpsChainKm = 0;
   for (var i = 1; i < sorted.length; i++) _gpsChainKm += getSegDist(sorted[i - 1], sorted[i]);
+  // Safety-net: kalau check-in pertama ada di lokasi pengiriman, leg berangkat dari base hilang → tambah km stored
+  if (sorted.length > 0) {
+    var _s0Ms = new Date(sorted[0].created_at).getTime();
+    var _s0Match = null;
+    (orders||[]).filter(function(o){ return o.courier_name===courierName && o.status==='delivered' && o.delivered_at; }).forEach(function(o){
+      var d = Math.abs(new Date(o.delivered_at).getTime()-_s0Ms);
+      if (d<8*60*1000 && (!_s0Match || d<Math.abs(new Date(_s0Match.jam).getTime()-_s0Ms))) _s0Match={jam:o.delivered_at,km:o.distance_km||0};
+    });
+    (courierTasks||[]).filter(function(t){ return t.assigned_courier===courierName && t.status==='done' && t.completed_at; }).forEach(function(t){
+      var d = Math.abs(new Date(t.completed_at).getTime()-_s0Ms);
+      if (d<8*60*1000 && (!_s0Match || d<Math.abs(new Date(_s0Match.jam).getTime()-_s0Ms))) _s0Match={jam:t.completed_at,km:t.distance_km||0};
+    });
+    if (_s0Match && _s0Match.km > 0) _gpsChainKm += _s0Match.km;
+  }
   // Prioritaskan GPS chain (sama dengan Summary Perjalanan & Excel), fallback actKm kalau GPS belum ada
   var totalKm = _gpsChainKm > 0
     ? parseFloat(_gpsChainKm.toFixed(1))
