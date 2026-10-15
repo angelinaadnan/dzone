@@ -23785,9 +23785,9 @@ function CourierSummary(_ref159) {
     });
   });
 
-  // Courier tasks done on this date
+  // Courier tasks done on this date (in_service = kurir sudah pickup, tugas kurir selesai)
   (courierTasks || []).filter(function (t) {
-    return t.assigned_courier === courierName && t.status === 'done' && mD(t.completed_at || t.updated_at);
+    return t.assigned_courier === courierName && (t.status === 'done' || (t.status === 'in_service' && t.distance_km)) && mD(t.completed_at || t.updated_at);
   }).forEach(function (t) {
     var loc = t.end_location || t.arrived_location;
     var dest = t.destination || '';
@@ -34430,7 +34430,7 @@ function CourierJobTasks(_ref207) {
     return ['assigned', 'on_the_way', 'arrived', 'returning'].includes(t.status);
   });
   var doneTasks = myTasks.filter(function (t) {
-    return t.status === 'done';
+    return t.status === 'done' || t.status === 'in_service';
   });
 
   // ── Kurir atur urutan SEMUA tugas sendiri (unified) ──
