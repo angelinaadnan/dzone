@@ -1435,24 +1435,21 @@ function KpiTeknisiPage(props) {
 
   function getTechStats(name) {
     var items = techItems.filter(function(si) { return si.tech_assigned === name; });
-    var todayT = items.filter(function(si) { return new Date(assignDate(si)) >= todayStart; });
     var monthT = items.filter(function(si) { return new Date(assignDate(si)) >= monthStart; });
     var open   = items.filter(function(si) { return TECH_ACTIVE.includes(si.status); });
     return {
       name: name,
-      todayDone: todayT.filter(function(si) { return TECH_DONE.includes(si.status); }).length,
-      todayTotal: todayT.length,
       monthDone: monthT.filter(function(si) { return TECH_DONE.includes(si.status); }).length,
       monthTotal: monthT.length,
       open: open
     };
   }
 
-  var allStats = techNames.map(getTechStats);
+  var allStats = techNames.map(getTechStats).filter(function(s) { return s.monthTotal > 0 || s.open.length > 0; });
   var allOpen  = techItems.filter(function(si) { return TECH_ACTIVE.includes(si.status); })
     .sort(function(a,b) { return new Date(a.created_at) - new Date(b.created_at); });
-  var totalTD = 0, totalTT = 0, totalMD = 0, totalMT = 0;
-  allStats.forEach(function(s) { totalTD+=s.todayDone; totalTT+=s.todayTotal; totalMD+=s.monthDone; totalMT+=s.monthTotal; });
+  var totalMD = 0, totalMT = 0;
+  allStats.forEach(function(s) { totalMD+=s.monthDone; totalMT+=s.monthTotal; });
 
   var thS = {padding:'8px 10px', textAlign:'left', fontWeight:600, fontSize:12, color:'var(--text2)', whiteSpace:'nowrap'};
   var tdS = {padding:'8px 10px', fontSize:13};
@@ -1466,7 +1463,7 @@ function KpiTeknisiPage(props) {
   }
 
   var isSupervisor = role !== 'technician';
-  var myStats = allStats[0] || {todayDone:0,todayTotal:0,monthDone:0,monthTotal:0,open:[]};
+  var myStats = allStats[0] || {monthDone:0,monthTotal:0,open:[]};
 
   return React.createElement('div', {style:{padding:24, maxWidth:1000}},
     React.createElement('div', {style:{marginBottom:20, borderBottom:'1px solid var(--border)', paddingBottom:12}},
@@ -1477,10 +1474,10 @@ function KpiTeknisiPage(props) {
     // Score tiles
     React.createElement('div', {style:{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(170px,1fr))', gap:12, marginBottom:24}},
       scoreTile(
-        (isSupervisor ? totalTD : myStats.todayDone) + '/' + (isSupervisor ? totalTT : myStats.todayTotal),
-        'Hari ini selesai',
-        'tugas masuk hari ini',
-        'var(--accent2)'
+        String(isSupervisor ? allOpen.length : myStats.open.length),
+        'Aktif sekarang',
+        'sedang dikerjakan teknisi',
+        allOpen.length === 0 ? 'var(--green)' : 'var(--accent2)'
       ),
       scoreTile(
         (isSupervisor ? totalMD : myStats.monthDone) + '/' + (isSupervisor ? totalMT : myStats.monthTotal),
@@ -1503,21 +1500,20 @@ function KpiTeknisiPage(props) {
           React.createElement('thead', null,
             React.createElement('tr', {style:{background:'var(--bg2)', borderBottom:'1px solid var(--border)'}},
               React.createElement('th', {style:thS}, 'Teknisi'),
-              React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, 'Hari ini'),
+              React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, 'Aktif'),
               React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, 'Bulan ini'),
               React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, 'Masih open')
             )
           ),
           React.createElement('tbody', null,
             allStats.map(function(s) {
-              var tOk = s.todayTotal > 0 && s.todayDone === s.todayTotal;
               var mOk = s.monthTotal > 0 && s.monthDone === s.monthTotal;
               return React.createElement('tr', {key:s.name, style:{borderBottom:'1px solid var(--border)'}},
                 React.createElement('td', {style:Object.assign({},tdS,{fontWeight:600})}, s.name),
                 React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})},
-                  React.createElement('span', {style:{fontWeight:700, color:tOk?'var(--green)':s.todayDone>0?'var(--amber)':'var(--text)'}},
-                    s.todayDone + '/' + s.todayTotal),
-                  React.createElement('span', {style:{fontSize:11, color:'var(--text3)', marginLeft:4}}, 'selesai')
+                  React.createElement('span', {style:{fontWeight:700, color:s.open.length>0?'var(--amber)':'var(--green)'}},
+                    s.open.length),
+                  React.createElement('span', {style:{fontSize:11, color:'var(--text3)', marginLeft:4}}, 'tugas')
                 ),
                 React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})},
                   React.createElement('span', {style:{fontWeight:700, color:mOk?'var(--green)':s.monthDone>0?'var(--amber)':'var(--text)'}},
