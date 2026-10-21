@@ -26424,20 +26424,8 @@ function TechnicianSummary(_ref165) {
   }, "Total"), /*#__PURE__*/React.createElement("div", {
     className: "stat-num"
   }, totalAll))),
-  // Tab bar
-  React.createElement('div', {style:{display:'flex', gap:4, marginBottom:16, borderBottom:'1px solid var(--border)', paddingBottom:0}},
-    ['ringkasan','riwayat'].map(function(t) {
-      var labels = {ringkasan:'\uD83D\uDCCA Ringkasan', riwayat:'\uD83D\uDCCB Riwayat'};
-      var active = ringkasanTab === t;
-      return React.createElement('button', {key:t, onClick:function(){setRingkasanTab(t);},
-        style:{padding:'8px 16px', fontSize:13, fontWeight:active?700:500, border:'none', background:'none',
-          borderBottom: active ? '2px solid var(--accent2)' : '2px solid transparent',
-          color: active ? 'var(--accent2)' : 'var(--text2)', cursor:'pointer', marginBottom:-1}},
-        labels[t]);
-    })
-  ),
-  // Ringkasan tab
-  ringkasanTab === 'ringkasan' && siOther.length > 0 && React.createElement('div', {style:{marginBottom:16}},
+  // Perlu Perhatian section
+  siOther.length > 0 && React.createElement('div', {style:{marginBottom:16}},
     React.createElement('div', {style:{fontSize:11, fontWeight:700, color:'var(--amber)', letterSpacing:'0.07em', marginBottom:8}},
       '\u26A0 PERLU PERHATIAN (' + siOther.length + ')'),
     siOther.map(function(si) {
@@ -26462,11 +26450,11 @@ function TechnicianSummary(_ref165) {
       );
     })
   ),
-  ringkasanTab === 'ringkasan' && siOther.length === 0 && siActive.length === 0 &&
-    React.createElement('div', {style:{textAlign:'center', padding:'24px 0', color:'var(--text3)', fontSize:13}},
+  siOther.length === 0 && siActive.length === 0 &&
+    React.createElement('div', {style:{textAlign:'center', padding:'16px 0', color:'var(--text3)', fontSize:13}},
       '\u2705 Semua beres, tidak ada item menggantung'),
-  // Riwayat tab
-  ringkasanTab === 'riwayat' && mySI.length > 0 && /*#__PURE__*/React.createElement("div", {
+  // Riwayat (selalu tampil di bawah)
+  mySI.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: 14
@@ -26485,7 +26473,7 @@ function TechnicianSummary(_ref165) {
       techName: techName,
       onUpdateSI: onUpdateSI
     });
-  })), ringkasanTab === 'riwayat' && myJobs.length > 0 && /*#__PURE__*/React.createElement("div", {
+  })), myJobs.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: 14
