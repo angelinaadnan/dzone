@@ -26271,12 +26271,12 @@ function TechnicianSummary(_ref165) {
   var siActive = mySI.filter(function (si) {
     return ['to_technician', 'post_sc_checking'].includes(si.status);
   });
+  var SI_DONE_ST = ['done','returned','branch_done','branch_returned','batal_dikembalikan','sc_batal','batal_servis'];
   var siDone = mySI.filter(function (si) {
-    return !['to_technician', 'post_sc_checking'].includes(si.status);
+    return SI_DONE_ST.includes(si.status);
   });
   var siOther = mySI.filter(function(si) {
-    var std = ['done','returned','branch_done','branch_returned','to_technician','post_sc_checking'];
-    return !std.includes(si.status);
+    return !SI_DONE_ST.includes(si.status) && !['to_technician','post_sc_checking'].includes(si.status);
   });
 
   // Tugas dari cabang
@@ -26438,9 +26438,9 @@ function TechnicianSummary(_ref165) {
     className: "stat-num"
   }, totalAll))),
   // Perlu Perhatian section
-  !riwayatOnly && siOther.length > 0 && React.createElement('div', {style:{marginBottom:16}},
+  !riwayatOnly && (siOther.length > 0 || branchTechActive.length > 0) && React.createElement('div', {style:{marginBottom:16}},
     React.createElement('div', {style:{fontSize:11, fontWeight:700, color:'var(--amber)', letterSpacing:'0.07em', marginBottom:8}},
-      '\u26A0 PERLU PERHATIAN (' + siOther.length + ')'),
+      '\u26A0 PERLU PERHATIAN (' + (siOther.length + branchTechActive.length) + ')'),
     siOther.map(function(si) {
       var statusLbl = {batal_dikembalikan:'Batal Dikembalikan', sc_batal:'SC Batal', batal_servis:'Batal Servis',
         to_service_center:'Ke SC', at_service_center:'Di SC', sc_pickup_assigned:'Jemput SC',
@@ -26461,9 +26461,24 @@ function TechnicianSummary(_ref165) {
             color: isBatal ? 'var(--red)' : 'var(--amber)'}}, lbl)
         )
       );
+    }),
+    branchTechActive.map(function(t, i) {
+      var r = t._req;
+      return React.createElement('div', {key: t.id || i, style:{padding:'10px 12px', borderRadius:8, marginBottom:6,
+        background:'var(--bg2)', border:'1px solid var(--border)'}},
+        React.createElement('div', {style:{display:'flex', justifyContent:'space-between', alignItems:'center', gap:8}},
+          React.createElement('div', {style:{flex:1, minWidth:0}},
+            React.createElement('div', {style:{fontWeight:600, fontSize:13}}, r && r.branch_name ? r.branch_name : 'Tugas Cabang'),
+            React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}},
+              (r && r.items || []).map(function(it){ return it.name || it; }).join(', ') || '\u2014')
+          ),
+          React.createElement('span', {style:{fontSize:11, padding:'2px 8px', borderRadius:10, flexShrink:0,
+            background:'rgba(245,158,11,0.12)', color:'var(--amber)'}}, 'Cabang')
+        )
+      );
     })
   ),
-  !riwayatOnly && siOther.length === 0 && siActive.length === 0 &&
+  !riwayatOnly && siOther.length === 0 && branchTechActive.length === 0 && siActive.length === 0 &&
     React.createElement('div', {style:{textAlign:'center', padding:'16px 0', color:'var(--text3)', fontSize:13}},
       '\u2705 Semua beres, tidak ada item menggantung'),
   // Riwayat \u2014 hanya tampil jika riwayatOnly mode
