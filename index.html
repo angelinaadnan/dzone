@@ -1448,7 +1448,12 @@ function KpiTeknisiPage(props) {
     var todayDone = items.filter(function(si) { return TECH_DONE.includes(si.status) && si.done_at && new Date(si.done_at) >= todayStart; });
     var monthT = items.filter(function(si) { return new Date(assignDate(si)) >= monthStart; });
     var open   = items.filter(function(si) { return TECH_ACTIVE.includes(si.status); });
-    var todayTotal = todayDone.length + open.length;
+    var todayOpen = open.filter(function(si) {
+      if (si.tech_assigned_at && new Date(si.tech_assigned_at) >= todayStart) return true;
+      if (si.updated_at && new Date(si.updated_at) >= todayStart) return true;
+      return false;
+    });
+    var todayTotal = todayDone.length + todayOpen.length;
     return {
       name: name,
       todayDone: todayDone.length,
@@ -26257,11 +26262,15 @@ function TechnicianSummary(_ref165) {
   var myJobs = orders.filter(function (o) {
     return o.tech_name === techName || (o.extra_techs || []).includes(techName);
   });
+  var JOB_DONE_ST = ['tech_done','on_delivery','delivered','completed','done'];
   var jobsDone = myJobs.filter(function (o) {
-    return ['tech_done', 'on_delivery', 'delivered'].includes(o.status);
+    return JOB_DONE_ST.includes(o.status);
   });
   var jobsActive = myJobs.filter(function (o) {
     return o.status === 'tech';
+  });
+  var jobsOther = myJobs.filter(function (o) {
+    return !JOB_DONE_ST.includes(o.status) && o.status !== 'tech';
   });
 
   // Servisan
@@ -26438,9 +26447,9 @@ function TechnicianSummary(_ref165) {
     className: "stat-num"
   }, totalAll))),
   // Perlu Perhatian section
-  !riwayatOnly && (siOther.length > 0 || branchTechActive.length > 0) && React.createElement('div', {style:{marginBottom:16}},
+  !riwayatOnly && (siOther.length > 0 || branchTechActive.length > 0 || jobsOther.length > 0) && React.createElement('div', {style:{marginBottom:16}},
     React.createElement('div', {style:{fontSize:11, fontWeight:700, color:'var(--amber)', letterSpacing:'0.07em', marginBottom:8}},
-      '\u26A0 PERLU PERHATIAN (' + (siOther.length + branchTechActive.length) + ')'),
+      '\u26A0 PERLU PERHATIAN (' + (siOther.length + branchTechActive.length + jobsOther.length) + ')'),
     siOther.map(function(si) {
       var statusLbl = {batal_dikembalikan:'Batal Dikembalikan', sc_batal:'SC Batal', batal_servis:'Batal Servis',
         to_service_center:'Ke SC', at_service_center:'Di SC', sc_pickup_assigned:'Jemput SC',
@@ -26476,9 +26485,23 @@ function TechnicianSummary(_ref165) {
             background:'rgba(245,158,11,0.12)', color:'var(--amber)'}}, 'Cabang')
         )
       );
+    }),
+    jobsOther.map(function(o) {
+      return React.createElement('div', {key: o.id, style:{padding:'10px 12px', borderRadius:8, marginBottom:6,
+        background:'var(--bg2)', border:'1px solid var(--border)'}},
+        React.createElement('div', {style:{display:'flex', justifyContent:'space-between', alignItems:'center', gap:8}},
+          React.createElement('div', {style:{flex:1, minWidth:0}},
+            React.createElement('div', {style:{fontWeight:600, fontSize:13}}, o.customer_name || '\u2014'),
+            React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}},
+              (o.goods||[]).map(function(g){return g.name;}).join(', ') || '\u2014')
+          ),
+          React.createElement('span', {style:{fontSize:11, padding:'2px 8px', borderRadius:10, flexShrink:0,
+            background:'rgba(245,158,11,0.12)', color:'var(--amber)'}}, STATUS_LABELS[o.status] || o.status)
+        )
+      );
     })
   ),
-  !riwayatOnly && siOther.length === 0 && branchTechActive.length === 0 && siActive.length === 0 &&
+  !riwayatOnly && siOther.length === 0 && branchTechActive.length === 0 && jobsOther.length === 0 && siActive.length === 0 &&
     React.createElement('div', {style:{textAlign:'center', padding:'16px 0', color:'var(--text3)', fontSize:13}},
       '\u2705 Semua beres, tidak ada item menggantung'),
   // Riwayat \u2014 hanya tampil jika riwayatOnly mode
