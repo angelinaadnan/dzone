@@ -26259,7 +26259,7 @@ function TechnicianSummary(_ref165) {
     return ['to_technician', 'post_sc_checking'].includes(si.status);
   });
   var siDone = mySI.filter(function (si) {
-    return ['done','returned','branch_done','branch_returned'].includes(si.status);
+    return !['to_technician', 'post_sc_checking'].includes(si.status);
   });
 
   // Tugas dari cabang
