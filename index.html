@@ -26261,6 +26261,10 @@ function TechnicianSummary(_ref165) {
   var siDone = mySI.filter(function (si) {
     return !['to_technician', 'post_sc_checking'].includes(si.status);
   });
+  var siOther = mySI.filter(function(si) {
+    var std = ['done','returned','branch_done','branch_returned','to_technician','post_sc_checking'];
+    return !std.includes(si.status);
+  });
 
   // Tugas dari cabang
   var branchTechAll = (branchRequests || []).flatMap(function (r) {
@@ -26286,6 +26290,10 @@ function TechnicianSummary(_ref165) {
     _React$useState244 = _slicedToArray(_React$useState243, 2),
     editComp = _React$useState244[0],
     setEditComp = _React$useState244[1];
+  var _React$useState245 = React.useState('ringkasan'),
+    _React$useState246 = _slicedToArray(_React$useState245, 2),
+    ringkasanTab = _React$useState246[0],
+    setRingkasanTab = _React$useState246[1];
   var startEdit = function startEdit(id, comp) {
     setEditingId(id);
     setEditComp({
@@ -26415,7 +26423,50 @@ function TechnicianSummary(_ref165) {
     }
   }, "Total"), /*#__PURE__*/React.createElement("div", {
     className: "stat-num"
-  }, totalAll))), mySI.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, totalAll))),
+  // Tab bar
+  React.createElement('div', {style:{display:'flex', gap:4, marginBottom:16, borderBottom:'1px solid var(--border)', paddingBottom:0}},
+    ['ringkasan','riwayat'].map(function(t) {
+      var labels = {ringkasan:'\uD83D\uDCCA Ringkasan', riwayat:'\uD83D\uDCCB Riwayat'};
+      var active = ringkasanTab === t;
+      return React.createElement('button', {key:t, onClick:function(){setRingkasanTab(t);},
+        style:{padding:'8px 16px', fontSize:13, fontWeight:active?700:500, border:'none', background:'none',
+          borderBottom: active ? '2px solid var(--accent2)' : '2px solid transparent',
+          color: active ? 'var(--accent2)' : 'var(--text2)', cursor:'pointer', marginBottom:-1}},
+        labels[t]);
+    })
+  ),
+  // Ringkasan tab
+  ringkasanTab === 'ringkasan' && siOther.length > 0 && React.createElement('div', {style:{marginBottom:16}},
+    React.createElement('div', {style:{fontSize:11, fontWeight:700, color:'var(--amber)', letterSpacing:'0.07em', marginBottom:8}},
+      '\u26A0 PERLU PERHATIAN (' + siOther.length + ')'),
+    siOther.map(function(si) {
+      var statusLbl = {batal_dikembalikan:'Batal Dikembalikan', sc_batal:'SC Batal', batal_servis:'Batal Servis',
+        to_service_center:'Ke SC', at_service_center:'Di SC', sc_pickup_assigned:'Jemput SC',
+        sc_ekspedisi_waiting:'Ekspedisi SC', back_from_sc:'Kembali SC', received:'Diterima'};
+      var lbl = statusLbl[si.status] || si.status;
+      var isBatal = si.status.includes('batal');
+      return React.createElement('div', {key:si.id, style:{padding:'10px 12px', borderRadius:8, marginBottom:6,
+        background:'var(--bg2)', border:'1px solid var(--border)'}},
+        React.createElement('div', {style:{display:'flex', justifyContent:'space-between', alignItems:'center', gap:8}},
+          React.createElement('div', {style:{flex:1, minWidth:0}},
+            React.createElement('div', {style:{fontWeight:600, fontSize:13, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
+              si.customer_name || '\u2014'),
+            React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}},
+              si.unit_type || si.complaint || '\u2014')
+          ),
+          React.createElement('span', {style:{fontSize:11, padding:'2px 8px', borderRadius:10, flexShrink:0,
+            background: isBatal ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+            color: isBatal ? 'var(--red)' : 'var(--amber)'}}, lbl)
+        )
+      );
+    })
+  ),
+  ringkasanTab === 'ringkasan' && siOther.length === 0 && siActive.length === 0 &&
+    React.createElement('div', {style:{textAlign:'center', padding:'24px 0', color:'var(--text3)', fontSize:13}},
+      '\u2705 Semua beres, tidak ada item menggantung'),
+  // Riwayat tab
+  ringkasanTab === 'riwayat' && mySI.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: 14
@@ -26434,7 +26485,7 @@ function TechnicianSummary(_ref165) {
       techName: techName,
       onUpdateSI: onUpdateSI
     });
-  })), myJobs.length > 0 && /*#__PURE__*/React.createElement("div", {
+  })), ringkasanTab === 'riwayat' && myJobs.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: 14
