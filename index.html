@@ -1436,10 +1436,9 @@ function KpiTeknisiPage(props) {
   function getTechStats(name) {
     var items = techItems.filter(function(si) { return si.tech_assigned === name; });
     var todayWorked = items.filter(function(si) {
-      return (si.done_at && new Date(si.done_at) >= todayStart) ||
-             (si.tech_assigned_at && new Date(si.tech_assigned_at) >= todayStart);
+      return si.tech_assigned_at && new Date(si.tech_assigned_at) >= todayStart;
     });
-    var todayDone = todayWorked.filter(function(si) { return si.done_at && new Date(si.done_at) >= todayStart; });
+    var todayDone = todayWorked.filter(function(si) { return TECH_DONE.includes(si.status); });
     var monthT = items.filter(function(si) { return new Date(assignDate(si)) >= monthStart; });
     var open   = items.filter(function(si) { return TECH_ACTIVE.includes(si.status); });
     return {
