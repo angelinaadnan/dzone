@@ -873,6 +873,10 @@ var ROLE_NAV = {
     icon: '📊',
     label: 'Ringkasan'
   }, {
+    id: 'riwayat_teknisi',
+    icon: '📋',
+    label: 'Riwayat'
+  }, {
     id: 'my_jobs',
     icon: '🔧',
     label: 'My Jobs'
@@ -4679,6 +4683,14 @@ function App() {
     onUpdate: updateOrder,
     onUpdateSI: updateServiceIntake,
     branchRequests: branchRequests
+  }), role === 'technician' && page === 'riwayat_teknisi' && /*#__PURE__*/React.createElement(TechnicianSummary, {
+    orders: orders,
+    serviceIntakes: serviceIntakes,
+    techName: userName,
+    onUpdate: updateOrder,
+    onUpdateSI: updateServiceIntake,
+    branchRequests: branchRequests,
+    riwayatOnly: true
   }), (role === 'ops' || role === 'supervisor') && page === 'kpi_ops' && /*#__PURE__*/React.createElement(KpiOpsPage, {
     orders: orders,
     courierTasks: courierTasks,
@@ -26239,7 +26251,8 @@ function TechnicianSummary(_ref165) {
     techName = _ref165.techName,
     onUpdate = _ref165.onUpdate,
     onUpdateSI = _ref165.onUpdateSI,
-    branchRequests = _ref165.branchRequests;
+    branchRequests = _ref165.branchRequests,
+    riwayatOnly = _ref165.riwayatOnly || false;
   // Instalasi / upgrade jobs
   var myJobs = orders.filter(function (o) {
     return o.tech_name === techName || (o.extra_techs || []).includes(techName);
@@ -26373,7 +26386,7 @@ function TechnicianSummary(_ref165) {
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "section-title"
-  }, "\uD83D\uDCCA Ringkasan Teknisi"), /*#__PURE__*/React.createElement("div", {
+  }, riwayatOnly ? "\uD83D\uDCCB Riwayat" : "\uD83D\uDCCA Ringkasan Teknisi"), !riwayatOnly && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))',
@@ -26425,7 +26438,7 @@ function TechnicianSummary(_ref165) {
     className: "stat-num"
   }, totalAll))),
   // Perlu Perhatian section
-  siOther.length > 0 && React.createElement('div', {style:{marginBottom:16}},
+  !riwayatOnly && siOther.length > 0 && React.createElement('div', {style:{marginBottom:16}},
     React.createElement('div', {style:{fontSize:11, fontWeight:700, color:'var(--amber)', letterSpacing:'0.07em', marginBottom:8}},
       '\u26A0 PERLU PERHATIAN (' + siOther.length + ')'),
     siOther.map(function(si) {
@@ -26450,11 +26463,11 @@ function TechnicianSummary(_ref165) {
       );
     })
   ),
-  siOther.length === 0 && siActive.length === 0 &&
+  !riwayatOnly && siOther.length === 0 && siActive.length === 0 &&
     React.createElement('div', {style:{textAlign:'center', padding:'16px 0', color:'var(--text3)', fontSize:13}},
       '\u2705 Semua beres, tidak ada item menggantung'),
-  // Riwayat (selalu tampil di bawah)
-  mySI.length > 0 && /*#__PURE__*/React.createElement("div", {
+  // Riwayat \u2014 hanya tampil jika riwayatOnly mode
+  riwayatOnly && mySI.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: 14
@@ -26473,7 +26486,7 @@ function TechnicianSummary(_ref165) {
       techName: techName,
       onUpdateSI: onUpdateSI
     });
-  })), myJobs.length > 0 && /*#__PURE__*/React.createElement("div", {
+  })), riwayatOnly && myJobs.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: 14
