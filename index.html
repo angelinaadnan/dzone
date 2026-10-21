@@ -1444,10 +1444,11 @@ function KpiTeknisiPage(props) {
     var todayDone = items.filter(function(si) { return TECH_DONE.includes(si.status) && si.done_at && new Date(si.done_at) >= todayStart; });
     var monthT = items.filter(function(si) { return new Date(assignDate(si)) >= monthStart; });
     var open   = items.filter(function(si) { return TECH_ACTIVE.includes(si.status); });
+    var todayTotal = todayDone.length + open.length;
     return {
       name: name,
       todayDone: todayDone.length,
-      todayTotal: todayWorked.length,
+      todayTotal: todayTotal,
       monthDone: monthT.filter(function(si) { return TECH_DONE.includes(si.status); }).length,
       monthTotal: monthT.length,
       open: open
@@ -1485,7 +1486,7 @@ function KpiTeknisiPage(props) {
       scoreTile(
         (isSupervisor ? totalTD : myStats.todayDone) + '/' + (isSupervisor ? totalTT : myStats.todayTotal),
         'Hari ini selesai',
-        (isSupervisor ? totalTT : myStats.todayTotal) === 0 ? 'belum ada tugas hari ini' : 'dari yang dikerjakan hari ini',
+        (isSupervisor ? totalTT : myStats.todayTotal) === 0 ? 'semua selesai / tidak ada aktif' : 'selesai / (selesai + masih aktif)',
         (isSupervisor ? totalTD===totalTT && totalTT>0 : myStats.todayDone===myStats.todayTotal && myStats.todayTotal>0) ? 'var(--green)' : (isSupervisor?totalTD:myStats.todayDone)>0 ? 'var(--amber)' : 'var(--text)'
       ),
       scoreTile(
