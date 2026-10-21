@@ -2364,13 +2364,13 @@ function App() {
             setLoading(false);
             return _context5.abrupt("return");
           case 29:
-            if (data && role === 'courier') {
-              // Supplementary: semua order pending kurir ini tanpa batas tanggal
+            if (data && (role === 'courier' || role === 'sales')) {
+              // Supplementary: semua order belum selesai tanpa batas tanggal
               var _oColsAll = orderColsBase + orderColsNew;
-              db.from('orders').select(_oColsAll)
-                .or("courier_name.eq.".concat(userName, ",extra_couriers.cs.[\"").concat(userName, "\"]"))
-                .not('status', 'in', '(delivered,cancelled)')
-                .then(function(pr) {
+              var supQ = db.from('orders').select(_oColsAll).not('status', 'in', '(delivered,cancelled)');
+              if (role === 'courier') supQ = supQ.or("courier_name.eq.".concat(userName, ",extra_couriers.cs.[\"").concat(userName, "\"]"));
+              else if (role === 'sales') supQ = supQ.eq('sales_name', userName);
+              supQ.then(function(pr) {
                   if (pr.data && pr.data.length) {
                     var ids = new Set(data.map(function(d) { return d.id; }));
                     var extra = pr.data.filter(function(r) { return !ids.has(r.id); });
