@@ -26258,7 +26258,7 @@ function TechnicianSummary(_ref165) {
     return ['to_technician', 'post_sc_checking'].includes(si.status);
   });
   var siDone = mySI.filter(function (si) {
-    return si.status === 'done' || si.status === 'returned';
+    return ['done','returned','branch_done','branch_returned'].includes(si.status);
   });
 
   // Tugas dari cabang
@@ -26344,6 +26344,17 @@ function TechnicianSummary(_ref165) {
       return _ref166.apply(this, arguments);
     };
   }();
+  var todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  var siHariIni = mySI.filter(function(si) {
+    if (si.tech_assigned_at && new Date(si.tech_assigned_at) >= todayStart) return true;
+    if (si.done_at && new Date(si.done_at) >= todayStart) return true;
+    if (['to_technician','post_sc_checking'].includes(si.status) && si.updated_at && new Date(si.updated_at) >= todayStart) return true;
+    return false;
+  });
+  var jobsHariIni = myJobs.filter(function(o) {
+    return (o.completed_at && new Date(o.completed_at) >= todayStart) || (o.assigned_at && new Date(o.assigned_at) >= todayStart);
+  });
+  var totalHariIni = siHariIni.length + jobsHariIni.length;
   var totalActive = jobsActive.length + siActive.length + branchTechActive.length;
   var totalDone = jobsDone.length + siDone.length + branchTechDone.length;
   var totalAll = myJobs.length + mySI.length + branchTechAll.length;
@@ -26361,6 +26372,13 @@ function TechnicianSummary(_ref165) {
       marginBottom: 24
     }
   }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {fontSize:12, color:'var(--text2)', marginBottom:6}
+  }, "Hari ini"), /*#__PURE__*/React.createElement("div", {
+    className: "stat-num",
+    style: {color: totalHariIni > 0 ? 'var(--accent2)' : 'var(--text3)'}
+  }, totalHariIni)), /*#__PURE__*/React.createElement("div", {
     className: "stat-card"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
