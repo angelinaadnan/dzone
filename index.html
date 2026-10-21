@@ -1452,7 +1452,7 @@ function App() {
     _useState38 = _slicedToArray(_useState37, 2),
     accurateOpen = _useState38[0],
     setAccurateOpen = _useState38[1];
-  var _useStateKpi = React.useState(false),
+  var _useStateKpi = useState(false),
     _useStateKpi2 = _slicedToArray(_useStateKpi, 2),
     kpiOpen = _useStateKpi2[0],
     setKpiOpen = _useStateKpi2[1];
@@ -23516,7 +23516,7 @@ function CourierDeliveries(_ref155) {
             _context67.t0 = _context67["catch"](3);
             isDenied = _context67.t0.code === 1 || (_context67.t0.message || '').toLowerCase().includes('denied');
             isTimeout = _context67.t0.code === 3 || (_context67.t0.message || '').toLowerCase().includes('timeout');
-            setCheckinGpsErr(isDenied ? 'denied' : isTimeout ? 'Timeout — coba di luar gedung / aktifkan WiFi' : _context67.t0.message || 'GPS gagal');
+            setCheckinGpsErr(isDenied ? 'denied' : 'GPS timeout — aktifkan WiFi & coba di dekat jendela atau di luar gedung');
             setCheckinLoading(false);
             return _context67.abrupt("return");
           case 16:
@@ -29294,7 +29294,7 @@ function CourierCheckinPanel(_ref186) {
             _context78.prev = 12;
             _context78.t0 = _context78["catch"](2);
             isDenied = _context78.t0.code === 1 || (_context78.t0.message || '').toLowerCase().includes('denied') || (_context78.t0.message || '').toLowerCase().includes('permission');
-            setGpsErr(isDenied ? 'denied' : _context78.t0.message || 'GPS gagal');
+            setGpsErr(isDenied ? 'denied' : 'GPS timeout — aktifkan WiFi & coba di dekat jendela atau di luar gedung');
           case 16:
             setLoading(false);
           case 17:
