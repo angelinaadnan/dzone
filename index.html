@@ -836,6 +836,16 @@ var ROLE_NAV = {
     icon: '🚚',
     label: 'History Kurir'
   }, {
+    id: '_section_kpi',
+    icon: '',
+    label: 'KPI',
+    _section: true
+  }, {
+    id: 'kpi_ops',
+    icon: '📊',
+    label: 'KPI Ops',
+    _inSection: 'kpi'
+  }, {
     id: 'absensi',
     icon: '🗓',
     label: 'Absensi'
@@ -861,6 +871,10 @@ var ROLE_NAV = {
     id: 'my_jobs',
     icon: '🔧',
     label: 'My Jobs'
+  }, {
+    id: 'kpi_teknisi',
+    icon: '📊',
+    label: 'KPI Teknisi'
   }, {
     id: 'absensi',
     icon: '🗓',
@@ -974,6 +988,21 @@ var ROLE_NAV = {
     id: 'pesan_barang',
     icon: '🛒',
     label: 'Pesan Barang'
+  }, {
+    id: '_section_kpi',
+    icon: '',
+    label: 'KPI',
+    _section: true
+  }, {
+    id: 'kpi_ops',
+    icon: '📊',
+    label: 'KPI Ops',
+    _inSection: 'kpi'
+  }, {
+    id: 'kpi_teknisi',
+    icon: '🔧',
+    label: 'KPI Teknisi',
+    _inSection: 'kpi'
   }, {
     id: 'absensi',
     icon: '🗓',
@@ -1110,6 +1139,230 @@ function _getRoadDistanceKm() {
   }));
   return _getRoadDistanceKm.apply(this, arguments);
 }
+
+// ─── KPI Helper ───────────────────────────────────────────────────────────────
+function kpiScoreTile(label, value, sub, type) {
+  var c = type === 'green' ? {bg:'rgba(34,197,94,0.1)',bd:'rgba(34,197,94,0.3)',fg:'var(--green)'}
+        : type === 'amber' ? {bg:'rgba(245,158,11,0.1)',bd:'rgba(245,158,11,0.3)',fg:'var(--amber)'}
+        : type === 'red'   ? {bg:'rgba(239,68,68,0.08)',bd:'rgba(239,68,68,0.25)',fg:'var(--red)'}
+        :                    {bg:'var(--bg2)',bd:'var(--border)',fg:'var(--text3)'};
+  return React.createElement('div', {style:{background:c.bg,border:'1px solid '+c.bd,borderRadius:10,padding:'14px 16px',minWidth:0}},
+    React.createElement('div', {style:{fontSize:28,fontWeight:800,color:c.fg,lineHeight:1.1}}, value),
+    React.createElement('div', {style:{fontSize:12,fontWeight:600,color:'var(--text)',marginTop:6}}, label),
+    React.createElement('div', {style:{fontSize:11,color:'var(--text3)',marginTop:2}}, sub)
+  );
+}
+function kpiRateType(r) {
+  if (r === null) return 'neutral';
+  if (r >= 90) return 'green';
+  if (r >= 70) return 'amber';
+  return 'red';
+}
+function kpiRateColor(r) {
+  if (r === null) return 'var(--text3)';
+  if (r >= 90) return 'var(--green)';
+  if (r >= 70) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+// ─── KPI Ops Page ────────────────────────────────────────────────────────────
+function KpiOpsPage(props) {
+  var orders = props.orders || [];
+  var courierTasks = props.courierTasks || [];
+  var serviceIntakes = props.serviceIntakes || [];
+  var purchaseOrders = props.purchaseOrders || [];
+  var now = new Date();
+  function dStart(d) { var x = new Date(d); return new Date(x.getFullYear(), x.getMonth(), x.getDate()); }
+  var todayStart = dStart(now);
+  function isToday(d) { return dStart(d).getTime() === todayStart.getTime(); }
+  function isPrev(d)  { return dStart(d).getTime() < todayStart.getTime(); }
+
+  var ordersToday = orders.filter(function(o) { return isToday(o.created_at) && o.status !== 'cancelled'; });
+  var ordersDone  = ordersToday.filter(function(o) { return o.status === 'delivered'; });
+  var orderRate   = ordersToday.length > 0 ? Math.round(ordersDone.length / ordersToday.length * 100) : null;
+
+  var tasksToday = courierTasks.filter(function(t) { return isToday(t.created_at); });
+  var tasksDone  = tasksToday.filter(function(t) { return t.status === 'done' || t.status === 'in_service'; });
+  var taskRate   = tasksToday.length > 0 ? Math.round(tasksDone.length / tasksToday.length * 100) : null;
+
+  var intakesToday    = serviceIntakes.filter(function(si) { return isToday(si.created_at); });
+  var intakesAssigned = intakesToday.filter(function(si) { return si.status !== 'received'; });
+  var intakeType = intakesToday.length === 0 ? 'neutral' : intakesAssigned.length === intakesToday.length ? 'green' : 'amber';
+  var intakeVal  = intakesToday.length === 0 ? '—' : intakesAssigned.length + '/' + intakesToday.length;
+  var intakeSub  = intakesToday.length === 0 ? 'Tidak ada intake hari ini' : intakesAssigned.length === intakesToday.length ? 'Semua sudah di-assign' : (intakesToday.length - intakesAssigned.length) + ' belum di-assign';
+
+  var ordersNginep = orders.filter(function(o) { return isPrev(o.created_at) && !['delivered','cancelled'].includes(o.status); });
+  var tasksNginep  = courierTasks.filter(function(t) { return isPrev(t.created_at) && !['done','in_service'].includes(t.status); });
+  var totalNginep  = ordersNginep.length + tasksNginep.length;
+  var nginepType   = totalNginep === 0 ? 'green' : totalNginep <= 3 ? 'amber' : 'red';
+
+  var poAlert = purchaseOrders.filter(function(po) {
+    if (!['pending','partial'].includes(po.status)) return false;
+    if (po.expected_date && new Date(po.expected_date) < now) return true;
+    return (now - new Date(po.created_at)) / 86400000 > 2;
+  });
+
+  var weekData = Array.from({length:7}, function(_, idx) {
+    var d = new Date(todayStart); d.setDate(d.getDate() - (6 - idx));
+    var dT = d.getTime();
+    var dayOrders = orders.filter(function(o) { return dStart(o.created_at).getTime() === dT && o.status !== 'cancelled'; });
+    var dayDone   = dayOrders.filter(function(o) { return o.status === 'delivered'; });
+    var dayTasks  = courierTasks.filter(function(t) { return dStart(t.created_at).getTime() === dT; });
+    var dayTDone  = dayTasks.filter(function(t) { return t.status === 'done' || t.status === 'in_service'; });
+    return {
+      label: d.toLocaleDateString('id-ID', {weekday:'short', day:'2-digit', month:'short'}),
+      isToday: idx === 6,
+      oRate: dayOrders.length > 0 ? Math.round(dayDone.length / dayOrders.length * 100) : null,
+      oStr:  dayOrders.length > 0 ? dayDone.length + '/' + dayOrders.length : '—',
+      tRate: dayTasks.length > 0 ? Math.round(dayTDone.length / dayTasks.length * 100) : null,
+      tStr:  dayTasks.length > 0 ? dayTDone.length + '/' + dayTasks.length : '—',
+    };
+  });
+
+  var thS = {padding:'8px 12px', textAlign:'left', fontWeight:600, fontSize:12, color:'var(--text2)', whiteSpace:'nowrap'};
+  var tdS = {padding:'8px 12px'};
+  return React.createElement('div', {style:{padding:24, maxWidth:900}},
+    React.createElement('div', {style:{marginBottom:20, borderBottom:'1px solid var(--border)', paddingBottom:12}},
+      React.createElement('h2', {style:{margin:0, fontSize:20, fontWeight:700}}, '📊 KPI Ops'),
+      React.createElement('div', {style:{fontSize:13, color:'var(--text3)', marginTop:4}},
+        now.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long', year:'numeric'}))
+    ),
+    React.createElement('div', {style:{fontSize:10, fontWeight:700, color:'var(--text3)', letterSpacing:'0.07em', marginBottom:8}}, 'HARI INI'),
+    React.createElement('div', {style:{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(175px,1fr))', gap:12, marginBottom:24}},
+      kpiScoreTile('Order Selesai', orderRate !== null ? orderRate + '%' : '—', ordersDone.length + '/' + ordersToday.length + ' order', kpiRateType(orderRate)),
+      kpiScoreTile('Kurir Selesai', taskRate !== null ? taskRate + '%' : '—', tasksDone.length + '/' + tasksToday.length + ' task', kpiRateType(taskRate)),
+      kpiScoreTile('Servis Di-assign', intakeVal, intakeSub, intakeType),
+      kpiScoreTile('Nginep', totalNginep.toString(), ordersNginep.length + ' order · ' + tasksNginep.length + ' task kurir', nginepType)
+    ),
+    totalNginep > 0 && React.createElement('div', {style:{marginBottom:20, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:10, padding:'12px 16px'}},
+      React.createElement('div', {style:{fontWeight:700, fontSize:13, color:'var(--red)', marginBottom:8}}, '⏰ Belum Selesai dari Hari Sebelumnya'),
+      [].concat(
+        ordersNginep.slice(0,4).map(function(o) {
+          return React.createElement('div', {key:'o'+o.id, style:{fontSize:12, padding:'4px 0', borderBottom:'1px solid var(--border)', color:'var(--text2)'}},
+            '📦 ', React.createElement('b', null, o.customer_name), ' — ', o.goods ? (o.goods.length > 45 ? o.goods.slice(0,45) + '…' : o.goods) : '—',
+            ' · ', fmtDate(o.created_at));
+        }),
+        tasksNginep.slice(0,4).map(function(t) {
+          return React.createElement('div', {key:'t'+t.id, style:{fontSize:12, padding:'4px 0', borderBottom:'1px solid var(--border)', color:'var(--text2)'}},
+            '🚚 ', React.createElement('b', null, t.destination || t.title || 'Task kurir'),
+            ' · ', fmtDate(t.created_at));
+        }),
+        (totalNginep > 8) ? [React.createElement('div', {key:'more', style:{fontSize:11, color:'var(--text3)', marginTop:6}}, '+ ' + (totalNginep - 8) + ' lainnya')] : []
+      )
+    ),
+    poAlert.length > 0 && React.createElement('div', {style:{marginBottom:20, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:10, padding:'12px 16px'}},
+      React.createElement('div', {style:{fontWeight:700, fontSize:13, color:'var(--amber)', marginBottom:8}}, '📦 PO Stok Belum Tiba (' + poAlert.length + ')'),
+      poAlert.slice(0,5).map(function(po) {
+        return React.createElement('div', {key:po.id, style:{fontSize:12, padding:'4px 0', borderBottom:'1px solid var(--border)', color:'var(--text2)'}},
+          React.createElement('b', null, po.supplier_name || '—'),
+          po.expected_date ? ' · Est: ' + fmtDate(po.expected_date) : ' · Belum ada estimasi',
+          ' · Buat: ' + fmtDate(po.created_at));
+      })
+    ),
+    React.createElement('div', {style:{fontSize:10, fontWeight:700, color:'var(--text3)', letterSpacing:'0.07em', marginBottom:10}}, '7 HARI TERAKHIR'),
+    React.createElement('div', {style:{overflowX:'auto'}},
+      React.createElement('table', {style:{width:'100%', borderCollapse:'collapse', fontSize:13}},
+        React.createElement('thead', null,
+          React.createElement('tr', {style:{background:'var(--bg2)', borderBottom:'1px solid var(--border)'}},
+            React.createElement('th', Object.assign({}, thS, {style:Object.assign({},thS)}), 'Tanggal'),
+            React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, '% Order Selesai'),
+            React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, '% Kurir Selesai')
+          )
+        ),
+        React.createElement('tbody', null,
+          weekData.map(function(day, i) {
+            return React.createElement('tr', {key:i, style:{background:day.isToday?'rgba(108,99,255,0.06)':'transparent', borderBottom:'1px solid var(--border)'}},
+              React.createElement('td', {style:Object.assign({},tdS,{fontWeight:day.isToday?700:400, color:day.isToday?'var(--accent2)':'var(--text)'})},
+                day.label, day.isToday && React.createElement('span', {style:{fontSize:10, color:'var(--accent2)', marginLeft:5}}, '← hari ini')),
+              React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})},
+                day.oRate !== null ? React.createElement('span', {style:{fontWeight:700, color:kpiRateColor(day.oRate)}}, day.oRate + '%') : React.createElement('span', {style:{color:'var(--text3)'}}, '—'),
+                React.createElement('span', {style:{fontSize:11, color:'var(--text3)', marginLeft:6}}, day.oStr)
+              ),
+              React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})},
+                day.tRate !== null ? React.createElement('span', {style:{fontWeight:700, color:kpiRateColor(day.tRate)}}, day.tRate + '%') : React.createElement('span', {style:{color:'var(--text3)'}}, '—'),
+                React.createElement('span', {style:{fontSize:11, color:'var(--text3)', marginLeft:6}}, day.tStr)
+              )
+            );
+          })
+        )
+      )
+    )
+  );
+}
+
+// ─── KPI Teknisi Page ────────────────────────────────────────────────────────
+function KpiTeknisiPage(props) {
+  var serviceIntakes = props.serviceIntakes || [];
+  var now = new Date();
+  var active = serviceIntakes.filter(function(si) {
+    return !['done','returned','branch_done','branch_returned'].includes(si.status);
+  });
+  function ageDays(si) { return Math.floor((now - new Date(si.created_at)) / 86400000); }
+  function ageType(d)  { return d <= 1 ? 'green' : d <= 2 ? 'amber' : 'red'; }
+  function ageLabel(d) { return d === 0 ? 'Hari ini' : d === 1 ? '1 hari' : d + ' hari'; }
+  function ageColor(d) { return d <= 1 ? 'var(--green)' : d <= 2 ? 'var(--amber)' : 'var(--red)'; }
+  var sorted = active.slice().sort(function(a, b) { return new Date(a.created_at) - new Date(b.created_at); });
+  var g  = active.filter(function(si) { return ageDays(si) <= 1; }).length;
+  var o  = active.filter(function(si) { return ageDays(si) === 2; }).length;
+  var r  = active.filter(function(si) { var d = ageDays(si); return d >= 3 && d < 7; }).length;
+  var rr = active.filter(function(si) { return ageDays(si) >= 7; }).length;
+  var statusLbl = {received:'Diterima', to_technician:'Di Teknisi', post_sc_checking:'Cek SC', done:'Selesai', returned:'Kembali'};
+  var thS = {padding:'8px 10px', textAlign:'left', fontWeight:600, fontSize:12, color:'var(--text2)', whiteSpace:'nowrap'};
+  var tdS = {padding:'8px 10px'};
+  return React.createElement('div', {style:{padding:24, maxWidth:950}},
+    React.createElement('div', {style:{marginBottom:20, borderBottom:'1px solid var(--border)', paddingBottom:12}},
+      React.createElement('h2', {style:{margin:0, fontSize:20, fontWeight:700}}, '🔧 KPI Teknisi — Antrian Servis'),
+      React.createElement('div', {style:{fontSize:13, color:'var(--text3)', marginTop:4}}, active.length + ' tiket aktif · target: selesai hari H atau H+1')
+    ),
+    React.createElement('div', {style:{display:'flex', gap:10, marginBottom:20, flexWrap:'wrap'}},
+      React.createElement('span', {style:{background:'rgba(34,197,94,0.12)', color:'var(--green)', border:'1px solid rgba(34,197,94,0.3)', borderRadius:20, padding:'4px 14px', fontSize:13, fontWeight:600}}, '🟢 ≤1 hari: ' + g),
+      React.createElement('span', {style:{background:'rgba(245,158,11,0.12)', color:'var(--amber)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:20, padding:'4px 14px', fontSize:13, fontWeight:600}}, '🟡 2 hari: ' + o),
+      React.createElement('span', {style:{background:'rgba(239,68,68,0.08)', color:'var(--red)', border:'1px solid rgba(239,68,68,0.25)', borderRadius:20, padding:'4px 14px', fontSize:13, fontWeight:600}}, '🔴 3–6 hari: ' + r),
+      rr > 0 && React.createElement('span', {style:{background:'rgba(239,68,68,0.18)', color:'var(--red)', border:'1px solid rgba(239,68,68,0.4)', borderRadius:20, padding:'4px 14px', fontSize:13, fontWeight:700}}, '🚨 ≥7 hari: ' + rr)
+    ),
+    active.length === 0
+      ? React.createElement('div', {style:{textAlign:'center', color:'var(--text3)', padding:48, fontSize:15}}, '✅ Tidak ada servis aktif saat ini')
+      : React.createElement('div', {style:{overflowX:'auto'}},
+          React.createElement('table', {style:{width:'100%', borderCollapse:'collapse', fontSize:13}},
+            React.createElement('thead', null,
+              React.createElement('tr', {style:{background:'var(--bg2)', borderBottom:'2px solid var(--border)'}},
+                React.createElement('th', {style:thS}, 'Umur'),
+                React.createElement('th', {style:thS}, 'Customer'),
+                React.createElement('th', {style:thS}, 'Unit'),
+                React.createElement('th', {style:thS}, 'Teknisi'),
+                React.createElement('th', {style:thS}, 'Status'),
+                React.createElement('th', {style:thS}, 'Tgl Masuk')
+              )
+            ),
+            React.createElement('tbody', null,
+              sorted.map(function(si) {
+                var d = ageDays(si);
+                var rowBg = d <= 1 ? 'transparent' : d <= 2 ? 'rgba(245,158,11,0.04)' : 'rgba(239,68,68,0.05)';
+                return React.createElement('tr', {key:si.id, style:{background:rowBg, borderBottom:'1px solid var(--border)'}},
+                  React.createElement('td', {style:tdS},
+                    React.createElement('span', {style:{fontWeight:700, color:ageColor(d), fontSize:14}}, ageLabel(d)),
+                    d >= 7 && React.createElement('span', {style:{fontSize:11, color:'var(--red)', fontWeight:700, marginLeft:4}}, '⚠')
+                  ),
+                  React.createElement('td', {style:Object.assign({},tdS,{fontWeight:500})}, si.customer_name || '—'),
+                  React.createElement('td', {style:Object.assign({},tdS,{color:'var(--text2)'})}, si.unit_type || '—'),
+                  React.createElement('td', {style:Object.assign({},tdS,{color:si.tech_assigned?'var(--text)':'var(--amber)'})},
+                    si.tech_assigned || React.createElement('em', {style:{color:'var(--amber)'}}, 'Belum')),
+                  React.createElement('td', {style:tdS},
+                    React.createElement('span', {style:{
+                      fontSize:11, padding:'2px 8px', borderRadius:10,
+                      background: si.status==='to_technician'?'rgba(99,102,241,0.12)':si.status==='received'?'rgba(245,158,11,0.12)':'var(--bg3)',
+                      color: si.status==='to_technician'?'var(--accent2)':si.status==='received'?'var(--amber)':'var(--text2)',
+                    }}, statusLbl[si.status] || si.status)
+                  ),
+                  React.createElement('td', {style:Object.assign({},tdS,{color:'var(--text3)',fontSize:12})}, fmtDate(si.created_at))
+                );
+              })
+            )
+          )
+        )
+  );
+}
+
 function App() {
   var _useState = useState(null),
     _useState2 = _slicedToArray(_useState, 2),
@@ -1199,6 +1452,10 @@ function App() {
     _useState38 = _slicedToArray(_useState37, 2),
     accurateOpen = _useState38[0],
     setAccurateOpen = _useState38[1];
+  var _useStateKpi = React.useState(false),
+    _useStateKpi2 = _slicedToArray(_useStateKpi, 2),
+    kpiOpen = _useStateKpi2[0],
+    setKpiOpen = _useStateKpi2[1];
   var purchaseOrdersRef = React.useRef(purchaseOrders);
   React.useEffect(function () {
     purchaseOrdersRef.current = purchaseOrders;
@@ -3939,11 +4196,12 @@ function App() {
     }
   }, navItems.filter(function(n) {
     if (n._inSection === 'accurate') return accurateOpen;
+    if (n._inSection === 'kpi') return kpiOpen;
     return true;
   }).map(function (n) {
     if (n._section) {
-      var isOpen = n.id === '_section_accurate' ? accurateOpen : true;
-      var toggleFn = n.id === '_section_accurate' ? function() { setAccurateOpen(function(v) { return !v; }); } : null;
+      var isOpen = n.id === '_section_accurate' ? accurateOpen : n.id === '_section_kpi' ? kpiOpen : true;
+      var toggleFn = n.id === '_section_accurate' ? function() { setAccurateOpen(function(v) { return !v; }); } : n.id === '_section_kpi' ? function() { setKpiOpen(function(v) { return !v; }); } : null;
       return /*#__PURE__*/React.createElement("div", {
         key: n.id,
         onClick: toggleFn,
@@ -4199,6 +4457,13 @@ function App() {
     onUpdate: updateOrder,
     onUpdateSI: updateServiceIntake,
     branchRequests: branchRequests
+  }), (role === 'ops' || role === 'supervisor') && page === 'kpi_ops' && /*#__PURE__*/React.createElement(KpiOpsPage, {
+    orders: orders,
+    courierTasks: courierTasks,
+    serviceIntakes: serviceIntakes,
+    purchaseOrders: purchaseOrders
+  }), (role === 'technician' || role === 'supervisor') && page === 'kpi_teknisi' && /*#__PURE__*/React.createElement(KpiTeknisiPage, {
+    serviceIntakes: serviceIntakes
   }), role === 'sales' && page === 'new_service' && /*#__PURE__*/React.createElement(ServiceIntakeEntry, {
     onSave: saveServiceIntake,
     createdByRole: "sales",
