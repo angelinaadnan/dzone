@@ -1415,6 +1415,7 @@ function ServisSummaryPage(props) {
 // ─── KPI Teknisi Page (produktivitas teknisi: hari ini & bulan ini) ───────────
 function KpiTeknisiPage(props) {
   var serviceIntakes = props.serviceIntakes || [];
+  var orders = props.orders || [];
   var userName = props.userName || '';
   var role = props.role || '';
   var now = new Date();
@@ -1422,10 +1423,32 @@ function KpiTeknisiPage(props) {
   var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   var TECH_ACTIVE = ['to_technician', 'post_sc_checking'];
   var TECH_DONE   = ['done', 'returned', 'branch_done', 'branch_returned'];
+  var ORD_TECH_DONE = ['tech_done','on_delivery','delivered','completed','done'];
   function assignDate(si) { return si.tech_assigned_at || si.created_at; }
   function ageDays(si) { return Math.floor((now - new Date(si.created_at)) / 86400000); }
   function ageLabel(d) { return d === 0 ? 'Hari ini' : d + ' hari'; }
   function ageColor(d) { return d <= 1 ? 'var(--green)' : d <= 2 ? 'var(--amber)' : 'var(--red)'; }
+
+  // Normalize orders: extract tech_assigned_at & tech_done_at dari status_history
+  var techOrders = orders.filter(function(o) {
+    if (!o.tech_name) return false;
+    if (role === 'technician') return o.tech_name === userName;
+    return true;
+  }).filter(function(o) { return ORD_TECH_DONE.concat(['tech']).includes(o.status); })
+  .map(function(o) {
+    var hist = Array.isArray(o.status_history) ? o.status_history : [];
+    var techEnt = hist.filter(function(h) { return h.status === 'tech'; });
+    var doneEnt = hist.filter(function(h) { return h.status === 'tech_done'; });
+    return {
+      _isOrder: true,
+      id: o.id,
+      tech_assigned: o.tech_name,
+      status: o.status === 'tech' ? 'to_technician' : 'done', // map to SI-compatible
+      tech_assigned_at: techEnt.length ? techEnt[techEnt.length-1].time : o.created_at,
+      done_at: doneEnt.length ? doneEnt[doneEnt.length-1].time : null,
+      created_at: o.created_at,
+    };
+  });
 
   var techItems = serviceIntakes.filter(function(si) {
     if (!si.tech_assigned) return false;
@@ -1433,39 +1456,33 @@ function KpiTeknisiPage(props) {
     return true;
   }).filter(function(si) { return TECH_ACTIVE.concat(TECH_DONE).includes(si.status); });
 
+  var allTechItems = techItems.concat(techOrders);
+
   var nameSet = {};
-  techItems.forEach(function(si) { if (si.tech_assigned) nameSet[si.tech_assigned] = true; });
+  allTechItems.forEach(function(si) { if (si.tech_assigned) nameSet[si.tech_assigned] = true; });
   var techNames = role === 'technician' ? [userName] : Object.keys(nameSet).sort();
 
   function getTechStats(name) {
-    var items = techItems.filter(function(si) { return si.tech_assigned === name; });
-    var todayWorked = items.filter(function(si) {
-      if (si.tech_assigned_at && new Date(si.tech_assigned_at) >= todayStart) return true;
-      if (si.done_at && new Date(si.done_at) >= todayStart) return true;
-      if (TECH_ACTIVE.includes(si.status) && si.updated_at && new Date(si.updated_at) >= todayStart) return true;
-      return false;
-    });
+    var items = allTechItems.filter(function(si) { return si.tech_assigned === name; });
+    var siItems = techItems.filter(function(si) { return si.tech_assigned === name; });
     var todayDone = items.filter(function(si) {
-      if (!TECH_DONE.includes(si.status)) return false;
+      var isDone = TECH_DONE.includes(si.status) || (si._isOrder && si.status === 'done');
+      if (!isDone) return false;
       if (si.done_at && new Date(si.done_at) >= todayStart) return true;
-      if (!si.done_at && si.updated_at && new Date(si.updated_at) >= todayStart) return true;
       return false;
     });
     var monthT = items.filter(function(si) { return new Date(assignDate(si)) >= monthStart; });
-    var open   = items.filter(function(si) { return TECH_ACTIVE.includes(si.status); });
-    var todayOpen = open.filter(function(si) {
-      if (si.tech_assigned_at && new Date(si.tech_assigned_at) >= todayStart) return true;
-      if (si.updated_at && new Date(si.updated_at) >= todayStart) return true;
-      return false;
-    });
-    var todayTotal = todayDone.length + open.length;
+    var open   = siItems.filter(function(si) { return TECH_ACTIVE.includes(si.status); });
+    var openOrders = techOrders.filter(function(o) { return o.tech_assigned === name && o.status === 'to_technician'; });
+    var allOpen = open.concat(openOrders);
+    var todayTotal = todayDone.length + allOpen.length;
     return {
       name: name,
       todayDone: todayDone.length,
       todayTotal: todayTotal,
-      monthDone: monthT.filter(function(si) { return TECH_DONE.includes(si.status); }).length,
+      monthDone: monthT.filter(function(si) { return TECH_DONE.includes(si.status) || (si._isOrder && si.status === 'done'); }).length,
       monthTotal: monthT.length,
-      open: open
+      open: allOpen
     };
   }
 
@@ -4710,6 +4727,7 @@ function App() {
     serviceIntakes: serviceIntakes
   }), (role === 'technician' || role === 'supervisor') && page === 'kpi_teknisi' && /*#__PURE__*/React.createElement(KpiTeknisiPage, {
     serviceIntakes: serviceIntakes,
+    orders: orders,
     userName: userName,
     role: role
   }), role === 'sales' && page === 'new_service' && /*#__PURE__*/React.createElement(ServiceIntakeEntry, {
