@@ -1458,7 +1458,7 @@ function KpiTeknisiPage(props) {
       if (si.updated_at && new Date(si.updated_at) >= todayStart) return true;
       return false;
     });
-    var todayTotal = todayDone.length + todayOpen.length;
+    var todayTotal = todayDone.length + open.length;
     return {
       name: name,
       todayDone: todayDone.length,
