@@ -873,10 +873,6 @@ var ROLE_NAV = {
     icon: '📊',
     label: 'Ringkasan'
   }, {
-    id: 'riwayat_teknisi',
-    icon: '📋',
-    label: 'Riwayat'
-  }, {
     id: 'my_jobs',
     icon: '🔧',
     label: 'My Jobs'
@@ -888,6 +884,10 @@ var ROLE_NAV = {
     id: 'absensi',
     icon: '🗓',
     label: 'Absensi'
+  }, {
+    id: 'riwayat_teknisi',
+    icon: '📋',
+    label: 'Riwayat'
   }],
   cabang: [{
     id: 'branch_dashboard',
@@ -26577,7 +26577,7 @@ function TechnicianSummary(_ref165) {
         color: 'var(--green)'
       }
     }, "\uD83D\uDD12 Dikunci \u2014 tidak bisa diedit")));
-  })), branchTechAll.length > 0 && /*#__PURE__*/React.createElement("div", {
+  })), riwayatOnly && branchTechAll.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       marginBottom: 14
