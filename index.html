@@ -846,6 +846,11 @@ var ROLE_NAV = {
     label: 'KPI Ops',
     _inSection: 'kpi'
   }, {
+    id: 'servis_summary',
+    icon: '📋',
+    label: 'Summary Servis',
+    _inSection: 'kpi'
+  }, {
     id: 'absensi',
     icon: '🗓',
     label: 'Absensi'
@@ -997,6 +1002,11 @@ var ROLE_NAV = {
     id: 'kpi_ops',
     icon: '📊',
     label: 'KPI Ops',
+    _inSection: 'kpi'
+  }, {
+    id: 'servis_summary',
+    icon: '📋',
+    label: 'Summary Servis',
     _inSection: 'kpi'
   }, {
     id: 'kpi_teknisi',
@@ -1314,29 +1324,40 @@ function KpiOpsPage(props) {
   }
 }
 
-// ─── KPI Teknisi Page ────────────────────────────────────────────────────────
-function KpiTeknisiPage(props) {
+// ─── Summary Servis Page (semua antrian aktif: teknisi + SC) ─────────────────
+function ServisSummaryPage(props) {
   var serviceIntakes = props.serviceIntakes || [];
   var now = new Date();
   var active = serviceIntakes.filter(function(si) {
-    return !['done','returned','branch_done','branch_returned','batal_dikembalikan'].includes(si.status);
+    return !['done','returned','branch_done','branch_returned','batal_dikembalikan','sc_batal','batal_servis'].includes(si.status);
   });
   function ageDays(si) { return Math.floor((now - new Date(si.created_at)) / 86400000); }
-  function ageType(d)  { return d <= 1 ? 'green' : d <= 2 ? 'amber' : 'red'; }
-  function ageLabel(d) { return d === 0 ? 'Hari ini' : d === 1 ? '1 hari' : d + ' hari'; }
+  function ageLabel(d) { return d === 0 ? 'Hari ini' : d + ' hari'; }
   function ageColor(d) { return d <= 1 ? 'var(--green)' : d <= 2 ? 'var(--amber)' : 'var(--red)'; }
   var sorted = active.slice().sort(function(a, b) { return new Date(a.created_at) - new Date(b.created_at); });
   var g  = active.filter(function(si) { return ageDays(si) <= 1; }).length;
   var o  = active.filter(function(si) { return ageDays(si) === 2; }).length;
   var r  = active.filter(function(si) { var d = ageDays(si); return d >= 3 && d < 7; }).length;
   var rr = active.filter(function(si) { return ageDays(si) >= 7; }).length;
-  var statusLbl = {received:'Diterima', to_technician:'Di Teknisi', post_sc_checking:'Cek SC', done:'Selesai', returned:'Kembali'};
+  var statusLbl = {
+    received:'Diterima', to_technician:'Di Teknisi', post_sc_checking:'Cek Pasca SC',
+    to_service_center:'Ke SC', at_service_center:'Di SC', sc_pickup_assigned:'Jemput SC',
+    sc_ekspedisi_waiting:'Ekspedisi SC', back_from_sc:'Kembali SC', done:'Selesai', returned:'Kembali'
+  };
+  function statusBg(s) {
+    if (s==='to_technician') return {bg:'rgba(99,102,241,0.12)',fg:'var(--accent2)'};
+    if (s==='received') return {bg:'rgba(245,158,11,0.12)',fg:'var(--amber)'};
+    if (['to_service_center','at_service_center','sc_pickup_assigned','sc_ekspedisi_waiting','back_from_sc'].includes(s))
+      return {bg:'rgba(59,130,246,0.12)',fg:'var(--blue)'};
+    if (s==='post_sc_checking') return {bg:'rgba(20,184,166,0.12)',fg:'var(--teal)'};
+    return {bg:'var(--bg3)',fg:'var(--text2)'};
+  }
   var thS = {padding:'8px 10px', textAlign:'left', fontWeight:600, fontSize:12, color:'var(--text2)', whiteSpace:'nowrap'};
   var tdS = {padding:'8px 10px'};
-  return React.createElement('div', {style:{padding:24, maxWidth:950}},
+  return React.createElement('div', {style:{padding:24, maxWidth:1000}},
     React.createElement('div', {style:{marginBottom:20, borderBottom:'1px solid var(--border)', paddingBottom:12}},
-      React.createElement('h2', {style:{margin:0, fontSize:20, fontWeight:700}}, '🔧 KPI Teknisi — Antrian Servis'),
-      React.createElement('div', {style:{fontSize:13, color:'var(--text3)', marginTop:4}}, active.length + ' tiket aktif · target: selesai hari H atau H+1')
+      React.createElement('h2', {style:{margin:0, fontSize:20, fontWeight:700}}, '📋 Summary Servis — Antrian Aktif'),
+      React.createElement('div', {style:{fontSize:13, color:'var(--text3)', marginTop:4}}, active.length + ' tiket belum selesai · semua teknisi & service center')
     ),
     React.createElement('div', {style:{display:'flex', gap:10, marginBottom:20, flexWrap:'wrap'}},
       React.createElement('span', {style:{background:'rgba(34,197,94,0.12)', color:'var(--green)', border:'1px solid rgba(34,197,94,0.3)', borderRadius:20, padding:'4px 14px', fontSize:13, fontWeight:600}}, '🟢 ≤1 hari: ' + g),
@@ -1353,13 +1374,185 @@ function KpiTeknisiPage(props) {
                 React.createElement('th', {style:thS}, 'Umur'),
                 React.createElement('th', {style:thS}, 'Customer'),
                 React.createElement('th', {style:thS}, 'Unit'),
-                React.createElement('th', {style:thS}, 'Teknisi'),
+                React.createElement('th', {style:thS}, 'Lokasi / Assign'),
                 React.createElement('th', {style:thS}, 'Status'),
                 React.createElement('th', {style:thS}, 'Tgl Masuk')
               )
             ),
             React.createElement('tbody', null,
               sorted.map(function(si) {
+                var d = ageDays(si);
+                var rowBg = d <= 1 ? 'transparent' : d <= 2 ? 'rgba(245,158,11,0.04)' : 'rgba(239,68,68,0.05)';
+                var sc = statusBg(si.status);
+                var lokasi = si.tech_assigned
+                  ? si.tech_assigned
+                  : (si.service_center_name || (si.status.includes('service_center')||si.status.includes('sc_')||si.status==='back_from_sc' ? 'SC' : '—'));
+                return React.createElement('tr', {key:si.id, style:{background:rowBg, borderBottom:'1px solid var(--border)'}},
+                  React.createElement('td', {style:tdS},
+                    React.createElement('span', {style:{fontWeight:700, color:ageColor(d), fontSize:14}}, ageLabel(d)),
+                    d >= 7 && React.createElement('span', {style:{fontSize:11, color:'var(--red)', fontWeight:700, marginLeft:4}}, '⚠')
+                  ),
+                  React.createElement('td', {style:Object.assign({},tdS,{fontWeight:500})}, si.customer_name || '—'),
+                  React.createElement('td', {style:Object.assign({},tdS,{color:'var(--text2)'})}, si.unit_type || '—'),
+                  React.createElement('td', {style:Object.assign({},tdS,{color:'var(--text2)'})}, lokasi),
+                  React.createElement('td', {style:tdS},
+                    React.createElement('span', {style:{fontSize:11, padding:'2px 8px', borderRadius:10, background:sc.bg, color:sc.fg}},
+                      statusLbl[si.status] || si.status)
+                  ),
+                  React.createElement('td', {style:Object.assign({},tdS,{color:'var(--text3)',fontSize:12})}, fmtDate(si.created_at))
+                );
+              })
+            )
+          )
+        )
+  );
+}
+
+// ─── KPI Teknisi Page (produktivitas teknisi: hari ini & bulan ini) ───────────
+function KpiTeknisiPage(props) {
+  var serviceIntakes = props.serviceIntakes || [];
+  var userName = props.userName || '';
+  var role = props.role || '';
+  var now = new Date();
+  var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  var TECH_ACTIVE = ['to_technician', 'post_sc_checking'];
+  var TECH_DONE   = ['done', 'returned', 'branch_done', 'branch_returned'];
+  function assignDate(si) { return si.tech_assigned_at || si.created_at; }
+  function ageDays(si) { return Math.floor((now - new Date(si.created_at)) / 86400000); }
+  function ageLabel(d) { return d === 0 ? 'Hari ini' : d + ' hari'; }
+  function ageColor(d) { return d <= 1 ? 'var(--green)' : d <= 2 ? 'var(--amber)' : 'var(--red)'; }
+
+  var techItems = serviceIntakes.filter(function(si) {
+    if (!si.tech_assigned) return false;
+    if (role === 'technician') return si.tech_assigned === userName;
+    return true;
+  }).filter(function(si) { return TECH_ACTIVE.concat(TECH_DONE).includes(si.status); });
+
+  var nameSet = {};
+  techItems.forEach(function(si) { if (si.tech_assigned) nameSet[si.tech_assigned] = true; });
+  var techNames = role === 'technician' ? [userName] : Object.keys(nameSet).sort();
+
+  function getTechStats(name) {
+    var items = techItems.filter(function(si) { return si.tech_assigned === name; });
+    var todayT = items.filter(function(si) { return new Date(assignDate(si)) >= todayStart; });
+    var monthT = items.filter(function(si) { return new Date(assignDate(si)) >= monthStart; });
+    var open   = items.filter(function(si) { return TECH_ACTIVE.includes(si.status); });
+    return {
+      name: name,
+      todayDone: todayT.filter(function(si) { return TECH_DONE.includes(si.status); }).length,
+      todayTotal: todayT.length,
+      monthDone: monthT.filter(function(si) { return TECH_DONE.includes(si.status); }).length,
+      monthTotal: monthT.length,
+      open: open
+    };
+  }
+
+  var allStats = techNames.map(getTechStats);
+  var allOpen  = techItems.filter(function(si) { return TECH_ACTIVE.includes(si.status); })
+    .sort(function(a,b) { return new Date(a.created_at) - new Date(b.created_at); });
+  var totalTD = 0, totalTT = 0, totalMD = 0, totalMT = 0;
+  allStats.forEach(function(s) { totalTD+=s.todayDone; totalTT+=s.todayTotal; totalMD+=s.monthDone; totalMT+=s.monthTotal; });
+
+  var thS = {padding:'8px 10px', textAlign:'left', fontWeight:600, fontSize:12, color:'var(--text2)', whiteSpace:'nowrap'};
+  var tdS = {padding:'8px 10px', fontSize:13};
+
+  function scoreTile(top, label, sub, color) {
+    return React.createElement('div', {style:{background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:10, padding:'14px 16px'}},
+      React.createElement('div', {style:{fontSize:28, fontWeight:800, color:color||'var(--text)'}}, top),
+      React.createElement('div', {style:{fontSize:12, fontWeight:600, color:'var(--text)', marginTop:6}}, label),
+      React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}}, sub)
+    );
+  }
+
+  var isSupervisor = role !== 'technician';
+  var myStats = allStats[0] || {todayDone:0,todayTotal:0,monthDone:0,monthTotal:0,open:[]};
+
+  return React.createElement('div', {style:{padding:24, maxWidth:1000}},
+    React.createElement('div', {style:{marginBottom:20, borderBottom:'1px solid var(--border)', paddingBottom:12}},
+      React.createElement('h2', {style:{margin:0, fontSize:20, fontWeight:700}}, '🔧 KPI Teknisi'),
+      React.createElement('div', {style:{fontSize:13, color:'var(--text3)', marginTop:4}},
+        now.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long', year:'numeric'}))
+    ),
+    // Score tiles
+    React.createElement('div', {style:{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(170px,1fr))', gap:12, marginBottom:24}},
+      scoreTile(
+        (isSupervisor ? totalTD : myStats.todayDone) + '/' + (isSupervisor ? totalTT : myStats.todayTotal),
+        'Hari ini selesai',
+        'tugas masuk hari ini',
+        'var(--accent2)'
+      ),
+      scoreTile(
+        (isSupervisor ? totalMD : myStats.monthDone) + '/' + (isSupervisor ? totalMT : myStats.monthTotal),
+        'Bulan ini selesai',
+        new Date().toLocaleDateString('id-ID',{month:'long'}),
+        (isSupervisor ? totalMD===totalMT : myStats.monthDone===myStats.monthTotal) && totalMT > 0 ? 'var(--green)' : 'var(--text)'
+      ),
+      scoreTile(
+        String(allOpen.length),
+        'Masih open',
+        allOpen.length === 0 ? 'Semua selesai 🎉' : 'belum dikembalikan ke customer',
+        allOpen.length === 0 ? 'var(--green)' : allOpen.length <= 3 ? 'var(--amber)' : 'var(--red)'
+      )
+    ),
+    // Per-technician table (supervisor only)
+    isSupervisor && allStats.length > 0 && React.createElement('div', {style:{marginBottom:24}},
+      React.createElement('div', {style:{fontSize:10, fontWeight:700, color:'var(--text3)', letterSpacing:'0.07em', marginBottom:10}}, 'PER TEKNISI — ' + new Date().toLocaleDateString('id-ID',{month:'long', year:'numeric'}).toUpperCase()),
+      React.createElement('div', {style:{overflowX:'auto'}},
+        React.createElement('table', {style:{width:'100%', borderCollapse:'collapse', fontSize:13}},
+          React.createElement('thead', null,
+            React.createElement('tr', {style:{background:'var(--bg2)', borderBottom:'1px solid var(--border)'}},
+              React.createElement('th', {style:thS}, 'Teknisi'),
+              React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, 'Hari ini'),
+              React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, 'Bulan ini'),
+              React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, 'Masih open')
+            )
+          ),
+          React.createElement('tbody', null,
+            allStats.map(function(s) {
+              var tOk = s.todayTotal > 0 && s.todayDone === s.todayTotal;
+              var mOk = s.monthTotal > 0 && s.monthDone === s.monthTotal;
+              return React.createElement('tr', {key:s.name, style:{borderBottom:'1px solid var(--border)'}},
+                React.createElement('td', {style:Object.assign({},tdS,{fontWeight:600})}, s.name),
+                React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})},
+                  React.createElement('span', {style:{fontWeight:700, color:tOk?'var(--green)':s.todayDone>0?'var(--amber)':'var(--text)'}},
+                    s.todayDone + '/' + s.todayTotal),
+                  React.createElement('span', {style:{fontSize:11, color:'var(--text3)', marginLeft:4}}, 'selesai')
+                ),
+                React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})},
+                  React.createElement('span', {style:{fontWeight:700, color:mOk?'var(--green)':s.monthDone>0?'var(--amber)':'var(--text)'}},
+                    s.monthDone + '/' + s.monthTotal),
+                  React.createElement('span', {style:{fontSize:11, color:'var(--text3)', marginLeft:4}}, 'selesai')
+                ),
+                React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})},
+                  React.createElement('span', {style:{fontWeight:700, color:s.open.length>0?'var(--amber)':'var(--green)'}},
+                    s.open.length)
+                )
+              );
+            })
+          )
+        )
+      )
+    ),
+    // Open items
+    React.createElement('div', {style:{fontSize:10, fontWeight:700, color:'var(--text3)', letterSpacing:'0.07em', marginBottom:10}},
+      'MASIH OPEN (' + allOpen.length + ')'),
+    allOpen.length === 0
+      ? React.createElement('div', {style:{textAlign:'center', color:'var(--text3)', padding:32, fontSize:14}}, '✅ Semua tugas teknisi sudah selesai!')
+      : React.createElement('div', {style:{overflowX:'auto'}},
+          React.createElement('table', {style:{width:'100%', borderCollapse:'collapse', fontSize:13}},
+            React.createElement('thead', null,
+              React.createElement('tr', {style:{background:'var(--bg2)', borderBottom:'2px solid var(--border)'}},
+                React.createElement('th', {style:thS}, 'Umur'),
+                React.createElement('th', {style:thS}, 'Customer'),
+                React.createElement('th', {style:thS}, 'Unit'),
+                isSupervisor && React.createElement('th', {style:thS}, 'Teknisi'),
+                React.createElement('th', {style:thS}, 'Status'),
+                React.createElement('th', {style:thS}, 'Tgl Masuk')
+              )
+            ),
+            React.createElement('tbody', null,
+              allOpen.map(function(si) {
                 var d = ageDays(si);
                 var rowBg = d <= 1 ? 'transparent' : d <= 2 ? 'rgba(245,158,11,0.04)' : 'rgba(239,68,68,0.05)';
                 return React.createElement('tr', {key:si.id, style:{background:rowBg, borderBottom:'1px solid var(--border)'}},
@@ -1369,14 +1562,12 @@ function KpiTeknisiPage(props) {
                   ),
                   React.createElement('td', {style:Object.assign({},tdS,{fontWeight:500})}, si.customer_name || '—'),
                   React.createElement('td', {style:Object.assign({},tdS,{color:'var(--text2)'})}, si.unit_type || '—'),
-                  React.createElement('td', {style:Object.assign({},tdS,{color:si.tech_assigned?'var(--text)':'var(--amber)'})},
-                    si.tech_assigned || React.createElement('em', {style:{color:'var(--amber)'}}, 'Belum')),
+                  isSupervisor && React.createElement('td', {style:tdS}, si.tech_assigned || '—'),
                   React.createElement('td', {style:tdS},
-                    React.createElement('span', {style:{
-                      fontSize:11, padding:'2px 8px', borderRadius:10,
-                      background: si.status==='to_technician'?'rgba(99,102,241,0.12)':si.status==='received'?'rgba(245,158,11,0.12)':'var(--bg3)',
-                      color: si.status==='to_technician'?'var(--accent2)':si.status==='received'?'var(--amber)':'var(--text2)',
-                    }}, statusLbl[si.status] || si.status)
+                    React.createElement('span', {style:{fontSize:11, padding:'2px 8px', borderRadius:10,
+                      background:si.status==='to_technician'?'rgba(99,102,241,0.12)':'rgba(20,184,166,0.12)',
+                      color:si.status==='to_technician'?'var(--accent2)':'var(--teal)'
+                    }}, si.status==='to_technician'?'Di Teknisi':'Cek Pasca SC')
                   ),
                   React.createElement('td', {style:Object.assign({},tdS,{color:'var(--text3)',fontSize:12})}, fmtDate(si.created_at))
                 );
@@ -4486,8 +4677,12 @@ function App() {
     courierTasks: courierTasks,
     serviceIntakes: serviceIntakes,
     purchaseOrders: purchaseOrders
-  }), (role === 'technician' || role === 'supervisor') && page === 'kpi_teknisi' && /*#__PURE__*/React.createElement(KpiTeknisiPage, {
+  }), (role === 'ops' || role === 'supervisor') && page === 'servis_summary' && /*#__PURE__*/React.createElement(ServisSummaryPage, {
     serviceIntakes: serviceIntakes
+  }), (role === 'technician' || role === 'supervisor') && page === 'kpi_teknisi' && /*#__PURE__*/React.createElement(KpiTeknisiPage, {
+    serviceIntakes: serviceIntakes,
+    userName: userName,
+    role: role
   }), role === 'sales' && page === 'new_service' && /*#__PURE__*/React.createElement(ServiceIntakeEntry, {
     onSave: saveServiceIntake,
     createdByRole: "sales",
