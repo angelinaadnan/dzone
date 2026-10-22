@@ -47280,7 +47280,7 @@ function OrderDetailModal(_ref278) {
         case 3:
           if (!(i < newAdminPhotos.length)) { _ctx_ap.next = 10; break; }
           _ctx_ap.next = 6;
-          return uploadPhoto(newAdminPhotos[i], 'invoice', 1);
+          return uploadAlreadyCompressedPhoto(newAdminPhotos[i], 'invoice');
         case 6:
           url = _ctx_ap.sent;
           if (url) uploaded.push(url);
@@ -47323,8 +47323,8 @@ function OrderDetailModal(_ref278) {
             });
           case 6:
             setSavingInvoice(false);
-            setEditingInvoice(false);
-            setNewInvoiceNum('');
+            if (_context115.sent) { setEditingInvoice(false); setNewInvoiceNum(''); }
+            else { alert('Gagal simpan nomor invoice. Coba lagi.'); }
           case 9:
           case "end":
             return _context115.stop();
