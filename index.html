@@ -4268,6 +4268,12 @@ function App() {
               _context35.next = 3;
               break;
             }
+            if (db) {
+              updated = Object.assign({}, updates);
+              delete updated.status_note;
+              _context35.next = 11;
+              break;
+            }
             return _context35.abrupt("return");
           case 3:
             updated = _objectSpread(_objectSpread({}, order), updates);
