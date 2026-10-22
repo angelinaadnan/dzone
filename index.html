@@ -47275,35 +47275,15 @@ function OrderDetailModal(_ref278) {
     var updated = existingAdminPhotos.filter(function(_, i) { return i !== idx; });
     onUpdate(order.id, { admin_photos: updated, admin_photo: updated[0] || null });
   };
-  var saveNewAdminPhotos = /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee_ap() {
-    var uploaded, i, url, merged;
-    return _regeneratorRuntime().wrap(function _callee_ap$(_ctx_ap) {
-      while (1) switch (_ctx_ap.prev = _ctx_ap.next) {
-        case 0:
-          setSavingAdminPhoto(true);
-          uploaded = [];
-          i = 0;
-        case 3:
-          if (!(i < newAdminPhotos.length)) { _ctx_ap.next = 10; break; }
-          _ctx_ap.next = 6;
-          return uploadAlreadyCompressedPhoto(newAdminPhotos[i], 'invoice');
-        case 6:
-          url = _ctx_ap.sent;
-          uploaded.push(url || newAdminPhotos[i]);
-          i++;
-          _ctx_ap.next = 3;
-          break;
-        case 10:
-          merged = existingAdminPhotos.concat(uploaded).slice(0, 3);
-          onUpdate(order.id, { admin_photos: merged, admin_photo: merged[0] || null });
-          setNewAdminPhotos([]);
-          setSavingAdminPhoto(false);
-          break;
-        case 15:
-        case 'end': return _ctx_ap.stop();
-      }
-    }, _callee_ap);
-  }));
+  var saveNewAdminPhotos = function() {
+    setSavingAdminPhoto(true);
+    var slots = Math.max(0, 3 - existingAdminPhotos.length);
+    var toSave = newAdminPhotos.slice(0, slots);
+    var merged = existingAdminPhotos.concat(toSave).slice(0, 3);
+    onUpdate(order.id, { admin_photos: merged, admin_photo: merged[0] || null });
+    setNewAdminPhotos([]);
+    setSavingAdminPhoto(false);
+  };
   var saveInvoice = /*#__PURE__*/function () {
     var _ref279 = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee113() {
       return _regeneratorRuntime().wrap(function _callee113$(_context115) {
