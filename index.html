@@ -47201,8 +47201,8 @@ function OrderDetailModal(_ref278) {
     _React$useState506 = _slicedToArray(_React$useState505, 2),
     savingInvoice = _React$useState506[0],
     setSavingInvoice = _React$useState506[1];
-  var canEditInvoice = ['admin', 'ops'].includes(role);
-  var canEditAdminPhoto = ['admin', 'ops'].includes(role);
+  var canEditInvoice = ['admin', 'ops', 'admin_online'].includes(role);
+  var canEditAdminPhoto = ['admin', 'ops', 'admin_online'].includes(role);
   var _React$useState507 = React.useState([]),
     _React$useState508 = _slicedToArray(_React$useState507, 2),
     newAdminPhotos = _React$useState508[0],
