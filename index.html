@@ -4841,7 +4841,8 @@ function App() {
     orders: orders,
     onSelect: setSelectedOrder,
     onUpdate: updateOrder,
-    aoName: userName
+    aoName: userName,
+    db: db
   }), role === 'admin_online' && page === 'ao_tech_request' && /*#__PURE__*/React.createElement(AdminOnlineTechRequest, {
     intakes: serviceIntakes,
     onSave: saveServiceIntake,
@@ -20455,11 +20456,25 @@ function AdminOnlineOrders(_ref144) {
   var orders = _ref144.orders,
     onSelect = _ref144.onSelect,
     onUpdate = _ref144.onUpdate,
-    aoName = _ref144.aoName;
+    aoName = _ref144.aoName,
+    db = _ref144.db;
   var _React$useState223 = React.useState(''),
     _React$useState224 = _slicedToArray(_React$useState223, 2),
     search = _React$useState224[0],
     setSearch = _React$useState224[1];
+  var _dbAO = React.useState(null); var dbAOOrders = _dbAO[0]; var setDbAOOrders = _dbAO[1];
+  var _dbAOL = React.useState(false); var dbAOLoading = _dbAOL[0]; var setDbAOLoading = _dbAOL[1];
+  var _aoTimer = React.useRef(null);
+  var queryAOSearch = function(term) {
+    if (!db || !term || term.trim().length < 2) { setDbAOOrders(null); return; }
+    setDbAOLoading(true);
+    var t = term.trim();
+    db.from('orders').select('*')
+      .or('customer_name.ilike.%' + t + '%,sales_name.ilike.%' + t + '%,invoice_number.ilike.%' + t + '%')
+      .order('created_at', { ascending: false }).limit(200)
+      .then(function(res){ setDbAOOrders(res.data || []); setDbAOLoading(false); })
+      .catch(function(){ setDbAOLoading(false); });
+  };
   var _React$useState225 = React.useState({}),
     _React$useState226 = _slicedToArray(_React$useState225, 2),
     pengirimanOpen = _React$useState226[0],
@@ -20599,7 +20614,7 @@ function AdminOnlineOrders(_ref144) {
     { key: 'selesai', label: '✅ Selesai',         statuses: ['delivered'] },
     { key: 'batal',   label: '❌ Dibatalkan',      statuses: ['cancelled'] }
   ];
-  var myOrders = orders.filter(function (o) {
+  var myOrders = (dbAOOrders !== null ? dbAOOrders : orders.filter(function (o) {
     return SALES_AO.includes(o.sales_name);
   }).filter(function (o) {
     if (srcFilter === 'online') return !(o.info_tambahan || '').includes('[Titip Kirim dari Cabang:');
@@ -20611,7 +20626,8 @@ function AdminOnlineOrders(_ref144) {
       return g ? g.statuses.includes(o.status) : true;
     }
     return true;
-  }).filter(function (o) {
+  })).filter(function (o) {
+    if (dbAOOrders !== null) return true; // already filtered by DB search
     return !search || [o.customer_name, o.sales_name, o.invoice_number].some(function (v) {
       return (v || '').toLowerCase().includes(search.toLowerCase());
     });
@@ -20675,24 +20691,32 @@ function AdminOnlineOrders(_ref144) {
         setStatusFilter(g.key);
       }
     }, g.label || 'Semua', ' (', cnt, ')');
-  })), /*#__PURE__*/React.createElement("input", {
-    placeholder: "\uD83D\uDD0D Cari customer / sales / invoice...",
-    value: search,
-    onChange: function onChange(e) {
-      return setSearch(e.target.value);
-    },
-    style: {
-      width: '100%',
-      padding: '8px 12px',
-      background: 'var(--bg3)',
-      border: '1px solid var(--border)',
-      borderRadius: 8,
-      color: 'var(--text)',
-      marginBottom: 8,
-      fontSize: 13,
-      boxSizing: 'border-box'
-    }
-  }), myOrders.length === 0 && /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", { style: { position: 'relative', marginBottom: 8 } },
+    /*#__PURE__*/React.createElement("input", {
+      placeholder: dbAOLoading ? '\u23F3 Mencari...' : '\uD83D\uDD0D Cari customer / sales / invoice (semua order)...',
+      value: search,
+      onChange: function onChange(e) {
+        var v = e.target.value; setSearch(v);
+        clearTimeout(_aoTimer.current);
+        _aoTimer.current = setTimeout(function(){ queryAOSearch(v); }, 400);
+        if (!v) setDbAOOrders(null);
+      },
+      style: {
+        width: '100%',
+        padding: '8px 12px',
+        background: 'var(--bg3)',
+        border: '1px solid var(--border)',
+        borderRadius: 8,
+        color: 'var(--text)',
+        fontSize: 13,
+        boxSizing: 'border-box'
+      }
+    }),
+    search && /*#__PURE__*/React.createElement("button", {
+      onClick: function(){ setSearch(''); setDbAOOrders(null); },
+      style: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', fontSize: 16 }
+    }, '\u2715')
+  ), myOrders.length === 0 && /*#__PURE__*/React.createElement("div", {
     className: "empty-state"
   }, /*#__PURE__*/React.createElement("div", {
     className: "icon"
