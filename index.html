@@ -228,7 +228,7 @@ function uploadAlreadyCompressedPhoto(dataUrl, folder) {
         if (r.error) return null;
         return db.storage.from('photos').getPublicUrl(name).data.publicUrl;
       });
-    var timeout = new Promise(function(resolve) { setTimeout(function() { resolve(null); }, 45000); });
+    var timeout = new Promise(function(resolve) { setTimeout(function() { resolve(null); }, 15000); });
     return Promise.race([uploadPromise, timeout]).catch(function() { return null; });
   } catch(e) { return Promise.resolve(null); }
 }
@@ -47289,7 +47289,7 @@ function OrderDetailModal(_ref278) {
           return uploadAlreadyCompressedPhoto(newAdminPhotos[i], 'invoice');
         case 6:
           url = _ctx_ap.sent;
-          if (url) uploaded.push(url);
+          uploaded.push(url || newAdminPhotos[i]);
           i++;
           _ctx_ap.next = 3;
           break;
