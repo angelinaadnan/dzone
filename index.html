@@ -732,6 +732,7 @@ var ORDER_SOURCE_COLOR = {
   cabang: 'var(--amber)',
   other: 'var(--text3)'
 };
+var STOCK_CALC_USERS = ['Liana', 'Angel', 'Santo', 'Jenny', 'Lukas'];
 var ROLE_NAV = {
   sales: [{
     id: 'dashboard',
@@ -4398,7 +4399,8 @@ function App() {
   }) : ROLE_NAV[role]).filter(function (n) {
     return n.id !== 'pesan_barang' || canAccessPesanBarang;
   }).concat(accurateSection)
-  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : []);
+  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
+  .concat(STOCK_CALC_USERS.includes(userName) ? [{ id: 'stock_calculator', icon: '🧮', label: 'Kalkulator Stok' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -4860,7 +4862,7 @@ function App() {
     onUpdate: updateCourierTask,
     createdBy: userName,
     createdByRole: "admin_online"
-  }), canAccessPesanBarang && page === 'pesan_barang' && /*#__PURE__*/React.createElement(PesanBarangPage, {
+  }), STOCK_CALC_USERS.includes(userName) && page === 'stock_calculator' && /*#__PURE__*/React.createElement(StockCalculatorPage, null), canAccessPesanBarang && page === 'pesan_barang' && /*#__PURE__*/React.createElement(PesanBarangPage, {
     orders: purchaseOrders,
     onSave: savePurchaseOrder,
     onUpdate: updatePurchaseOrder,
@@ -49221,6 +49223,142 @@ function BusinessAnalystPage() {
           })
         )
       )
+    )
+  );
+}
+
+// ─── STOCK PURCHASE CALCULATOR ───────────────────────────────────
+function StockCalculatorPage() {
+  var _uc = React.useState(''); var unitCost = _uc[0]; var setUnitCost = _uc[1];
+  var _qq = React.useState(''); var qty = _qq[0]; var setQty = _qq[1];
+  var _gp = React.useState(''); var grossProfit = _gp[0]; var setGrossProfit = _gp[1];
+  var _rt = React.useState('1'); var rate = _rt[0]; var setRate = _rt[1];
+  var _ds = React.useState(''); var dailySales = _ds[0]; var setDailySales = _ds[1];
+  var _mt = React.useState('1'); var method = _mt[0]; var setMethod = _mt[1];
+
+  var C = parseFloat(unitCost) || 0;
+  var Q = parseFloat(qty) || 0;
+  var G = parseFloat(grossProfit) || 0;
+  var r = parseFloat(rate) / 100;
+  var S = parseFloat(dailySales) || 0;
+
+  var hasData = C > 0 && Q > 0 && S > 0;
+  var totalCapital = C * Q;
+  var totalGrossProfit = G * Q;
+  var D = S > 0 ? Q / S : 0;
+
+  var totalOC, maxDays, profitAfterOC, status, statusReason;
+  if (!hasData || G <= 0) {
+    status = !hasData ? 'INSUFFICIENT_DATA' : 'NOT_FEASIBLE';
+    statusReason = !hasData ? 'Isi satuan harga, jumlah unit, dan target penjualan harian.' : 'Gross profit per unit harus lebih dari 0.';
+    totalOC = 0; maxDays = 0; profitAfterOC = 0;
+  } else if (r === 0) {
+    totalOC = 0; maxDays = Infinity; profitAfterOC = totalGrossProfit;
+    status = 'CAUTION';
+    statusReason = 'Opportunity cost 0% — keuntungan positif tapi tidak ada batas waktu optimal yang bisa dihitung.';
+  } else {
+    var divisor = method === '1' ? 60 : 30;
+    totalOC = totalCapital * r * D / divisor;
+    maxDays = totalGrossProfit * divisor / (totalCapital * r);
+    profitAfterOC = totalGrossProfit - totalOC;
+    if (profitAfterOC <= 0) {
+      status = 'NOT_FEASIBLE';
+      statusReason = 'Estimasi biaya peluang melebihi laba kotor. Pertimbangkan harga, jumlah, atau target penjualan.';
+    } else if (D <= maxDays) {
+      status = 'PROFITABLE';
+      statusReason = 'Estimasi waktu jual (' + Math.round(D) + ' hari) dalam batas maksimal (' + Math.round(maxDays) + ' hari). Pembelian layak dilanjutkan.';
+    } else {
+      status = 'CAUTION';
+      statusReason = 'Laba bersih positif namun estimasi waktu jual (' + Math.round(D) + ' hari) melewati batas optimal (' + Math.round(maxDays) + ' hari). Perlu review asumsi penjualan.';
+    }
+  }
+
+  var statusConfig = {
+    PROFITABLE:        { label: 'LAYAK DALAM TARGET', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+    CAUTION:           { label: 'PERHATIAN',          color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+    NOT_FEASIBLE:      { label: 'TIDAK LAYAK',        color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
+    INSUFFICIENT_DATA: { label: 'DATA KURANG',        color: '#6b7280', bg: 'rgba(107,114,128,0.12)' },
+  };
+  var sc = statusConfig[status] || statusConfig.INSUFFICIENT_DATA;
+
+  function numInput(label, val, setter, placeholder) {
+    return React.createElement('div', { style:{ marginBottom:14 } },
+      React.createElement('label', { style:{ display:'block', fontSize:12, color:'var(--text2)', marginBottom:4, fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase' } }, label),
+      React.createElement('input', {
+        type:'number', min:'0', value:val, placeholder:placeholder || '0',
+        onChange: function(e){ setter(e.target.value); },
+        style:{ width:'100%', padding:'9px 12px', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:14, boxSizing:'border-box' }
+      })
+    );
+  }
+
+  function row(label, val, highlight) {
+    return React.createElement('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 0', borderBottom:'1px solid var(--border)' } },
+      React.createElement('span', { style:{ fontSize:13, color:'var(--text2)' } }, label),
+      React.createElement('span', { style:{ fontSize:14, fontWeight: highlight ? 700 : 500, color: highlight ? 'var(--accent2)' : 'var(--text)', fontFamily:'monospace' } }, val)
+    );
+  }
+
+  var inf = maxDays === Infinity;
+
+  return React.createElement('div', { style:{ padding:'24px 20px', maxWidth:680, margin:'0 auto' } },
+    React.createElement('h2', { style:{ fontFamily:'Syne', fontWeight:700, fontSize:20, marginBottom:4 } }, '📦 Kalkulator Pembelian Stok'),
+    React.createElement('p', { style:{ fontSize:13, color:'var(--text2)', marginBottom:24 } }, 'Evaluasi kelayakan pembelian stok dengan memperhitungkan biaya peluang modal.'),
+
+    // Inputs
+    React.createElement('div', { style:{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:20, marginBottom:20 } },
+      React.createElement('div', { style:{ fontWeight:700, fontSize:13, marginBottom:16, color:'var(--text2)', letterSpacing:'0.05em', textTransform:'uppercase' } }, 'Input'),
+      React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 16px' } },
+        numInput('Harga Satuan (Rp)', unitCost, setUnitCost, 'Contoh: 5000000'),
+        numInput('Jumlah Unit', qty, setQty, 'Contoh: 10'),
+        numInput('Laba Kotor per Unit (Rp)', grossProfit, setGrossProfit, 'Contoh: 500000'),
+        numInput('Target Penjualan Harian (unit/hari)', dailySales, setDailySales, 'Contoh: 2')
+      ),
+      React.createElement('div', { style:{ marginBottom:14 } },
+        React.createElement('label', { style:{ display:'block', fontSize:12, color:'var(--text2)', marginBottom:6, fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase' } }, 'Tingkat Biaya Peluang Bulanan'),
+        React.createElement('div', { style:{ display:'flex', gap:8 } },
+          ['0','1','2','3'].map(function(v) {
+            return React.createElement('button', {
+              key:v,
+              onClick: function(){ setRate(v); },
+              style:{ padding:'6px 16px', borderRadius:8, border:'none', cursor:'pointer', fontWeight:600, fontSize:13,
+                background: rate===v ? 'var(--accent2)' : 'var(--bg3)',
+                color: rate===v ? '#fff' : 'var(--text2)' }
+            }, v + '%');
+          })
+        )
+      ),
+      React.createElement('div', { style:{ marginBottom:4 } },
+        React.createElement('label', { style:{ display:'block', fontSize:12, color:'var(--text2)', marginBottom:6, fontWeight:600, letterSpacing:'0.04em', textTransform:'uppercase' } }, 'Metode Perhitungan Bunga'),
+        React.createElement('div', { style:{ display:'flex', flexDirection:'column', gap:8 } },
+          React.createElement('label', { style:{ display:'flex', alignItems:'flex-start', gap:8, cursor:'pointer', fontSize:13 } },
+            React.createElement('input', { type:'radio', name:'method', value:'1', checked:method==='1', onChange:function(){ setMethod('1'); }, style:{ marginTop:2 } }),
+            React.createElement('span', null, React.createElement('strong', null, 'Metode 1:'), ' Modal berkurang progresif seiring penjualan (÷60)')
+          ),
+          React.createElement('label', { style:{ display:'flex', alignItems:'flex-start', gap:8, cursor:'pointer', fontSize:13 } },
+            React.createElement('input', { type:'radio', name:'method', value:'2', checked:method==='2', onChange:function(){ setMethod('2'); }, style:{ marginTop:2 } }),
+            React.createElement('span', null, React.createElement('strong', null, 'Metode 2:'), ' Modal awal tetap jadi dasar perhitungan sampai habis terjual (÷30)')
+          )
+        )
+      )
+    ),
+
+    // Results
+    React.createElement('div', { style:{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:20, marginBottom:20 } },
+      React.createElement('div', { style:{ fontWeight:700, fontSize:13, marginBottom:12, color:'var(--text2)', letterSpacing:'0.05em', textTransform:'uppercase' } }, 'Hasil Kalkulasi'),
+      row('Total Modal yang Dibutuhkan', hasData ? fmtCurrency(totalCapital) : '—'),
+      row('Total Laba Kotor', hasData ? fmtCurrency(totalGrossProfit) : '—'),
+      row('Estimasi Hari Habis Terjual', hasData ? Math.round(D) + ' hari' : '—'),
+      row('Biaya Peluang Bulanan (modal awal)', r > 0 && hasData ? fmtCurrency(totalCapital * r) : r===0 ? 'Rp 0 (rate 0%)' : '—'),
+      row('Maks. Hari agar Laba ≥ Biaya Peluang', !hasData || G<=0 ? '—' : inf ? '∞ (rate 0%)' : Math.round(maxDays) + ' hari'),
+      row('Estimasi Total Biaya Peluang', hasData && G>0 ? fmtCurrency(totalOC) : '—'),
+      row('Estimasi Laba Bersih', hasData && G>0 ? fmtCurrency(profitAfterOC) : '—', true)
+    ),
+
+    // Status
+    React.createElement('div', { style:{ background: sc.bg, border:'1px solid ' + sc.color, borderRadius:12, padding:20 } },
+      React.createElement('div', { style:{ fontWeight:800, fontSize:15, color: sc.color, marginBottom:8 } }, sc.label),
+      React.createElement('div', { style:{ fontSize:13, color:'var(--text)' } }, statusReason)
     )
   );
 }
