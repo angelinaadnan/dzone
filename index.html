@@ -49485,7 +49485,14 @@ function StockAgingPage() {
       var ao = AGING_CFG[a._ac] ? AGING_CFG[a._ac].order : 6;
       var bo = AGING_CFG[b._ac] ? AGING_CFG[b._ac].order : 6;
       if (ao !== bo) return ao - bo;
-      return b._oc - a._oc;
+      if (b._oc !== a._oc) return b._oc - a._oc;
+      if (b._tc !== a._tc) return b._tc - a._tc;
+      var av = a.avg_daily_sales ? parseFloat(a.avg_daily_sales) : 0;
+      var bv = b.avg_daily_sales ? parseFloat(b.avg_daily_sales) : 0;
+      if (av !== bv) return av - bv;
+      var aa = a._age !== null ? a._age : -1;
+      var ba = b._age !== null ? b._age : -1;
+      return ba - aa;
     });
   }, [enriched, activeTab, activeCat, activeBrand, search]);
 
@@ -49514,7 +49521,7 @@ function StockAgingPage() {
 
   function fetchData() {
     setLoading(true); setErr(null);
-    fetch('https://connectoracc.dzoutlet.co.id/api/stock/aging?db=' + dbId)
+    fetch('https://connectoracc.dzoutlet.co.id/api/stock/aging?db=' + dbId, { headers: { 'X-API-Key': 'dzone-connector-secret-2026' } })
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.error) throw new Error(d.error);
