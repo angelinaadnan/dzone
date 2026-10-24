@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Santo Dashboard Token Sync",
+  "version": "1.0",
+  "description": "Auto-sync _dsi token dari iris.accurate.id ke Santo Dashboard",
+  "permissions": ["storage", "notifications"],
+  "host_permissions": [
+    "https://iris.accurate.id/*",
+    "https://dz-one.pages.dev/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://iris.accurate.id/accurate/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}

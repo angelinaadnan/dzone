@@ -733,6 +733,7 @@ var ORDER_SOURCE_COLOR = {
   other: 'var(--text3)'
 };
 var STOCK_CALC_USERS = ['Liana', 'Angel', 'Santo', 'Jenny', 'Lukas'];
+var STOCK_AGING_USERS = ['Liana', 'Angel', 'Santo', 'Jenny', 'Lukas'];
 var ROLE_NAV = {
   sales: [{
     id: 'dashboard',
@@ -4400,7 +4401,8 @@ function App() {
     return n.id !== 'pesan_barang' || canAccessPesanBarang;
   }).concat(accurateSection)
   .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
-  .concat(STOCK_CALC_USERS.includes(userName) ? [{ id: 'stock_calculator', icon: '🧮', label: 'Kalkulator Stok' }] : []);
+  .concat(STOCK_CALC_USERS.includes(userName) ? [{ id: 'stock_calculator', icon: '🧮', label: 'Kalkulator Stok' }] : [])
+  .concat(STOCK_AGING_USERS.includes(userName) ? [{ id: 'stock_aging', icon: '📦', label: 'Review Stok' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -4862,7 +4864,7 @@ function App() {
     onUpdate: updateCourierTask,
     createdBy: userName,
     createdByRole: "admin_online"
-  }), STOCK_CALC_USERS.includes(userName) && page === 'stock_calculator' && /*#__PURE__*/React.createElement(StockCalculatorPage, null), canAccessPesanBarang && page === 'pesan_barang' && /*#__PURE__*/React.createElement(PesanBarangPage, {
+  }), STOCK_CALC_USERS.includes(userName) && page === 'stock_calculator' && /*#__PURE__*/React.createElement(StockCalculatorPage, null), STOCK_AGING_USERS.includes(userName) && page === 'stock_aging' && /*#__PURE__*/React.createElement(StockAgingPage, null), canAccessPesanBarang && page === 'pesan_barang' && /*#__PURE__*/React.createElement(PesanBarangPage, {
     orders: purchaseOrders,
     onSave: savePurchaseOrder,
     onUpdate: updatePurchaseOrder,
@@ -49360,6 +49362,472 @@ function StockCalculatorPage() {
       React.createElement('div', { style:{ fontWeight:800, fontSize:15, color: sc.color, marginBottom:8 } }, sc.label),
       React.createElement('div', { style:{ fontSize:13, color:'var(--text)' } }, statusReason)
     )
+  );
+}
+
+// ─── STOCK AGING REVIEW ───────────────────────────────────────────
+function StockAgingPage() {
+  var _items = React.useState([]); var items = _items[0]; var setItems = _items[1];
+  var _loading = React.useState(false); var loading = _loading[0]; var setLoading = _loading[1];
+  var _err = React.useState(null); var err = _err[0]; var setErr = _err[1];
+  var _tab = React.useState('all'); var activeTab = _tab[0]; var setActiveTab = _tab[1];
+  var _cat = React.useState('all'); var activeCat = _cat[0]; var setActiveCat = _cat[1];
+  var _brand = React.useState('all'); var activeBrand = _brand[0]; var setActiveBrand = _brand[1];
+  var _search = React.useState(''); var search = _search[0]; var setSearch = _search[1];
+  var _rate = React.useState(1); var ocRate = _rate[0]; var setOcRate = _rate[1];
+  var _noSaleDays = React.useState(14); var noSaleDays = _noSaleDays[0]; var setNoSaleDays = _noSaleDays[1];
+  var _db = React.useState('74419'); var dbId = _db[0]; var setDbId = _db[1];
+  var _fetched = React.useState(null); var fetchedAt = _fetched[0]; var setFetchedAt = _fetched[1];
+  var _sim = React.useState(null); var simItem = _sim[0]; var setSimItem = _sim[1];
+  var _simPrice = React.useState(''); var simPrice = _simPrice[0]; var setSimPrice = _simPrice[1];
+  var _showOCBreakdown = React.useState(true); var showOCBreakdown = _showOCBreakdown[0]; var setShowOCBreakdown = _showOCBreakdown[1];
+
+  var AGING_CFG = {
+    critical: { label: 'CRITICAL AGING', short: 'Kritis', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', days: '>60 hari', order: 0 },
+    old:      { label: 'OLD STOCK',       short: 'Lama',   color: '#f97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.3)', days: '46–60 hari', order: 1 },
+    slow:     { label: 'SLOW MOVING',     short: 'Lambat', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)', days: '31–45 hari', order: 2 },
+    aging:    { label: 'AGING',           short: 'Aging',  color: '#eab308', bg: 'rgba(234,179,8,0.12)', border: 'rgba(234,179,8,0.3)', days: '15–30 hari', order: 3 },
+    monitor:  { label: 'MONITOR',         short: 'Monitor',color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.3)', days: '8–14 hari', order: 4 },
+    fresh:    { label: 'FRESH / NEW',     short: 'Fresh',  color: '#22c55e', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.3)', days: '0–7 hari', order: 5 },
+    unknown:  { label: 'DATA UNAVAILABLE',short: 'N/A',    color: '#6b7280', bg: 'rgba(107,114,128,0.12)', border: 'rgba(107,114,128,0.3)', days: '—', order: 6 },
+  };
+
+  function getAgingCat(d) {
+    if (d === null || d === undefined) return 'unknown';
+    if (d <= 7)  return 'fresh';
+    if (d <= 14) return 'monitor';
+    if (d <= 30) return 'aging';
+    if (d <= 45) return 'slow';
+    if (d <= 60) return 'old';
+    return 'critical';
+  }
+
+  function getBrand(kode) {
+    if (!kode) return '—';
+    var p = kode.split('-');
+    if (/^PC-AIO-/.test(kode)) return p[2] || '—';
+    return p[1] || '—';
+  }
+
+  function getCatLabel(kode) {
+    if (/^NB-/.test(kode))    return 'Notebook';
+    if (/^PC-AIO-/.test(kode)) return 'PC AIO';
+    if (/^PR-/.test(kode))    return 'Printer';
+    if (/^PJ/.test(kode))     return 'Projector';
+    return '—';
+  }
+
+  function calcOC(unitCost, stock, ageDays, rate) {
+    if (!unitCost || !stock || !ageDays || !rate) return 0;
+    return stock * unitCost * (rate / 100) * ageDays / 30;
+  }
+
+  function getRec(item) {
+    var cat = item._ac; var sold30 = item.sold_30d || 0; var sold90 = item.sold_90d || 0;
+    var d = item.age_days;
+    if (d === null || d === undefined) return { s: 'INSUFFICIENT DATA', r: 'Tidak ada data tanggal pembelian.' };
+    if (!item._uc) return { s: 'INSUFFICIENT DATA', r: 'Data harga modal tidak tersedia.' };
+    if (cat === 'critical' && sold30 === 0 && sold90 === 0)
+      return { s: 'URGENT CLEARANCE REVIEW', r: 'Stok >60 hari, tidak ada penjualan 90 hari terakhir. Prioritas review manajemen segera.' };
+    if (cat === 'critical')
+      return { s: 'CLEARANCE SALE', r: 'Stok >60 hari, biaya peluang terakumulasi signifikan. Pertimbangkan clearance/diskon.' };
+    if (cat === 'old' && sold30 === 0)
+      return { s: 'CLEARANCE SALE', r: 'Stok 46–60 hari tanpa penjualan bulan ini. Evaluasi harga atau dorong promosi segera.' };
+    if ((cat === 'slow' || cat === 'old') && sold30 > 0)
+      return { s: 'MONITOR / PROMOTE', r: 'Stok mulai aging namun penjualan masih berjalan. Pertimbangkan promosi tambahan.' };
+    if (cat === 'aging' && sold30 === 0)
+      return { s: 'MONITOR / PROMOTE', r: 'Stok 15–30 hari tanpa penjualan bulan ini. Pantau dan pertimbangkan promosi.' };
+    if (cat === 'fresh' || cat === 'monitor' || (cat === 'aging' && sold30 > 0))
+      return { s: 'RETAIN STOCK', r: 'Stok masih segar dan/atau ada penjualan aktif. Pertahankan.' };
+    return { s: 'INSUFFICIENT DATA', r: 'Data tidak cukup untuk rekomendasi.' };
+  }
+
+  var REC_COLOR = {
+    'RETAIN STOCK': '#22c55e',
+    'MONITOR / PROMOTE': '#3b82f6',
+    'CLEARANCE SALE': '#f59e0b',
+    'URGENT CLEARANCE REVIEW': '#ef4444',
+    'INSUFFICIENT DATA': '#6b7280',
+  };
+
+  var enriched = React.useMemo(function() {
+    return items.map(function(item) {
+      var uc = parseFloat(item.unit_cost) || 0;
+      var st = parseInt(item.total_stock) || 0;
+      var d = item.age_days !== null && item.age_days !== undefined ? parseInt(item.age_days) : null;
+      var ac = getAgingCat(d);
+      var oc = calcOC(uc, st, d, ocRate);
+      var tc = uc * st;
+      var rec = getRec(Object.assign({}, item, { _ac: ac, _uc: uc }));
+      var avgD = item.avg_daily_sales ? parseFloat(item.avg_daily_sales) : null;
+      var dts = avgD && avgD > 0 ? Math.round(st / avgD) : null;
+      return Object.assign({}, item, {
+        _ac: ac, _oc: oc, _tc: tc, _rec: rec,
+        _brand: getBrand(item.kode), _catL: getCatLabel(item.kode),
+        _dts: dts, _uc: uc, _st: st, _age: d,
+        _ocPerUnit: st > 0 ? oc / st : 0,
+        _ocPct: uc > 0 ? (oc / tc) * 100 : 0,
+      });
+    });
+  }, [items, ocRate]);
+
+  var filtered = React.useMemo(function() {
+    return enriched.filter(function(i) {
+      if (activeTab !== 'all' && i._ac !== activeTab) return false;
+      if (activeCat === 'NB' && !/^NB-/.test(i.kode)) return false;
+      if (activeCat === 'PC-AIO' && !/^PC-AIO-/.test(i.kode)) return false;
+      if (activeCat === 'PR' && !/^PR-/.test(i.kode)) return false;
+      if (activeCat === 'PJ' && !/^PJ/.test(i.kode)) return false;
+      if (activeBrand !== 'all' && i._brand !== activeBrand) return false;
+      if (search) { var q = search.toLowerCase(); if (!i.nama.toLowerCase().includes(q) && !i.kode.toLowerCase().includes(q)) return false; }
+      return true;
+    }).sort(function(a, b) {
+      var ao = AGING_CFG[a._ac] ? AGING_CFG[a._ac].order : 6;
+      var bo = AGING_CFG[b._ac] ? AGING_CFG[b._ac].order : 6;
+      if (ao !== bo) return ao - bo;
+      return b._oc - a._oc;
+    });
+  }, [enriched, activeTab, activeCat, activeBrand, search]);
+
+  var stats = React.useMemo(function() {
+    var totalCost=0, critCost=0, oldCost=0, cost30p=0, cost60p=0, critCnt=0, oldCnt=0, noSaleCnt=0, totalOC=0;
+    var bdown = {};
+    Object.keys(AGING_CFG).forEach(function(k) { bdown[k] = { cnt: 0, cost: 0, oc: 0 }; });
+    var now = Date.now();
+    enriched.forEach(function(i) {
+      totalCost += i._tc; totalOC += i._oc;
+      if (i._ac === 'critical') { critCost += i._tc; critCnt++; }
+      if (i._ac === 'old') { oldCost += i._tc; oldCnt++; }
+      if ((i._age || 0) > 30) cost30p += i._tc;
+      if ((i._age || 0) > 60) cost60p += i._tc;
+      var lsd = i.last_sale_date ? Math.floor((now - new Date(i.last_sale_date)) / 86400000) : null;
+      if (!lsd || lsd > noSaleDays) noSaleCnt++;
+      if (bdown[i._ac]) { bdown[i._ac].cnt++; bdown[i._ac].cost += i._tc; bdown[i._ac].oc += i._oc; }
+    });
+    return { totalCost, critCost, oldCost, cost30p, cost60p, critCnt, oldCnt, noSaleCnt, totalOC, bdown };
+  }, [enriched, noSaleDays]);
+
+  var brands = React.useMemo(function() {
+    var s = new Set(enriched.map(function(i) { return i._brand; }));
+    return Array.from(s).filter(function(b) { return b && b !== '—'; }).sort();
+  }, [enriched]);
+
+  function fetchData() {
+    setLoading(true); setErr(null);
+    fetch('https://connectoracc.dzoutlet.co.id/api/stock/aging?db=' + dbId)
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) throw new Error(d.error);
+        setItems(d.items || []); setFetchedAt(d.fetched_at || new Date().toISOString()); setLoading(false);
+      })
+      .catch(function(e) { setErr(e.message); setLoading(false); });
+  }
+  React.useEffect(function() { fetchData(); }, [dbId]);
+
+  function fmtRp(n) { return 'Rp ' + Math.round(n || 0).toLocaleString('id-ID'); }
+  function fmtRpK(n) {
+    n = n || 0;
+    if (n >= 1e9) return 'Rp ' + (n/1e9).toFixed(1) + 'M';
+    if (n >= 1e6) return 'Rp ' + (n/1e6).toFixed(0) + 'jt';
+    return 'Rp ' + Math.round(n).toLocaleString('id-ID');
+  }
+  function fmtDate(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' }); }
+  function fmtPct(n) { return (n||0).toFixed(1) + '%'; }
+
+  function exportCSV() {
+    var hdrs = ['Kode','Nama','Kategori','Brand','Stok','Modal/Unit (Rp)','Total Modal (Rp)','Hari di Gudang','Status Aging','OC Akumulasi (est. Rp)','OC/Unit (Rp)','OC % Modal','Jual 30H','Jual 60H','Jual 90H','Avg/Hari','Est. Hari Habis','Tgl Beli Terakhir','Tgl Jual Terakhir','Rekomendasi'];
+    var rows = filtered.map(function(i) {
+      return [
+        i.kode, i.nama, i._catL, i._brand, i._st, i._uc, Math.round(i._tc),
+        i._age !== null ? i._age : 'N/A',
+        (AGING_CFG[i._ac] || {}).label || i._ac,
+        Math.round(i._oc), Math.round(i._ocPerUnit), fmtPct(i._ocPct),
+        i.sold_30d||0, i.sold_60d||0, i.sold_90d||0,
+        i.avg_daily_sales ? parseFloat(i.avg_daily_sales).toFixed(2) : 'N/A',
+        i._dts || 'N/A', i.last_buy_date || 'N/A', i.last_sale_date || 'N/A', i._rec.s,
+      ];
+    });
+    var csv = [hdrs].concat(rows).map(function(r) { return r.map(function(v) { return '"'+String(v).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+    var blob = new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'review-stok-'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  // ── Clearance simulator ──────────────────────────────────────────
+  function SimulatorPanel() {
+    if (!simItem) return null;
+    var prices = [
+      { label: 'Harga saat ini', mult: 1 },
+      { label: 'Diskon 5%',      mult: 0.95 },
+      { label: 'Diskon 10%',     mult: 0.90 },
+      { label: 'Diskon 15%',     mult: 0.85 },
+      { label: 'Harga custom',   mult: null },
+    ];
+    var customP = parseFloat(simPrice) || 0;
+    return React.createElement('div', { style:{ position:'fixed', top:0, right:0, bottom:0, width:440, background:'var(--bg2)', borderLeft:'1px solid var(--border2)', zIndex:200, overflowY:'auto', padding:24 } },
+      React.createElement('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 } },
+        React.createElement('div', { style:{ fontFamily:'Syne', fontWeight:700, fontSize:16 } }, '🧮 Simulasi Harga Clearance'),
+        React.createElement('button', { className:'btn-secondary btn-sm', onClick: function(){ setSimItem(null); } }, '✕ Tutup')
+      ),
+      React.createElement('div', { style:{ background:'var(--bg3)', borderRadius:8, padding:12, marginBottom:16 } },
+        React.createElement('div', { style:{ fontSize:12, color:'var(--text2)', marginBottom:4 } }, simItem.kode),
+        React.createElement('div', { style:{ fontSize:14, fontWeight:600, marginBottom:8 } }, simItem.nama),
+        React.createElement('div', { style:{ display:'flex', gap:12, fontSize:12, color:'var(--text2)' } },
+          React.createElement('span', null, 'Stok: ', React.createElement('strong', { style:{ color:'var(--text)' } }, simItem._st, ' unit')),
+          React.createElement('span', null, 'Modal: ', React.createElement('strong', { style:{ color:'var(--text)' } }, fmtRpK(simItem._uc)))
+        )
+      ),
+      React.createElement('label', null, 'HARGA CUSTOM'),
+      React.createElement('input', { type:'number', value:simPrice, onChange:function(e){setSimPrice(e.target.value);}, placeholder:'Masukkan harga jual (Rp)', style:{marginBottom:16} }),
+      prices.map(function(p) {
+        var sellP = p.mult !== null ? Math.round(simItem._uc * p.mult) : customP;
+        if (p.mult === null && !customP) return null;
+        var gpUnit = sellP - simItem._uc;
+        var gpTotal = gpUnit * simItem._st;
+        var isLoss = gpUnit < 0;
+        var avgD = simItem.avg_daily_sales ? parseFloat(simItem.avg_daily_sales) : null;
+        var estDays = avgD && avgD > 0 ? Math.round(simItem._st / avgD) : null;
+        var futureOC = estDays ? calcOC(simItem._uc, simItem._st, estDays, ocRate) : null;
+        return React.createElement('div', { key: p.label, style:{ background:'var(--bg3)', borderRadius:8, padding:12, marginBottom:10, border: p.mult === null ? '1px solid var(--accent)' : '1px solid var(--border)' } },
+          React.createElement('div', { style:{ fontWeight:600, fontSize:13, marginBottom:8, color: p.mult === null ? 'var(--accent2)' : 'var(--text)' } }, p.label),
+          React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:12 } },
+            React.createElement('div', null, React.createElement('span', { style:{ color:'var(--text2)' } }, 'Harga jual: '), React.createElement('strong', null, fmtRp(sellP))),
+            React.createElement('div', null, React.createElement('span', { style:{ color:'var(--text2)' } }, 'GP/unit: '), React.createElement('strong', { style:{ color: isLoss ? 'var(--red)' : 'var(--green)' } }, fmtRp(gpUnit))),
+            React.createElement('div', null, React.createElement('span', { style:{ color:'var(--text2)' } }, 'GP total: '), React.createElement('strong', { style:{ color: isLoss ? 'var(--red)' : 'var(--green)' } }, fmtRpK(gpTotal))),
+            React.createElement('div', null, React.createElement('span', { style:{ color:'var(--text2)' } }, 'OC sisa (est.): '), React.createElement('strong', { style:{ color:'var(--amber)' } }, futureOC !== null ? fmtRpK(futureOC) : 'N/A')),
+            React.createElement('div', { style:{ gridColumn:'1/-1' } }, React.createElement('span', { style:{ color:'var(--text2)' } }, 'Est. hari habis: '), React.createElement('strong', null, estDays !== null ? estDays + ' hari' : 'N/A — data velocity tidak tersedia')),
+            gpUnit < 0 && React.createElement('div', { style:{ gridColumn:'1/-1', fontSize:11, color:'var(--amber)', marginTop:4 } }, '⚠ Harga di bawah modal. Konfirmasi jika ini keputusan manajemen.'),
+            React.createElement('div', { style:{ gridColumn:'1/-1', fontSize:11, color:'var(--text3)', marginTop:2 } }, 'Ini simulasi estimasi. Jangan gunakan untuk mengubah harga secara langsung.')
+          )
+        );
+      })
+    );
+  }
+
+  // ── Render helpers ───────────────────────────────────────────────
+  function SummaryCard(props) {
+    return React.createElement('div', { style:{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'16px 18px', display:'flex', flexDirection:'column', gap:6 } },
+      React.createElement('div', { style:{ fontSize:11, color:'var(--text2)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' } }, props.label),
+      React.createElement('div', { style:{ fontSize:20, fontWeight:700, color: props.color || 'var(--text)', fontFamily:'DM Mono, monospace', lineHeight:1.2 } }, props.value),
+      props.sub && React.createElement('div', { style:{ fontSize:11, color:'var(--text3)' } }, props.sub)
+    );
+  }
+
+  function agingBadge(ac) {
+    var cfg = AGING_CFG[ac] || AGING_CFG.unknown;
+    return React.createElement('span', { style:{ display:'inline-block', padding:'2px 7px', borderRadius:20, fontSize:10, fontWeight:700, letterSpacing:'0.04em', background:cfg.bg, color:cfg.color, border:'1px solid '+cfg.border, whiteSpace:'nowrap' } }, cfg.short);
+  }
+
+  function recBadge(s) {
+    return React.createElement('span', { style:{ display:'inline-block', fontSize:10, fontWeight:700, letterSpacing:'0.03em', color: REC_COLOR[s] || 'var(--text2)', whiteSpace:'normal', lineHeight:1.3 } }, s);
+  }
+
+  var tabCounts = React.useMemo(function() {
+    var m = {};
+    enriched.forEach(function(i) { m[i._ac] = (m[i._ac]||0)+1; });
+    return m;
+  }, [enriched]);
+
+  // ── Main render ──────────────────────────────────────────────────
+  return React.createElement('div', { style:{ padding:'24px 28px', maxWidth:1400, margin:'0 auto' } },
+
+    // Header
+    React.createElement('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:12 } },
+      React.createElement('div', null,
+        React.createElement('h2', { style:{ fontFamily:'Syne', fontWeight:800, fontSize:22, marginBottom:4 } }, '📦 Review Stok — Aging Analysis'),
+        React.createElement('div', { style:{ fontSize:12, color:'var(--text3)' } },
+          'Kategori: Notebook · PC AIO · Printer · Projector · ',
+          fetchedAt ? React.createElement('span', null, 'Data per ', fmtDate(fetchedAt)) : 'Memuat...'
+        )
+      ),
+      React.createElement('div', { style:{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' } },
+        React.createElement('select', { value:dbId, onChange:function(e){setDbId(e.target.value);}, style:{width:140,padding:'7px 10px'} },
+          React.createElement('option', { value:'74419' }, 'PT Anugerah (DZ)'),
+          React.createElement('option', { value:'131948' }, 'Group')
+        ),
+        React.createElement('button', { className:'btn-secondary btn-sm', onClick:fetchData, disabled:loading }, loading ? 'Memuat...' : '🔄 Refresh'),
+        enriched.length > 0 && React.createElement('button', { className:'btn-blue btn-sm', onClick:exportCSV }, '⬇ Export CSV')
+      )
+    ),
+
+    // Error
+    err && React.createElement('div', { style:{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:8, padding:'12px 16px', marginBottom:20, color:'#ef4444', fontSize:13 } },
+      '⚠ Gagal memuat data: ', err,
+      React.createElement('button', { onClick:fetchData, style:{ marginLeft:12, background:'none', border:'1px solid #ef4444', color:'#ef4444', borderRadius:6, padding:'3px 10px', fontSize:12, cursor:'pointer' } }, 'Coba lagi')
+    ),
+
+    // Loading skeleton
+    loading && items.length === 0 && React.createElement('div', { style:{ textAlign:'center', padding:'60px 0', color:'var(--text3)' } }, '🔄 Memuat data stok dari Accurate...'),
+
+    !loading && items.length > 0 && React.createElement(React.Fragment, null,
+
+      // ── Summary cards ─────────────────────────────────────────────
+      React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:10, marginBottom:20 } },
+        React.createElement(SummaryCard, { label:'Total Modal Stok Eligible', value: fmtRpK(stats.totalCost) }),
+        React.createElement(SummaryCard, { label:'Total OC Akumulasi (est.)', value: fmtRpK(stats.totalOC), color:'#f59e0b',
+          sub:'Rate ' + ocRate + '% / bulan — estimasi, bukan beban aktual' }),
+        React.createElement(SummaryCard, { label:'Modal Critical Aging (>60h)', value: fmtRpK(stats.critCost), color:'#ef4444',
+          sub: stats.critCnt + ' SKU' }),
+        React.createElement(SummaryCard, { label:'Modal Old Stock (46–60h)', value: fmtRpK(stats.oldCost), color:'#f97316',
+          sub: stats.oldCnt + ' SKU' }),
+        React.createElement(SummaryCard, { label:'Modal Stok >30 Hari', value: fmtRpK(stats.cost30p) }),
+        React.createElement(SummaryCard, { label:'Modal Stok >60 Hari', value: fmtRpK(stats.cost60p), color:'#ef4444' }),
+        React.createElement(SummaryCard, { label:'SKU Tanpa Jual >' + noSaleDays + 'H', value: stats.noSaleCnt + ' SKU', color:'#f59e0b' }),
+        React.createElement(SummaryCard, { label:'Total SKU Eligible', value: enriched.length + ' SKU' })
+      ),
+
+      // ── OC Rate config + OC Breakdown ─────────────────────────────
+      React.createElement('div', { style:{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'16px 18px', marginBottom:20 } },
+        React.createElement('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 } },
+          React.createElement('div', { style:{ fontFamily:'Syne', fontWeight:700, fontSize:14 } }, '💰 Biaya Peluang Modal Akumulasi (Estimasi)'),
+          React.createElement('div', { style:{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' } },
+            React.createElement('span', { style:{ fontSize:12, color:'var(--text2)' } }, 'Rate (% / bulan):'),
+            ['0.5','1','1.5','2'].map(function(v) {
+              return React.createElement('button', { key:v, onClick:function(){ setOcRate(parseFloat(v)); },
+                style:{ padding:'4px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
+                  background: ocRate === parseFloat(v) ? 'var(--accent2)' : 'var(--bg3)',
+                  color: ocRate === parseFloat(v) ? '#fff' : 'var(--text2)' } }, v+'%');
+            }),
+            React.createElement('button', { className:'btn-secondary btn-sm', onClick:function(){ setShowOCBreakdown(function(v){return !v;}); } },
+              showOCBreakdown ? '▲ Sembunyikan' : '▼ Lihat Breakdown'
+            )
+          )
+        ),
+        React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginBottom: showOCBreakdown ? 12 : 0 } },
+          '⚠ Angka ini adalah estimasi biaya peluang ekonomi (modal sendiri), bukan beban bunga aktual maupun kerugian yang perlu dibukukan. Gunakan sebagai alat bantu keputusan.'
+        ),
+        showOCBreakdown && React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 } },
+          ['critical','old','slow','aging','monitor','fresh'].map(function(k) {
+            var cfg = AGING_CFG[k]; var bd = stats.bdown[k] || { cnt:0, cost:0, oc:0 };
+            return React.createElement('div', { key:k, style:{ background:cfg.bg, border:'1px solid '+cfg.border, borderRadius:8, padding:'10px 12px' } },
+              React.createElement('div', { style:{ fontSize:10, fontWeight:700, color:cfg.color, letterSpacing:'0.05em', marginBottom:6 } }, cfg.label),
+              React.createElement('div', { style:{ fontSize:11, color:'var(--text2)', marginBottom:2 } }, bd.cnt, ' SKU · ', cfg.days),
+              React.createElement('div', { style:{ fontSize:12, fontWeight:600, color:cfg.color, fontFamily:'DM Mono, monospace' } }, fmtRpK(bd.oc)),
+              React.createElement('div', { style:{ fontSize:10, color:'var(--text3)' } }, 'OC — modal: ', fmtRpK(bd.cost))
+            );
+          })
+        )
+      ),
+
+      // ── Filters ───────────────────────────────────────────────────
+      React.createElement('div', { style:{ display:'flex', gap:10, marginBottom:12, flexWrap:'wrap', alignItems:'center' } },
+        React.createElement('input', { type:'text', placeholder:'Cari nama atau kode...', value:search, onChange:function(e){setSearch(e.target.value);}, style:{width:220, padding:'7px 12px'} }),
+        React.createElement('select', { value:activeCat, onChange:function(e){setActiveCat(e.target.value);}, style:{width:150} },
+          React.createElement('option', { value:'all' }, 'Semua Kategori'),
+          React.createElement('option', { value:'NB' }, 'Notebook'),
+          React.createElement('option', { value:'PC-AIO' }, 'PC AIO'),
+          React.createElement('option', { value:'PR' }, 'Printer'),
+          React.createElement('option', { value:'PJ' }, 'Projector')
+        ),
+        React.createElement('select', { value:activeBrand, onChange:function(e){setActiveBrand(e.target.value);}, style:{width:120} },
+          React.createElement('option', { value:'all' }, 'Semua Brand'),
+          brands.map(function(b) { return React.createElement('option', { key:b, value:b }, b); })
+        ),
+        React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--text2)', marginLeft:'auto' } },
+          'Alert no-sale:',
+          React.createElement('select', { value:noSaleDays, onChange:function(e){setNoSaleDays(parseInt(e.target.value));}, style:{width:90} },
+            [7,14,21,30].map(function(d) { return React.createElement('option', { key:d, value:d }, '>'+d+' hari'); })
+          )
+        )
+      ),
+
+      // ── Aging tabs ────────────────────────────────────────────────
+      React.createElement('div', { style:{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' } },
+        [
+          { id:'all', label:'Semua', color:'var(--text2)' },
+          { id:'critical', label:'Kritis', color:'#ef4444' },
+          { id:'old', label:'Old Stock', color:'#f97316' },
+          { id:'slow', label:'Slow Moving', color:'#f59e0b' },
+          { id:'aging', label:'Aging', color:'#eab308' },
+          { id:'monitor', label:'Monitor', color:'#3b82f6' },
+          { id:'fresh', label:'Fresh', color:'#22c55e' },
+          { id:'unknown', label:'No Data', color:'#6b7280' },
+        ].map(function(t) {
+          var cnt = t.id === 'all' ? enriched.length : (tabCounts[t.id]||0);
+          var active = activeTab === t.id;
+          return React.createElement('button', { key:t.id, onClick:function(){setActiveTab(t.id);},
+            style:{ padding:'6px 14px', borderRadius:20, border: active ? '1px solid '+t.color : '1px solid var(--border)',
+              background: active ? t.id === 'all' ? 'var(--bg3)' : 'rgba(255,255,255,0.04)' : 'transparent',
+              color: active ? t.color : 'var(--text3)', fontSize:12, fontWeight: active ? 700 : 400, cursor:'pointer',
+              transition:'all 0.15s' } },
+            t.label, ' (', cnt, ')'
+          );
+        })
+      ),
+
+      // ── SKU Table ────────────────────────────────────────────────
+      filtered.length === 0
+        ? React.createElement('div', { style:{ textAlign:'center', padding:'40px 0', color:'var(--text3)' } }, 'Tidak ada item yang cocok dengan filter.')
+        : React.createElement('div', { style:{ overflowX:'auto', borderRadius:12, border:'1px solid var(--border)' } },
+            React.createElement('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:12 } },
+              React.createElement('thead', null,
+                React.createElement('tr', { style:{ background:'var(--bg3)', borderBottom:'1px solid var(--border)' } },
+                  ['Nama / Kode','Kat.','Brand','Stok','Modal/Unit','Total Modal','Hari','Status','OC Akum. (est.)','OC/Unit','OC %','Jual 30H','Jual 90H','Est. Habis','Tgl Beli','Tgl Jual','Rekomendasi',''].map(function(h) {
+                    return React.createElement('th', { key:h, style:{ padding:'10px 10px', textAlign:'left', fontWeight:600, color:'var(--text2)', fontSize:11, letterSpacing:'0.04em', textTransform:'uppercase', whiteSpace:'nowrap' } }, h);
+                  })
+                )
+              ),
+              React.createElement('tbody', null,
+                filtered.map(function(item, idx) {
+                  var cfg = AGING_CFG[item._ac] || AGING_CFG.unknown;
+                  var noSaleAlert = (function(){
+                    if (!item.last_sale_date) return true;
+                    return Math.floor((Date.now() - new Date(item.last_sale_date)) / 86400000) > noSaleDays;
+                  })();
+                  return React.createElement('tr', { key:item.kode+idx, style:{ borderBottom:'1px solid var(--border)', background: idx%2===0?'transparent':'rgba(255,255,255,0.015)' } },
+                    React.createElement('td', { style:{ padding:'10px 10px', minWidth:200 } },
+                      React.createElement('div', { style:{ fontWeight:500, color:'var(--text)', marginBottom:2, lineHeight:1.3 } }, item.nama),
+                      React.createElement('div', { style:{ fontSize:10, color:'var(--text3)', fontFamily:'monospace' } }, item.kode)
+                    ),
+                    React.createElement('td', { style:{ padding:'10px 6px', whiteSpace:'nowrap' } }, item._catL),
+                    React.createElement('td', { style:{ padding:'10px 6px' } }, item._brand),
+                    React.createElement('td', { style:{ padding:'10px 8px', textAlign:'right', fontWeight:600 } }, item._st),
+                    React.createElement('td', { style:{ padding:'10px 8px', textAlign:'right', fontFamily:'monospace', fontSize:11 } }, fmtRpK(item._uc)),
+                    React.createElement('td', { style:{ padding:'10px 8px', textAlign:'right', fontFamily:'monospace', fontSize:11, fontWeight:600 } }, fmtRpK(item._tc)),
+                    React.createElement('td', { style:{ padding:'10px 8px', textAlign:'center', fontFamily:'monospace', fontWeight:700, color:cfg.color } },
+                      item._age !== null ? item._age : React.createElement('span', { style:{ color:'var(--text3)' } }, '—')
+                    ),
+                    React.createElement('td', { style:{ padding:'10px 6px' } }, agingBadge(item._ac)),
+                    React.createElement('td', { style:{ padding:'10px 8px', textAlign:'right', fontFamily:'monospace', fontSize:11, color:'#f59e0b', fontWeight:600 } }, fmtRpK(item._oc)),
+                    React.createElement('td', { style:{ padding:'10px 8px', textAlign:'right', fontFamily:'monospace', fontSize:11, color:'var(--text2)' } }, fmtRpK(item._ocPerUnit)),
+                    React.createElement('td', { style:{ padding:'10px 6px', textAlign:'right', color: item._ocPct > 5 ? '#ef4444' : item._ocPct > 2 ? '#f59e0b' : 'var(--text2)' } }, fmtPct(item._ocPct)),
+                    React.createElement('td', { style:{ padding:'10px 6px', textAlign:'center' } },
+                      React.createElement('span', { style:{ color: (item.sold_30d||0) > 0 ? 'var(--green)' : 'var(--text3)' } }, item.sold_30d||0)
+                    ),
+                    React.createElement('td', { style:{ padding:'10px 6px', textAlign:'center', color:'var(--text2)' } }, item.sold_90d||0),
+                    React.createElement('td', { style:{ padding:'10px 6px', textAlign:'center', fontSize:11, color:'var(--text2)' } },
+                      item._dts !== null ? item._dts+' H' : React.createElement('span', { style:{ color:'var(--text3)' } }, 'N/A')
+                    ),
+                    React.createElement('td', { style:{ padding:'10px 6px', whiteSpace:'nowrap', fontSize:11, color:'var(--text2)' } }, fmtDate(item.last_buy_date)),
+                    React.createElement('td', { style:{ padding:'10px 6px', whiteSpace:'nowrap', fontSize:11 } },
+                      noSaleAlert
+                        ? React.createElement('span', { style:{ color:'#f59e0b' }, title:'Tidak ada penjualan >'+noSaleDays+' hari' }, '⚠ ', fmtDate(item.last_sale_date))
+                        : React.createElement('span', { style:{ color:'var(--text2)' } }, fmtDate(item.last_sale_date))
+                    ),
+                    React.createElement('td', { style:{ padding:'10px 8px', minWidth:140 } }, recBadge(item._rec.s),
+                      React.createElement('div', { style:{ fontSize:10, color:'var(--text3)', marginTop:3, lineHeight:1.3 } }, item._rec.r)
+                    ),
+                    React.createElement('td', { style:{ padding:'10px 8px' } },
+                      React.createElement('button', { className:'btn-secondary btn-sm', onClick:function(){ setSimItem(item); setSimPrice(''); }, style:{ fontSize:11, whiteSpace:'nowrap' } }, '🧮 Simulasi')
+                    )
+                  );
+                })
+              )
+            )
+          ),
+
+      // ── Footer notes ──────────────────────────────────────────────
+      React.createElement('div', { style:{ marginTop:16, fontSize:11, color:'var(--text3)', lineHeight:1.6 } },
+        React.createElement('p', null, '• "Hari di gudang" dihitung dari tanggal purchase invoice terakhir di Accurate — proxy untuk usia stok, bukan FIFO exact. Jika ada pembelian berkali-kali, usia bisa lebih muda dari batch terlama yang masih ada.'),
+        React.createElement('p', null, '• Biaya Peluang = Qty × Modal/unit × Rate × Hari / 30. Ini estimasi ekonomi, bukan bunga aktual maupun kerugian yang perlu dibukukan.'),
+        React.createElement('p', null, '• Penjualan (sold 30H/90H) dari data invoice Accurate yang sudah ter-sync. Jika angka 0 padahal ada penjualan, pastikan sync invoice sudah up to date.'),
+        React.createElement('p', null, '• Rekomendasi adalah hasil evaluasi otomatis berdasarkan usia, penjualan, dan biaya peluang — bukan keputusan final. Manajemen tetap menentukan tindakan akhir.')
+      )
+    ),
+
+    // Clearance simulator panel
+    React.createElement(SimulatorPanel, null)
   );
 }
 
