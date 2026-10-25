@@ -49383,21 +49383,17 @@ function StockAgingPage() {
   var _showOCBreakdown = React.useState(true); var showOCBreakdown = _showOCBreakdown[0]; var setShowOCBreakdown = _showOCBreakdown[1];
 
   var AGING_CFG = {
-    critical: { label: 'CRITICAL AGING', short: 'Kritis', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', days: '>60 hari', order: 0 },
-    old:      { label: 'OLD STOCK',       short: 'Lama',   color: '#f97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.3)', days: '46–60 hari', order: 1 },
-    slow:     { label: 'SLOW MOVING',     short: 'Lambat', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)', days: '31–45 hari', order: 2 },
-    aging:    { label: 'AGING',           short: 'Aging',  color: '#eab308', bg: 'rgba(234,179,8,0.12)', border: 'rgba(234,179,8,0.3)', days: '15–30 hari', order: 3 },
-    monitor:  { label: 'MONITOR',         short: 'Monitor',color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.3)', days: '8–14 hari', order: 4 },
-    fresh:    { label: 'FRESH / NEW',     short: 'Fresh',  color: '#22c55e', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.3)', days: '0–7 hari', order: 5 },
-    unknown:  { label: 'DATA UNAVAILABLE',short: 'N/A',    color: '#6b7280', bg: 'rgba(107,114,128,0.12)', border: 'rgba(107,114,128,0.3)', days: '—', order: 6 },
+    critical: { label: 'CRITICAL AGING', short: 'Kritis', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', days: '>60 hari',   order: 0 },
+    old:      { label: 'OLD STOCK',      short: 'Lama',   color: '#f97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.3)', days: '31–60 hari', order: 1 },
+    aging:    { label: 'AGING',          short: 'Aging',  color: '#eab308', bg: 'rgba(234,179,8,0.12)',  border: 'rgba(234,179,8,0.3)',  days: '15–30 hari', order: 2 },
+    fresh:    { label: 'FRESH / NEW',    short: 'Fresh',  color: '#22c55e', bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.3)',  days: '0–14 hari',  order: 3 },
+    unknown:  { label: 'DATA UNAVAILABLE',short: 'N/A',   color: '#6b7280', bg: 'rgba(107,114,128,0.12)', border: 'rgba(107,114,128,0.3)', days: '—',        order: 4 },
   };
 
   function getAgingCat(d) {
     if (d === null || d === undefined) return 'unknown';
-    if (d <= 7)  return 'fresh';
-    if (d <= 14) return 'monitor';
+    if (d <= 14) return 'fresh';
     if (d <= 30) return 'aging';
-    if (d <= 45) return 'slow';
     if (d <= 60) return 'old';
     return 'critical';
   }
@@ -49432,12 +49428,12 @@ function StockAgingPage() {
     if (cat === 'critical')
       return { s: 'CLEARANCE SALE', r: 'Stok >60 hari, biaya peluang terakumulasi signifikan. Pertimbangkan clearance/diskon.' };
     if (cat === 'old' && sold30 === 0)
-      return { s: 'CLEARANCE SALE', r: 'Stok 46–60 hari tanpa penjualan bulan ini. Evaluasi harga atau dorong promosi segera.' };
-    if ((cat === 'slow' || cat === 'old') && sold30 > 0)
+      return { s: 'CLEARANCE SALE', r: 'Stok 31–60 hari tanpa penjualan bulan ini. Evaluasi harga atau dorong promosi segera.' };
+    if (cat === 'old' && sold30 > 0)
       return { s: 'MONITOR / PROMOTE', r: 'Stok mulai aging namun penjualan masih berjalan. Pertimbangkan promosi tambahan.' };
     if (cat === 'aging' && sold30 === 0)
       return { s: 'MONITOR / PROMOTE', r: 'Stok 15–30 hari tanpa penjualan bulan ini. Pantau dan pertimbangkan promosi.' };
-    if (cat === 'fresh' || cat === 'monitor' || (cat === 'aging' && sold30 > 0))
+    if (cat === 'fresh' || (cat === 'aging' && sold30 > 0))
       return { s: 'RETAIN STOCK', r: 'Stok masih segar dan/atau ada penjualan aktif. Pertahankan.' };
     return { s: 'INSUFFICIENT DATA', r: 'Data tidak cukup untuk rekomendasi.' };
   }
@@ -49676,7 +49672,7 @@ function StockAgingPage() {
           sub:'Rate ' + ocRate + '% / bulan — estimasi, bukan beban aktual' }),
         React.createElement(SummaryCard, { label:'Modal Critical Aging (>60h)', value: fmtRpK(stats.critCost), color:'#ef4444',
           sub: stats.critCnt + ' SKU' }),
-        React.createElement(SummaryCard, { label:'Modal Old Stock (46–60h)', value: fmtRpK(stats.oldCost), color:'#f97316',
+        React.createElement(SummaryCard, { label:'Modal Old Stock (31–60h)', value: fmtRpK(stats.oldCost), color:'#f97316',
           sub: stats.oldCnt + ' SKU' }),
         React.createElement(SummaryCard, { label:'Modal Stok >30 Hari', value: fmtRpK(stats.cost30p) }),
         React.createElement(SummaryCard, { label:'Modal Stok >60 Hari', value: fmtRpK(stats.cost60p), color:'#ef4444' }),
@@ -49705,7 +49701,7 @@ function StockAgingPage() {
           '⚠ Angka ini adalah estimasi biaya peluang ekonomi (modal sendiri), bukan beban bunga aktual maupun kerugian yang perlu dibukukan. Gunakan sebagai alat bantu keputusan.'
         ),
         showOCBreakdown && React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 } },
-          ['critical','old','slow','aging','monitor','fresh'].map(function(k) {
+          ['critical','old','aging','fresh'].map(function(k) {
             var cfg = AGING_CFG[k]; var bd = stats.bdown[k] || { cnt:0, cost:0, oc:0 };
             return React.createElement('div', { key:k, style:{ background:cfg.bg, border:'1px solid '+cfg.border, borderRadius:8, padding:'10px 12px' } },
               React.createElement('div', { style:{ fontSize:10, fontWeight:700, color:cfg.color, letterSpacing:'0.05em', marginBottom:6 } }, cfg.label),
@@ -49743,12 +49739,10 @@ function StockAgingPage() {
       React.createElement('div', { style:{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' } },
         [
           { id:'all', label:'Semua', color:'var(--text2)' },
-          { id:'critical', label:'Kritis', color:'#ef4444' },
+          { id:'critical', label:'Critical Aging', color:'#ef4444' },
           { id:'old', label:'Old Stock', color:'#f97316' },
-          { id:'slow', label:'Slow Moving', color:'#f59e0b' },
           { id:'aging', label:'Aging', color:'#eab308' },
-          { id:'monitor', label:'Monitor', color:'#3b82f6' },
-          { id:'fresh', label:'Fresh', color:'#22c55e' },
+          { id:'fresh', label:'Fresh / New', color:'#22c55e' },
           { id:'unknown', label:'No Data', color:'#6b7280' },
         ].map(function(t) {
           var cnt = t.id === 'all' ? enriched.length : (tabCounts[t.id]||0);
