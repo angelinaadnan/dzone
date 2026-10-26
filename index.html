@@ -49493,21 +49493,21 @@ function StockAgingPage() {
   }, [enriched, activeTab, activeCat, activeBrand, search]);
 
   var stats = React.useMemo(function() {
-    var totalCost=0, critCost=0, oldCost=0, cost30p=0, cost60p=0, critCnt=0, oldCnt=0, noSaleCnt=0, totalOC=0;
+    var totalCost=0, critCost=0, oldCost=0, cost30p=0, cost60p=0, critCnt=0, oldCnt=0, noSaleCnt=0, totalOC=0, critUnits=0, oldUnits=0;
     var bdown = {};
-    Object.keys(AGING_CFG).forEach(function(k) { bdown[k] = { cnt: 0, cost: 0, oc: 0 }; });
+    Object.keys(AGING_CFG).forEach(function(k) { bdown[k] = { cnt: 0, cost: 0, oc: 0, units: 0 }; });
     var now = Date.now();
     enriched.forEach(function(i) {
       totalCost += i._tc; totalOC += i._oc;
-      if (i._ac === 'critical') { critCost += i._tc; critCnt++; }
-      if (i._ac === 'old') { oldCost += i._tc; oldCnt++; }
+      if (i._ac === 'critical') { critCost += i._tc; critCnt++; critUnits += i._st; }
+      if (i._ac === 'old') { oldCost += i._tc; oldCnt++; oldUnits += i._st; }
       if ((i._age || 0) > 30) cost30p += i._tc;
       if ((i._age || 0) > 60) cost60p += i._tc;
       var lsd = i.last_sale_date ? Math.floor((now - new Date(i.last_sale_date)) / 86400000) : null;
       if (!lsd || lsd > noSaleDays) noSaleCnt++;
-      if (bdown[i._ac]) { bdown[i._ac].cnt++; bdown[i._ac].cost += i._tc; bdown[i._ac].oc += i._oc; }
+      if (bdown[i._ac]) { bdown[i._ac].cnt++; bdown[i._ac].cost += i._tc; bdown[i._ac].oc += i._oc; bdown[i._ac].units += i._st; }
     });
-    return { totalCost, critCost, oldCost, cost30p, cost60p, critCnt, oldCnt, noSaleCnt, totalOC, bdown };
+    return { totalCost, critCost, oldCost, cost30p, cost60p, critCnt, oldCnt, noSaleCnt, totalOC, bdown, critUnits, oldUnits };
   }, [enriched, noSaleDays]);
 
   var brands = React.useMemo(function() {
@@ -49671,9 +49671,9 @@ function StockAgingPage() {
         React.createElement(SummaryCard, { label:'Total OC Akumulasi (est.)', value: fmtRpK(stats.totalOC), color:'#f59e0b',
           sub:'Rate ' + ocRate + '% / bulan — estimasi, bukan beban aktual' }),
         React.createElement(SummaryCard, { label:'Modal Critical Aging (>60h)', value: fmtRpK(stats.critCost), color:'#ef4444',
-          sub: stats.critCnt + ' SKU' }),
+          sub: stats.critCnt + ' SKU · ' + (stats.critUnits||0).toLocaleString('id-ID') + ' unit' }),
         React.createElement(SummaryCard, { label:'Modal Old Stock (31–60h)', value: fmtRpK(stats.oldCost), color:'#f97316',
-          sub: stats.oldCnt + ' SKU' }),
+          sub: stats.oldCnt + ' SKU · ' + (stats.oldUnits||0).toLocaleString('id-ID') + ' unit' }),
         React.createElement(SummaryCard, { label:'Modal Stok >30 Hari', value: fmtRpK(stats.cost30p) }),
         React.createElement(SummaryCard, { label:'Modal Stok >60 Hari', value: fmtRpK(stats.cost60p), color:'#ef4444' }),
         React.createElement(SummaryCard, { label:'SKU Tanpa Jual >' + noSaleDays + 'H', value: stats.noSaleCnt + ' SKU', color:'#f59e0b' }),
@@ -49705,7 +49705,7 @@ function StockAgingPage() {
             var cfg = AGING_CFG[k]; var bd = stats.bdown[k] || { cnt:0, cost:0, oc:0 };
             return React.createElement('div', { key:k, style:{ background:cfg.bg, border:'1px solid '+cfg.border, borderRadius:8, padding:'10px 12px' } },
               React.createElement('div', { style:{ fontSize:10, fontWeight:700, color:cfg.color, letterSpacing:'0.05em', marginBottom:6 } }, cfg.label),
-              React.createElement('div', { style:{ fontSize:11, color:'var(--text2)', marginBottom:2 } }, bd.cnt, ' SKU · ', cfg.days),
+              React.createElement('div', { style:{ fontSize:11, color:'var(--text2)', marginBottom:2 } }, bd.cnt, ' SKU · ', (bd.units||0).toLocaleString('id-ID'), ' unit'),
               React.createElement('div', { style:{ fontSize:12, fontWeight:600, color:cfg.color, fontFamily:'DM Mono, monospace' } }, fmtRpK(bd.oc)),
               React.createElement('div', { style:{ fontSize:10, color:'var(--text3)' } }, 'OC — modal: ', fmtRpK(bd.cost))
             );
