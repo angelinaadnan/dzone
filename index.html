@@ -49376,18 +49376,73 @@ function ProfitDashboardPage() {
   var _s3 = React.useState(false); var loading = _s3[0]; var setLoading = _s3[1];
   var _s4 = React.useState(null); var err = _s4[0]; var setErr = _s4[1];
   var _s5 = React.useState('combined'); var activeTab = _s5[0]; var setActiveTab = _s5[1];
+  // PIN / JWT auth state
+  var _s6 = React.useState(null); var profitJwt = _s6[0]; var setProfitJwt = _s6[1];
+  var _s7 = React.useState(''); var pinInput = _s7[0]; var setPinInput = _s7[1];
+  var _s8 = React.useState(null); var pinErr = _s8[0]; var setPinErr = _s8[1];
+  var _s9 = React.useState(false); var pinLoading = _s9[0]; var setPinLoading = _s9[1];
+
+  // Read cached token from sessionStorage on mount
+  React.useEffect(function() {
+    try {
+      var t = sessionStorage.getItem('profit_jwt');
+      if (t) setProfitJwt(t);
+    } catch(_) {}
+  }, []);
+
+  // Get username from session (used for /api/profit-auth request)
+  var sessionUser = (function() {
+    try { return JSON.parse(localStorage.getItem('orderflow_session') || '{}').name || ''; } catch(_) { return ''; }
+  })();
+
+  function handlePinSubmit(e) {
+    e.preventDefault();
+    if (!pinInput.trim()) return;
+    setPinLoading(true); setPinErr(null);
+    fetch('/api/profit-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: sessionUser, pin: pinInput.trim() }),
+    })
+      .then(function(r) {
+        if (!r.ok) return r.json().then(function(d){ throw new Error(d.error || 'HTTP ' + r.status); });
+        return r.json();
+      })
+      .then(function(d) {
+        if (!d.token) throw new Error('Token tidak diterima dari server.');
+        try { sessionStorage.setItem('profit_jwt', d.token); } catch(_) {}
+        setProfitJwt(d.token);
+        setPinInput('');
+      })
+      .catch(function(e) { setPinErr(e.message); })
+      .finally(function() { setPinLoading(false); });
+  }
+
+  function clearToken() {
+    try { sessionStorage.removeItem('profit_jwt'); } catch(_) {}
+    setProfitJwt(null); setData(null); setErr(null);
+  }
 
   React.useEffect(function() {
-    if (!period) return;
+    if (!period || !profitJwt) return;
     var parts = period.split('-');
     var y = parseInt(parts[0], 10); var m = parseInt(parts[1], 10);
     setLoading(true); setErr(null); setData(null);
-    fetch('/api/profit-dashboard?year=' + y + '&month=' + m)
-      .then(function(r) { if (!r.ok) return r.json().then(function(d){ throw new Error(d.error||'HTTP '+r.status); }); return r.json(); })
-      .then(function(d) { if (d.error) throw new Error(d.error); setData(d); })
+    fetch('/api/profit-dashboard?year=' + y + '&month=' + m, {
+      headers: { 'Authorization': 'Bearer ' + profitJwt },
+    })
+      .then(function(r) {
+        if (r.status === 401 || r.status === 403) {
+          clearToken();
+          return r.json().then(function(d){ throw new Error(d.error || 'Sesi berakhir, masukkan PIN kembali.'); });
+        }
+        if (!r.ok) return r.json().then(function(d){ throw new Error(d.error || 'HTTP ' + r.status); });
+        return r.json();
+      })
+      .then(function(d) { if (d && d.error) throw new Error(d.error); setData(d); })
       .catch(function(e) { setErr(e.message); })
       .finally(function() { setLoading(false); });
-  }, [period]);
+  }, [period, profitJwt]);
 
   var fmt = function(v) { if (v===null||v===undefined) return '—'; var n=Number(v); return n>=1e9?(n/1e9).toFixed(2)+'M':n>=1e6?(n/1e6).toFixed(1)+'jt':Math.round(n).toLocaleString('id-ID'); };
   var fmtRp = function(v) { if (v===null||v===undefined) return '—'; return 'Rp '+fmt(v); };
@@ -49456,6 +49511,140 @@ function ProfitDashboardPage() {
     );
   }
 
+  function SalesTable(props) {
+    var rows = props.rows||[]; var showCompany = props.showCompany||false;
+    if (!rows.length) return React.createElement('div',{style:{color:'var(--text3)',fontSize:13}},'Tidak ada data salesperson.');
+    var UNKNOWN = ['Tidak Ada','Tidak Diketahui','Belum Ditentukan'];
+    var sorted = rows.slice().sort(function(a,b){
+      var au=UNKNOWN.indexOf(a.key)>=0, bu=UNKNOWN.indexOf(b.key)>=0;
+      if (au&&!bu) return 1; if (!au&&bu) return -1;
+      if (a.profit===null&&b.profit===null) return (b.revenue_line||0)-(a.revenue_line||0);
+      if (a.profit===null) return 1; if (b.profit===null) return -1;
+      return b.profit-a.profit;
+    });
+    var noWacCount = sorted.filter(function(r){ return r.wac_pct!==null&&r.wac_pct<100; }).length;
+    return React.createElement('div',null,
+      React.createElement('div',{style:{overflowX:'auto'}},
+        React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:12}},
+          React.createElement('thead',null,React.createElement('tr',null,
+            showCompany&&React.createElement('th',{style:Object.assign({},th,{width:48,fontSize:10})},'Entitas'),
+            React.createElement('th',{style:Object.assign({},th,{minWidth:130})},'Salesperson'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right',whiteSpace:'nowrap'})},'Inv'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right',whiteSpace:'nowrap'})},'Revenue (Line)'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right',whiteSpace:'nowrap'})},'HPP'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right',whiteSpace:'nowrap'})},'Laba Kotor'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right',whiteSpace:'nowrap'})},'Margin'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right',whiteSpace:'nowrap'})},'WAC%'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right',whiteSpace:'nowrap'})},'Blm Terhitung')
+          )),
+          React.createElement('tbody',null,
+            sorted.map(function(r,idx){
+              var isUnknown=UNKNOWN.indexOf(r.key)>=0;
+              var noWacLines=(r.wac_pct!==null&&r.wac_pct!==undefined)?(r.invoice_count&&r.wac_pct<100?'Ada':null):null;
+              var unknownProfit=r.profit===null&&(r.invoice_count||0)>0;
+              return React.createElement('tr',{key:(r._company||'')+':'+r.key+':'+idx,
+                style:{background:isUnknown?'rgba(128,128,128,0.06)':'transparent'}},
+                showCompany&&React.createElement('td',{style:Object.assign({},td,{fontSize:10,color:'var(--text3)',whiteSpace:'nowrap'})},r._company||''),
+                React.createElement('td',{style:Object.assign({},td,{color:isUnknown?'var(--text3)':'var(--text)',fontStyle:isUnknown?'italic':'normal'})},
+                  isUnknown?'Belum Ditentukan':r.key),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},(r.invoice_count||0).toLocaleString('id-ID')),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},fmtRp(r.revenue_line)),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},fmtRp(r.cogs)),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace',color:profitColor(r.profit)})},fmtRp(r.profit)),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right'})},r.profit_margin!=null?(r.profit_margin||0)+'%':'—'),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right'})},r.wac_pct!=null?r.wac_pct+'%':'—'),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right',color:unknownProfit?'var(--amber)':'var(--text3)'})},
+                  unknownProfit?'Ada (WAC —)':'—')
+              );
+            })
+          )
+        )
+      ),
+      React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6,fontStyle:'italic'}},
+        'Revenue = jumlah subtotal baris per salesperson. Invoice hanya dihitung untuk baris pertama invoice tersebut.')
+    );
+  }
+
+  function MonthlyMatrix(props) {
+    var adlTrend = props.adlTrend||[]; var groupTrend = props.groupTrend||[];
+    if (!adlTrend.length) return React.createElement('div',{style:{color:'var(--text3)',fontSize:13}},'Data trend belum tersedia.');
+    var months = adlTrend.map(function(r){return r.month;});
+    var adlMap={}, grpMap={};
+    adlTrend.forEach(function(r){adlMap[r.month]=r;});
+    groupTrend.forEach(function(r){grpMap[r.month]=r;});
+    var mthHdr = { padding:'6px 8px', fontSize:11, color:'var(--text2)', fontWeight:600, textAlign:'center',
+      borderBottom:'1px solid var(--border)', background:'rgba(108,99,255,0.07)', whiteSpace:'nowrap' };
+    var subHdr = { padding:'4px 8px', fontSize:10, color:'var(--text3)', fontWeight:600, textAlign:'right',
+      borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' };
+    var mCell = { padding:'7px 8px', fontSize:12, textAlign:'right', fontFamily:'DM Mono, monospace', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' };
+    var lCell = { padding:'7px 10px', fontSize:12, fontWeight:600, color:'var(--text2)', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' };
+    var metrics = [
+      { label:'Invoice',
+        fn: function(r){ return r?(r.invoice_count||0).toLocaleString('id-ID'):'0'; },
+        color: function(){ return 'var(--text)'; } },
+      { label:'Revenue',
+        fn: function(r){ return fmtRp(r&&r.revenue_gross!=null?r.revenue_gross:null); },
+        color: function(){ return 'var(--text)'; } },
+      { label:'HPP/COGS',
+        fn: function(r){ return r&&r.cogs!=null?fmtRp(r.cogs):'—'; },
+        color: function(r){ return r&&r.cogs!=null?'var(--text)':'var(--text3)'; } },
+      { label:'Laba Kotor',
+        fn: function(r){ return r&&r.profit!=null?fmtRp(r.profit):'—'; },
+        color: function(r){ return r&&r.profit!=null?profitColor(r.profit):'var(--text3)'; } },
+      { label:'Margin %',
+        fn: function(r){ return r&&r.profit_margin!=null?(r.profit_margin+'%'):'—'; },
+        color: function(r){ return r&&r.profit_margin!=null?profitColor(r.profit_margin):'var(--text3)'; } },
+      { label:'WAC Coverage',
+        fn: function(r){
+          var w=r&&r.wac_coverage;
+          return w?w.pct+'% ('+w.lines_with_wac+'/'+w.total_lines+')':'—';
+        },
+        color: function(r){
+          var w=r&&r.wac_coverage;
+          return !w?'var(--text3)':w.pct>=80?'var(--green)':w.pct>=50?'var(--amber)':'var(--text2)';
+        } },
+    ];
+    return React.createElement('div',null,
+      React.createElement('div',{style:{overflowX:'auto'}},
+        React.createElement('table',{style:{borderCollapse:'collapse',fontSize:12,minWidth:Math.max(500,months.length*180+120)}},
+          React.createElement('thead',null,
+            React.createElement('tr',null,
+              React.createElement('th',{style:Object.assign({},th,{width:110,background:'transparent'})},'Metrik'),
+              months.map(function(m){
+                return React.createElement('th',{key:m,colSpan:2,style:mthHdr},m);
+              })
+            ),
+            React.createElement('tr',null,
+              React.createElement('th',{style:Object.assign({},th,{background:'transparent'})},''),
+              months.map(function(m){
+                return [
+                  React.createElement('th',{key:m+':a',style:subHdr},'ADL'),
+                  React.createElement('th',{key:m+':g',style:subHdr},'Group'),
+                ];
+              })
+            )
+          ),
+          React.createElement('tbody',null,
+            metrics.map(function(metric){
+              return React.createElement('tr',{key:metric.label},
+                React.createElement('td',{style:lCell},metric.label),
+                months.map(function(m){
+                  var ar=adlMap[m], gr=grpMap[m];
+                  return [
+                    React.createElement('td',{key:m+':a',style:Object.assign({},mCell,{color:metric.color(ar)})},metric.fn(ar)),
+                    React.createElement('td',{key:m+':g',style:Object.assign({},mCell,{color:metric.color(gr)})},metric.fn(gr)),
+                  ];
+                })
+              );
+            })
+          )
+        )
+      ),
+      React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginTop:8,fontStyle:'italic'}},
+        '— = tidak ada data WAC untuk bulan tersebut (profit tidak dapat dihitung). Laba dihitung hanya dari baris yang memiliki WAC.')
+    );
+  }
+
   function TrendTable(props) {
     var rows = props.rows||[];
     if (!rows.length) return null;
@@ -49489,6 +49678,10 @@ function ProfitDashboardPage() {
         React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}}, 'Per Channel'),
         React.createElement(ChannelTable, { rows: d.by_channel })
       ),
+      d.by_salesman && d.by_salesman.length > 0 && React.createElement('div', { style: cs },
+        React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}},'Per Salesperson'),
+        React.createElement(SalesTable, { rows: d.by_salesman })
+      ),
       d.revenue_trend && d.revenue_trend.length > 0 && React.createElement('div', { style: cs },
         React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}}, 'Trend 6 Bulan'),
         React.createElement(TrendTable, { rows: d.revenue_trend })
@@ -49502,15 +49695,60 @@ function ProfitDashboardPage() {
     return new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, 1).toLocaleDateString('id-ID',{month:'long',year:'numeric'});
   })();
 
+  var combinedSales = (function(){
+    if (!data) return [];
+    var adlSales = (data.adl&&data.adl.by_salesman||[]).map(function(r){return Object.assign({},r,{_company:'ADL'});});
+    var grpSales = (data.group&&data.group.by_salesman||[]).map(function(r){return Object.assign({},r,{_company:'Group'});});
+    return adlSales.concat(grpSales);
+  })();
+
+  // PIN form (shown when no valid JWT)
+  if (!profitJwt) {
+    return React.createElement('div', { style:{ padding:'20px 24px', maxWidth:480, margin:'0 auto' } },
+      React.createElement('h2', { style:{ fontSize:20, fontWeight:700, marginBottom:8 } }, '💹 Profit Dashboard'),
+      React.createElement('div', { style:{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'24px 28px', marginTop:24 } },
+        React.createElement('div', { style:{ fontSize:14, fontWeight:600, marginBottom:4 } }, 'Masukkan PIN Dashboard'),
+        React.createElement('div', { style:{ fontSize:12, color:'var(--text3)', marginBottom:20 } },
+          'Akses dashboard profit memerlukan verifikasi PIN. PIN berbeda dari password login.'),
+        React.createElement('form', { onSubmit: handlePinSubmit },
+          React.createElement('div', { style:{ marginBottom:14 } },
+            React.createElement('div', { style:{ fontSize:12, color:'var(--text2)', marginBottom:6 } }, 'Nama akun: ' + (sessionUser || '—')),
+            React.createElement('input', {
+              type:'password', value:pinInput, autoFocus:true,
+              onChange:function(e){ setPinInput(e.target.value); },
+              placeholder:'PIN Dashboard',
+              style:{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--border2)',
+                background:'var(--bg3)', color:'var(--text)', fontSize:14, boxSizing:'border-box' }
+            })
+          ),
+          pinErr && React.createElement('div',{style:{color:'var(--red)',fontSize:12,marginBottom:12}},'⚠️ '+pinErr),
+          React.createElement('button', {
+            type:'submit', disabled:pinLoading||!pinInput.trim(),
+            style:{ padding:'9px 20px', borderRadius:8, background:'var(--accent2)', color:'#fff',
+              border:'none', fontSize:14, fontWeight:600, cursor:'pointer', width:'100%',
+              opacity:pinLoading||!pinInput.trim()?0.6:1 }
+          }, pinLoading ? 'Memverifikasi…' : 'Masuk')
+        ),
+        React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginTop:16,textAlign:'center'}},
+          'PIN hanya berlaku 8 jam per sesi browser.')
+      )
+    );
+  }
+
   return React.createElement('div', { style:{ padding:'20px 24px', maxWidth:1200, margin:'0 auto' } },
-    // Header
     React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:12, marginBottom:20, flexWrap:'wrap' } },
       React.createElement('h2', { style:{ fontSize:20, fontWeight:700, margin:0, flex:1 } }, '💹 Profit Dashboard'),
       React.createElement('input', {
         type:'month', value:period,
         onChange:function(e){ setPeriod(e.target.value); },
         style:{ padding:'6px 10px', borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg3)', color:'var(--text)', fontSize:14 }
-      })
+      }),
+      React.createElement('button', {
+        onClick:clearToken,
+        title:'Keluar dari sesi dashboard (hapus token)',
+        style:{ padding:'6px 10px', borderRadius:8, border:'1px solid var(--border2)', background:'transparent',
+          color:'var(--text3)', fontSize:12, cursor:'pointer' }
+      }, '🔒 Kunci')
     ),
 
     loading && React.createElement('div',{style:{textAlign:'center',padding:60,color:'var(--text3)'}},'⏳ Memuat data profit...'),
@@ -49519,19 +49757,31 @@ function ProfitDashboardPage() {
     data && React.createElement(React.Fragment, null,
       React.createElement('div',{style:{fontSize:12,color:'var(--text3)',marginBottom:16}},'Data: ',periodLabel,' • Diperbarui: ',new Date(data.generated_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})),
 
-      // Tabs
       React.createElement('div',{style:{display:'flex',gap:6,marginBottom:20,flexWrap:'wrap'}},
         tabBtn('combined','Gabungan'),
         tabBtn('adl','ADL (PT)'),
-        tabBtn('group','Group')
+        tabBtn('group','Group'),
+        tabBtn('matrix','📊 Matriks Bulanan')
       ),
 
       activeTab === 'combined' && data.combined && React.createElement('div', { style:cs },
         React.createElement('h3',{style:{fontSize:14,fontWeight:600,color:'var(--text2)',marginBottom:12,textTransform:'uppercase',letterSpacing:'0.06em'}},'Gabungan ADL + Group'),
-        React.createElement(SummaryCards,{summary:data.combined.summary})
+        React.createElement(SummaryCards,{summary:data.combined.summary}),
+        combinedSales.length > 0 && React.createElement('div',{style:{marginTop:4}},
+          React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}},'Per Salesperson (Semua Entitas)'),
+          React.createElement(SalesTable, { rows: combinedSales, showCompany: true })
+        )
       ),
-      activeTab === 'adl'      && React.createElement(EntityView, { data:data.adl,   label:'ADL (PT Digitalzone Artha Lestari)' }),
-      activeTab === 'group'    && React.createElement(EntityView, { data:data.group, label:'Group (Digitalzone Group)' })
+      activeTab === 'adl'    && React.createElement(EntityView, { data:data.adl,   label:'ADL (PT Anugerah Digital Lestari)' }),
+      activeTab === 'group'  && React.createElement(EntityView, { data:data.group, label:'Group (Digitalzone Group)' }),
+      activeTab === 'matrix' && React.createElement('div',{style:cs},
+        React.createElement('h3',{style:{fontSize:14,fontWeight:600,color:'var(--text2)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}},'Perbandingan Bulanan'),
+        React.createElement('div',{style:{fontSize:12,color:'var(--text3)',marginBottom:12}},'6 bulan terakhir — ADL vs Group'),
+        React.createElement(MonthlyMatrix, {
+          adlTrend:   data.adl&&data.adl.monthly_profit_trend||data.adl&&data.adl.revenue_trend||[],
+          groupTrend: data.group&&data.group.monthly_profit_trend||data.group&&data.group.revenue_trend||[]
+        })
+      )
     )
   );
 }
