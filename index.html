@@ -12322,6 +12322,7 @@ function CourierDailyMonitor(_ref84) {
       hasActivity: hasActivity,
       totalTaskKm: totalTaskKm,
       summaryKmStr: summaryKmStr,
+      osrmKm: _osrmKm != null ? _osrmKm : null,
       timeline: timeline
     };
   });
@@ -12701,7 +12702,7 @@ function CourierDailyMonitor(_ref84) {
         fontWeight: 700,
         color: 'var(--blue)'
       }
-    }, c.totalGpsStr, " \xB7 \u26FD ", fmtCurrency(Math.round(c.totalGpsKm * FUEL_PER_KM)))), (c.summaryKmStr || c.totalTaskKm > 0) && /*#__PURE__*/React.createElement("div", {
+    }, c.osrmKm != null ? c.osrmKm + ' km' : c.totalGpsStr, " \xB7 \u26FD ", fmtCurrency(Math.round((c.osrmKm != null ? c.osrmKm : c.totalGpsKm) * FUEL_PER_KM)))), (c.summaryKmStr || c.totalTaskKm > 0) && /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 6,
         padding: '8px 12px',
