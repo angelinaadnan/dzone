@@ -49377,6 +49377,19 @@ function ProfitDashboardPage() {
   var _s3 = React.useState(false); var loading = _s3[0]; var setLoading = _s3[1];
   var _s4 = React.useState(null); var err = _s4[0]; var setErr = _s4[1];
   var _s5 = React.useState('combined'); var activeTab = _s5[0]; var setActiveTab = _s5[1];
+  // Sales matrix state
+  var _sm1 = React.useState(null); var smData = _sm1[0]; var setSmData = _sm1[1];
+  var _sm2 = React.useState(false); var smLoading = _sm2[0]; var setSmLoading = _sm2[1];
+  var _sm3 = React.useState(null); var smErr = _sm3[0]; var setSmErr = _sm3[1];
+  var _sm4 = React.useState('profit'); var smMetric = _sm4[0]; var setSmMetric = _sm4[1];
+  var _sm5 = React.useState('combined'); var smEntity = _sm5[0]; var setSmEntity = _sm5[1];
+  var _sm6 = React.useState('profit_desc'); var smSort = _sm6[0]; var setSmSort = _sm6[1];
+  var _sm7 = React.useState((function(){
+    var d=new Date(); var to=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    var fy=d.getFullYear(), fm=d.getMonth()-4; if(fm<=0){fm+=12;fy--;}
+    return fy+'-'+String(fm).padStart(2,'0');
+  })()); var smFrom = _sm7[0]; var setSmFrom = _sm7[1];
+  var _sm8 = React.useState((function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');})()); var smTo = _sm8[0]; var setSmTo = _sm8[1];
   // JWT auth state
   var _s6 = React.useState(null); var profitJwt = _s6[0]; var setProfitJwt = _s6[1];
   var _s7 = React.useState(false); var authLoading = _s7[0]; var setAuthLoading = _s7[1];
@@ -49438,6 +49451,22 @@ function ProfitDashboardPage() {
       .catch(function(e) { setErr(e.message); })
       .finally(function() { setLoading(false); });
   }, [period, profitJwt]);
+
+  // Fetch sales matrix when tab is active
+  React.useEffect(function() {
+    if (activeTab !== 'salesmatrix' || !profitJwt) return;
+    setSmLoading(true); setSmErr(null);
+    var qs = new URLSearchParams({ from: smFrom, to: smTo });
+    fetch('/api/profit-sales-matrix?' + qs, { headers: { 'Authorization': 'Bearer ' + profitJwt } })
+      .then(function(r) {
+        if (r.status === 401 || r.status === 403) { clearToken(); throw new Error('Sesi berakhir.'); }
+        if (!r.ok) return r.json().then(function(d){ throw new Error(d.error || 'HTTP '+r.status); });
+        return r.json();
+      })
+      .then(function(d) { setSmData(d); })
+      .catch(function(e) { setSmErr(e.message); })
+      .finally(function() { setSmLoading(false); });
+  }, [activeTab, profitJwt, smFrom, smTo]);
 
   var fmt = function(v) { if (v===null||v===undefined) return '—'; var n=Number(v); return n>=1e9?(n/1e9).toFixed(2)+'M':n>=1e6?(n/1e6).toFixed(1)+'jt':Math.round(n).toLocaleString('id-ID'); };
   var fmtRp = function(v) { if (v===null||v===undefined) return '—'; return 'Rp '+fmt(v); };
@@ -49736,7 +49765,8 @@ function ProfitDashboardPage() {
         tabBtn('combined','Gabungan'),
         tabBtn('adl','ADL (PT)'),
         tabBtn('group','Group'),
-        tabBtn('matrix','📊 Matriks Bulanan')
+        tabBtn('matrix','📊 Matriks Bulanan'),
+        tabBtn('salesmatrix','📈 Matriks Sales')
       ),
 
       activeTab === 'combined' && data.combined && React.createElement('div', { style:cs },
@@ -49756,6 +49786,222 @@ function ProfitDashboardPage() {
           adlTrend:   data.adl&&data.adl.monthly_profit_trend||data.adl&&data.adl.revenue_trend||[],
           groupTrend: data.group&&data.group.monthly_profit_trend||data.group&&data.group.revenue_trend||[]
         })
+      ),
+      activeTab === 'salesmatrix' && React.createElement(SalesMatrixTab, {
+        smData:smData, smLoading:smLoading, smErr:smErr,
+        smMetric:smMetric, setSmMetric:setSmMetric,
+        smEntity:smEntity, setSmEntity:setSmEntity,
+        smSort:smSort, setSmSort:setSmSort,
+        smFrom:smFrom, setSmFrom:setSmFrom,
+        smTo:smTo, setSmTo:setSmTo,
+        cs:cs, fmtRp:fmtRp, profitColor:profitColor,
+      })
+    )
+  );
+}
+
+// ─── SALES MATRIX TAB ─────────────────────────────────────────────────────────
+function SalesMatrixTab(p) {
+  var smData=p.smData, smLoading=p.smLoading, smErr=p.smErr;
+  var smMetric=p.smMetric, setSmMetric=p.setSmMetric;
+  var smEntity=p.smEntity, setSmEntity=p.setSmEntity;
+  var smSort=p.smSort, setSmSort=p.setSmSort;
+  var smFrom=p.smFrom, setSmFrom=p.setSmFrom;
+  var smTo=p.smTo, setSmTo=p.setSmTo;
+  var cs=p.cs, fmtRp=p.fmtRp, profitColor=p.profitColor;
+
+  var selStyle = { padding:'5px 9px', borderRadius:7, border:'1px solid var(--border2)',
+    background:'var(--bg3)', color:'var(--text)', fontSize:12, cursor:'pointer' };
+  var inputStyle = { padding:'5px 9px', borderRadius:7, border:'1px solid var(--border2)',
+    background:'var(--bg3)', color:'var(--text)', fontSize:12 };
+
+  var METRICS = [
+    { id:'profit',    label:'Laba Kotor' },
+    { id:'revenue',   label:'Revenue' },
+    { id:'cogs',      label:'HPP/COGS' },
+    { id:'margin',    label:'Margin %' },
+    { id:'invoices',  label:'Jml Invoice' },
+    { id:'wac',       label:'WAC Coverage' },
+  ];
+  var SORTS = [
+    { id:'profit_desc',  label:'Laba ↓ terbaru' },
+    { id:'revenue_desc', label:'Revenue ↓ terbaru' },
+    { id:'profit_grow',  label:'Pertumbuhan laba ↑' },
+    { id:'profit_drop',  label:'Penurunan laba ↓' },
+  ];
+
+  function getVal(cell, metric) {
+    if (!cell) return null;
+    if (metric==='profit')   return cell.profit;
+    if (metric==='revenue')  return cell.revenue_gross;
+    if (metric==='cogs')     return cell.cogs;
+    if (metric==='margin')   return cell.profit_margin;
+    if (metric==='invoices') return cell.invoice_count;
+    if (metric==='wac')      return cell.wac_pct;
+    return null;
+  }
+
+  function fmtVal(v, metric) {
+    if (v===null||v===undefined) return '—';
+    if (metric==='margin'||metric==='wac') return v.toFixed(1)+'%';
+    if (metric==='invoices') return v;
+    return fmtRp(v);
+  }
+
+  // Color: only Profit and Margin have semantic direction. Revenue=blue. COGS/WAC/Invoice=neutral.
+  function deltaColor(delta, metric) {
+    if (delta===null) return 'var(--text3)';
+    if (metric==='profit'||metric==='margin') return delta>=0?'var(--green)':'var(--red)';
+    if (metric==='revenue') return delta>=0?'#60a5fa':'#f97316';
+    return 'var(--text3)';
+  }
+
+  function fmtDelta(cur, prev, metric) {
+    if (cur===null||prev===null) return null;
+    var delta = cur - prev;
+    var pct = (prev!==0) ? Math.round((delta/Math.abs(prev))*1000)/10 : null;
+    var sign = delta>=0?'+':'';
+    var dStr = (metric==='margin'||metric==='wac') ? sign+delta.toFixed(1)+'%'
+             : metric==='invoices' ? sign+delta
+             : sign+fmtRp(delta);
+    var pctStr = pct!==null ? ' ('+sign+pct+'%)' : '';
+    return { delta, dStr: dStr+pctStr };
+  }
+
+  var rows = smData ? (smEntity==='adl'?smData.adl : smEntity==='group'?smData.group : smData.combined) : [];
+  var months = smData ? smData.months : [];
+  var lastMonth = months.length>0 ? months[months.length-1] : null;
+
+  // Sort rows
+  rows = (rows||[]).slice().sort(function(a,b) {
+    if (smSort==='profit_desc') {
+      var av=getVal(a.by_month&&a.by_month[lastMonth],'profit'); var bv=getVal(b.by_month&&b.by_month[lastMonth],'profit');
+      if (av===null&&bv===null) return 0; if (av===null) return 1; if (bv===null) return -1; return bv-av;
+    }
+    if (smSort==='revenue_desc') {
+      var av2=getVal(a.by_month&&a.by_month[lastMonth],'revenue'); var bv2=getVal(b.by_month&&b.by_month[lastMonth],'revenue');
+      if (av2===null&&bv2===null) return 0; if (av2===null) return 1; if (bv2===null) return -1; return bv2-av2;
+    }
+    // profit growth/drop: compare last two months
+    var prevMonth = months.length>1 ? months[months.length-2] : null;
+    if (!prevMonth) return 0;
+    var aDelta = (a.by_month&&a.by_month[lastMonth]&&a.by_month[prevMonth]) ? getVal(a.by_month[lastMonth],'profit')-getVal(a.by_month[prevMonth],'profit') : null;
+    var bDelta = (b.by_month&&b.by_month[lastMonth]&&b.by_month[prevMonth]) ? getVal(b.by_month[lastMonth],'profit')-getVal(b.by_month[prevMonth],'profit') : null;
+    if (aDelta===null&&bDelta===null) return 0; if (aDelta===null) return 1; if (bDelta===null) return -1;
+    return smSort==='profit_grow' ? bDelta-aDelta : aDelta-bDelta;
+  });
+
+  // Summary: top gainer and dropper by last MoM profit delta
+  var prevM = months.length>1 ? months[months.length-2] : null;
+  var topGainer=null, topDropper=null;
+  if (prevM && lastMonth) {
+    (rows||[]).forEach(function(r) {
+      var cur=getVal(r.by_month&&r.by_month[lastMonth],'profit');
+      var prev=getVal(r.by_month&&r.by_month[prevM],'profit');
+      if (cur===null||prev===null) return;
+      var d=cur-prev;
+      if (!topGainer||d>topGainer.d) topGainer={name:r.salesman,d:d,cur:cur,prev:prev};
+      if (!topDropper||d<topDropper.d) topDropper={name:r.salesman,d:d,cur:cur,prev:prev};
+    });
+    if (topGainer&&topGainer.d<=0) topGainer=null;
+    if (topDropper&&topDropper.d>=0) topDropper=null;
+  }
+
+  var thStyle = { padding:'6px 8px', fontSize:11, color:'var(--text2)', fontWeight:600,
+    textAlign:'right', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap',
+    background:'rgba(108,99,255,0.07)' };
+  var tdStyle = { padding:'6px 8px', fontSize:12, textAlign:'right',
+    fontFamily:'DM Mono, monospace', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' };
+  var nameStyle = { padding:'6px 10px', fontSize:12, fontWeight:600, borderBottom:'1px solid var(--border)',
+    whiteSpace:'nowrap', color:'var(--text)', position:'sticky', left:0, background:'var(--bg2)', zIndex:1 };
+
+  return React.createElement('div', {style:cs},
+    React.createElement('div',{style:{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14,alignItems:'center'}},
+      React.createElement('strong',{style:{fontSize:13,color:'var(--text2)'}},'Matriks Sales Bulanan'),
+      React.createElement('select',{value:smEntity,onChange:function(e){setSmEntity(e.target.value);},style:selStyle},
+        React.createElement('option',{value:'combined'},'Gabungan'),
+        React.createElement('option',{value:'adl'},'ADL'),
+        React.createElement('option',{value:'group'},'Group')
+      ),
+      React.createElement('select',{value:smMetric,onChange:function(e){setSmMetric(e.target.value);},style:selStyle},
+        METRICS.map(function(m){return React.createElement('option',{key:m.id,value:m.id},m.label);})
+      ),
+      React.createElement('select',{value:smSort,onChange:function(e){setSmSort(e.target.value);},style:selStyle},
+        SORTS.map(function(s){return React.createElement('option',{key:s.id,value:s.id},s.label);})
+      ),
+      React.createElement('input',{type:'month',value:smFrom,onChange:function(e){setSmFrom(e.target.value);},style:inputStyle}),
+      React.createElement('span',{style:{fontSize:11,color:'var(--text3)'}},'s.d.'),
+      React.createElement('input',{type:'month',value:smTo,onChange:function(e){setSmTo(e.target.value);},style:inputStyle})
+    ),
+
+    smLoading && React.createElement('div',{style:{textAlign:'center',padding:40,color:'var(--text3)'}},'⏳ Memuat matriks...'),
+    smErr && React.createElement('div',{style:{color:'var(--red)',fontSize:13,padding:12,background:'var(--bg3)',borderRadius:8,marginBottom:12}},'⚠️ '+smErr),
+
+    !smLoading && !smErr && smData && React.createElement(React.Fragment,null,
+      (topGainer||topDropper) && React.createElement('div',{style:{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}},
+        topGainer && React.createElement('div',{style:{flex:1,minWidth:180,padding:'8px 12px',background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:8,fontSize:12}},
+          React.createElement('div',{style:{fontWeight:700,color:'var(--green)',marginBottom:2}},'▲ Kenaikan laba terbesar'),
+          React.createElement('div',{style:{fontWeight:600}},topGainer.name),
+          React.createElement('div',{style:{color:'var(--text3)'}},'+'+ fmtRp(topGainer.d)+' vs bulan lalu')
+        ),
+        topDropper && React.createElement('div',{style:{flex:1,minWidth:180,padding:'8px 12px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:8,fontSize:12}},
+          React.createElement('div',{style:{fontWeight:700,color:'var(--red)',marginBottom:2}},'▼ Penurunan laba terbesar'),
+          React.createElement('div',{style:{fontWeight:600}},topDropper.name),
+          React.createElement('div',{style:{color:'var(--text3)'}},' '+fmtRp(topDropper.d)+' vs bulan lalu')
+        )
+      ),
+
+      rows.length===0 && React.createElement('div',{style:{color:'var(--text3)',fontSize:13,padding:20}},'Tidak ada data.'),
+      rows.length>0 && React.createElement('div',{style:{overflowX:'auto'}},
+        React.createElement('table',{style:{borderCollapse:'collapse',minWidth:Math.max(400,months.length*150+180)}},
+          React.createElement('thead',null,
+            React.createElement('tr',null,
+              React.createElement('th',{style:Object.assign({},thStyle,{textAlign:'left',background:'transparent',position:'sticky',left:0,zIndex:2})},'Sales'),
+              months.map(function(m){
+                return React.createElement('th',{key:m,colSpan:2,style:Object.assign({},thStyle,{textAlign:'center'})},m);
+              })
+            ),
+            React.createElement('tr',null,
+              React.createElement('th',{style:Object.assign({},thStyle,{background:'transparent',position:'sticky',left:0,zIndex:2})},''),
+              months.map(function(m,mi){
+                return React.createElement(React.Fragment,{key:m},
+                  React.createElement('th',{style:thStyle},'Nilai'),
+                  React.createElement('th',{style:Object.assign({},thStyle,{color:'var(--text3)'})},mi===0?'—':'vs sebelumnya')
+                );
+              })
+            )
+          ),
+          React.createElement('tbody',null,
+            rows.map(function(row) {
+              return React.createElement('tr',{key:row.salesman},
+                React.createElement('td',{style:nameStyle},row.salesman),
+                months.map(function(m,mi) {
+                  var cell = row.by_month && row.by_month[m];
+                  var prevM2 = mi>0 ? months[mi-1] : null;
+                  var prevCell = prevM2 ? (row.by_month&&row.by_month[prevM2]) : null;
+                  var val = getVal(cell, smMetric);
+                  var prevVal = getVal(prevCell, smMetric);
+                  var df = mi>0 ? fmtDelta(val, prevVal, smMetric) : null;
+                  var valColor = (smMetric==='profit'||smMetric==='margin') ? profitColor(val)
+                    : smMetric==='revenue' ? (val>0?'#60a5fa':'var(--text)')
+                    : 'var(--text)';
+                  return React.createElement(React.Fragment,{key:m},
+                    React.createElement('td',{style:Object.assign({},tdStyle,{color:val!==null?valColor:'var(--text3)'})},
+                      fmtVal(val, smMetric)
+                    ),
+                    React.createElement('td',{style:Object.assign({},tdStyle,{fontSize:10,color:df?deltaColor(df.delta,smMetric):'var(--text3)'})},
+                      mi===0?'—': (df ? (df.delta>=0?'▲ ':'▼ ')+df.dStr : '—')
+                    )
+                  );
+                })
+              );
+            })
+          )
+        )
+      ),
+      React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginTop:8}},
+        rows.length+' sales • ',smData.generated_at?('Data: '+new Date(smData.generated_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})):'',
+        ' • Nilai ▲/▼ = perubahan vs bulan sebelumnya. HPP naik ≠ performa membaik.'
       )
     )
   );
