@@ -49377,51 +49377,45 @@ function ProfitDashboardPage() {
   var _s3 = React.useState(false); var loading = _s3[0]; var setLoading = _s3[1];
   var _s4 = React.useState(null); var err = _s4[0]; var setErr = _s4[1];
   var _s5 = React.useState('combined'); var activeTab = _s5[0]; var setActiveTab = _s5[1];
-  // PIN / JWT auth state
+  // JWT auth state
   var _s6 = React.useState(null); var profitJwt = _s6[0]; var setProfitJwt = _s6[1];
-  var _s7 = React.useState(''); var pinInput = _s7[0]; var setPinInput = _s7[1];
-  var _s8 = React.useState(null); var pinErr = _s8[0]; var setPinErr = _s8[1];
-  var _s9 = React.useState(false); var pinLoading = _s9[0]; var setPinLoading = _s9[1];
+  var _s7 = React.useState(false); var authLoading = _s7[0]; var setAuthLoading = _s7[1];
+  var _s8 = React.useState(null); var authErr = _s8[0]; var setAuthErr = _s8[1];
 
-  // Read cached token from sessionStorage on mount
-  React.useEffect(function() {
-    try {
-      var t = sessionStorage.getItem('profit_jwt');
-      if (t) setProfitJwt(t);
-    } catch(_) {}
-  }, []);
-
-  // Get username from session (used for /api/profit-auth request)
+  // Get username from session
   var sessionUser = (function() {
     try { return JSON.parse(localStorage.getItem('orderflow_session') || '{}').name || ''; } catch(_) { return ''; }
   })();
 
-  function handlePinSubmit(e) {
-    e.preventDefault();
-    if (!pinInput.trim()) return;
-    setPinLoading(true); setPinErr(null);
+  // Auto-auth on mount: try cached token, else request new one automatically
+  React.useEffect(function() {
+    try {
+      var t = sessionStorage.getItem('profit_jwt');
+      if (t) { setProfitJwt(t); return; }
+    } catch(_) {}
+    if (!sessionUser) return;
+    setAuthLoading(true);
     fetch('/api/profit-auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user: sessionUser, pin: pinInput.trim() }),
+      body: JSON.stringify({ user: sessionUser }),
     })
       .then(function(r) {
         if (!r.ok) return r.json().then(function(d){ throw new Error(d.error || 'HTTP ' + r.status); });
         return r.json();
       })
       .then(function(d) {
-        if (!d.token) throw new Error('Token tidak diterima dari server.');
+        if (!d.token) throw new Error('Token tidak diterima.');
         try { sessionStorage.setItem('profit_jwt', d.token); } catch(_) {}
         setProfitJwt(d.token);
-        setPinInput('');
       })
-      .catch(function(e) { setPinErr(e.message); })
-      .finally(function() { setPinLoading(false); });
-  }
+      .catch(function(e) { setAuthErr(e.message); })
+      .finally(function() { setAuthLoading(false); });
+  }, [sessionUser]);
 
   function clearToken() {
     try { sessionStorage.removeItem('profit_jwt'); } catch(_) {}
-    setProfitJwt(null); setData(null); setErr(null);
+    setProfitJwt(null); setData(null); setErr(null); setAuthErr(null);
   }
 
   React.useEffect(function() {
@@ -49435,7 +49429,7 @@ function ProfitDashboardPage() {
       .then(function(r) {
         if (r.status === 401 || r.status === 403) {
           clearToken();
-          return r.json().then(function(d){ throw new Error(d.error || 'Sesi berakhir, masukkan PIN kembali.'); });
+          return r.json().then(function(d){ throw new Error(d.error || 'Sesi berakhir, muat ulang halaman.'); });
         }
         if (!r.ok) return r.json().then(function(d){ throw new Error(d.error || 'HTTP ' + r.status); });
         return r.json();
@@ -49703,36 +49697,16 @@ function ProfitDashboardPage() {
     return adlSales.concat(grpSales);
   })();
 
-  // PIN form (shown when no valid JWT)
+  // Loading / error state (auto-auth, no PIN form needed)
   if (!profitJwt) {
     return React.createElement('div', { style:{ padding:'20px 24px', maxWidth:480, margin:'0 auto' } },
       React.createElement('h2', { style:{ fontSize:20, fontWeight:700, marginBottom:8 } }, '💹 Profit Dashboard'),
-      React.createElement('div', { style:{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'24px 28px', marginTop:24 } },
-        React.createElement('div', { style:{ fontSize:14, fontWeight:600, marginBottom:4 } }, 'Masukkan PIN Dashboard'),
-        React.createElement('div', { style:{ fontSize:12, color:'var(--text3)', marginBottom:20 } },
-          'Akses dashboard profit memerlukan verifikasi PIN. PIN berbeda dari password login.'),
-        React.createElement('form', { onSubmit: handlePinSubmit },
-          React.createElement('div', { style:{ marginBottom:14 } },
-            React.createElement('div', { style:{ fontSize:12, color:'var(--text2)', marginBottom:6 } }, 'Nama akun: ' + (sessionUser || '—')),
-            React.createElement('input', {
-              type:'password', value:pinInput, autoFocus:true,
-              onChange:function(e){ setPinInput(e.target.value); },
-              placeholder:'PIN Dashboard',
-              style:{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--border2)',
-                background:'var(--bg3)', color:'var(--text)', fontSize:14, boxSizing:'border-box' }
-            })
-          ),
-          pinErr && React.createElement('div',{style:{color:'var(--red)',fontSize:12,marginBottom:12}},'⚠️ '+pinErr),
-          React.createElement('button', {
-            type:'submit', disabled:pinLoading||!pinInput.trim(),
-            style:{ padding:'9px 20px', borderRadius:8, background:'var(--accent2)', color:'#fff',
-              border:'none', fontSize:14, fontWeight:600, cursor:'pointer', width:'100%',
-              opacity:pinLoading||!pinInput.trim()?0.6:1 }
-          }, pinLoading ? 'Memverifikasi…' : 'Masuk')
-        ),
-        React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginTop:16,textAlign:'center'}},
-          'PIN hanya berlaku 8 jam per sesi browser.')
-      )
+      authLoading
+        ? React.createElement('div',{style:{textAlign:'center',padding:60,color:'var(--text3)'}},'⏳ Memuat...')
+        : React.createElement('div', { style:{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'24px 28px', marginTop:24, textAlign:'center' } },
+            React.createElement('div',{style:{color:'var(--red)',fontSize:14,marginBottom:12}},'⚠️ ' + (authErr || 'Akses ditolak.')),
+            React.createElement('div',{style:{fontSize:12,color:'var(--text3)'}},'Hubungi admin jika kamu seharusnya punya akses.')
+          )
     );
   }
 

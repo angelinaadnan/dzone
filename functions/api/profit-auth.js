@@ -1,7 +1,6 @@
 // CF Pages Function — issue short-lived JWT for Profit Dashboard access
-// POST /api/profit-auth  body: { user: "Liana", pin: "<dashboard-pin>" }
-// Secrets (CF env): PROFIT_CREDS (JSON: {"Liana":"<pin>","Angel":"<pin>","Santo":"<pin>"})
-//                   PROFIT_JWT_SECRET (random 64-char string)
+// POST /api/profit-auth  body: { user: "Liana" }
+// Secret (CF env): PROFIT_JWT_SECRET (random 64-char string)
 // Returns: { token: "<jwt>" }  — expires in 8 hours
 // Never exposes CONNECTOR_API_KEY or any other secret.
 
@@ -16,10 +15,6 @@ const WHITELIST = ['Liana', 'Angel', 'Santo'];
 
 function b64url(input) {
   return btoa(input).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-}
-
-function fromB64url(s) {
-  return atob(s.replace(/-/g, '+').replace(/_/g, '/'));
 }
 
 async function importHmacKey(secret, usage) {
@@ -54,32 +49,18 @@ export async function onRequestPost(context) {
     return new Response(JSON.stringify({ error: 'Body harus JSON.' }), { status: 400, headers: CORS_POST });
   }
 
-  const { user, pin } = body || {};
-  if (typeof user !== 'string' || typeof pin !== 'string' || !user || !pin) {
-    return new Response(JSON.stringify({ error: 'Field user dan pin wajib diisi.' }), { status: 400, headers: CORS_POST });
+  const { user } = body || {};
+  if (typeof user !== 'string' || !user) {
+    return new Response(JSON.stringify({ error: 'Field user wajib diisi.' }), { status: 400, headers: CORS_POST });
   }
 
   if (!WHITELIST.includes(user)) {
     return new Response(JSON.stringify({ error: 'Akses ditolak.' }), { status: 403, headers: CORS_POST });
   }
 
-  const credsRaw    = env.PROFIT_CREDS      || '';
-  const jwtSecret   = env.PROFIT_JWT_SECRET || '';
-
-  if (!credsRaw || !jwtSecret) {
+  const jwtSecret = env.PROFIT_JWT_SECRET || '';
+  if (!jwtSecret) {
     return new Response(JSON.stringify({ error: 'Konfigurasi server belum lengkap.' }), { status: 503, headers: CORS_POST });
-  }
-
-  let creds;
-  try {
-    creds = JSON.parse(credsRaw);
-  } catch (_) {
-    return new Response(JSON.stringify({ error: 'Konfigurasi server tidak valid.' }), { status: 503, headers: CORS_POST });
-  }
-
-  const expected = creds[user];
-  if (typeof expected !== 'string' || pin !== expected) {
-    return new Response(JSON.stringify({ error: 'PIN tidak valid.' }), { status: 401, headers: CORS_POST });
   }
 
   const now = Math.floor(Date.now() / 1000);
