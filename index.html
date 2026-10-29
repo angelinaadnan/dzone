@@ -12701,7 +12701,7 @@ function CourierDailyMonitor(_ref84) {
         fontWeight: 700,
         color: 'var(--blue)'
       }
-    }, c.totalGpsStr, " \xB7 \u26FD ", fmtCurrency(Math.round(c.totalGpsKm * FUEL_PER_KM)))), c.totalTaskKm > 0 && /*#__PURE__*/React.createElement("div", {
+    }, c.totalGpsStr, " \xB7 \u26FD ", fmtCurrency(Math.round(c.totalGpsKm * FUEL_PER_KM)))), (c.summaryKmStr || c.totalTaskKm > 0) && /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 6,
         padding: '8px 12px',
@@ -12723,7 +12723,7 @@ function CourierDailyMonitor(_ref84) {
         color: 'var(--green)',
         fontFamily: 'Syne'
       }
-    }, fmtKmD(c.totalTaskKm) || c.totalTaskKm + ' km'))));
+    }, c.summaryKmStr || fmtKmD(c.totalTaskKm) || c.totalTaskKm + ' km'))));
   })), idleList.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
