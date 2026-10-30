@@ -49386,7 +49386,7 @@ function ProfitDashboardPage() {
   var _sm6 = React.useState('profit_desc'); var smSort = _sm6[0]; var setSmSort = _sm6[1];
   var _sm7 = React.useState((function(){
     var d=new Date(); var to=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    var fy=d.getFullYear(), fm=d.getMonth()-4; if(fm<=0){fm+=12;fy--;}
+    var fy=d.getFullYear(), fm=d.getMonth()-1; if(fm<=0){fm+=12;fy--;}
     return fy+'-'+String(fm).padStart(2,'0');
   })()); var smFrom = _sm7[0]; var setSmFrom = _sm7[1];
   var _sm8 = React.useState((function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');})()); var smTo = _sm8[0]; var setSmTo = _sm8[1];
@@ -49803,9 +49803,7 @@ function ProfitDashboardPage() {
 // ─── SALES MATRIX TAB ─────────────────────────────────────────────────────────
 function SalesMatrixTab(p) {
   var smData=p.smData, smLoading=p.smLoading, smErr=p.smErr;
-  var smMetric=p.smMetric, setSmMetric=p.setSmMetric;
   var smEntity=p.smEntity, setSmEntity=p.setSmEntity;
-  var smSort=p.smSort, setSmSort=p.setSmSort;
   var smFrom=p.smFrom, setSmFrom=p.setSmFrom;
   var smTo=p.smTo, setSmTo=p.setSmTo;
   var cs=p.cs, fmtRp=p.fmtRp, profitColor=p.profitColor;
@@ -49815,105 +49813,37 @@ function SalesMatrixTab(p) {
   var inputStyle = { padding:'5px 9px', borderRadius:7, border:'1px solid var(--border2)',
     background:'var(--bg3)', color:'var(--text)', fontSize:12 };
 
-  var METRICS = [
-    { id:'profit',    label:'Laba Kotor' },
-    { id:'revenue',   label:'Revenue' },
-    { id:'cogs',      label:'HPP/COGS' },
-    { id:'margin',    label:'Margin %' },
-    { id:'invoices',  label:'Jml Invoice' },
-    { id:'wac',       label:'WAC Coverage' },
+  var COL_DEFS = [
+    { key:'revenue_gross', label:'Total Revenue',  fmt:function(v){return v==null?'—':fmtRp(v);},  color:function(v){return v>0?'#60a5fa':'var(--text)';} },
+    { key:'profit',        label:'Total Profit',   fmt:function(v){return v==null?'—':fmtRp(v);},  color:function(v){return profitColor(v);} },
+    { key:'qty_nb',        label:'Qty Notebook',   fmt:function(v){return v==null?'—':v;},          color:function(){return 'var(--text)';} },
+    { key:'qty_pc_aio',    label:'Qty PC AIO',     fmt:function(v){return v==null?'—':v;},          color:function(){return 'var(--text)';} },
+    { key:'qty_printer',   label:'Qty Printer',    fmt:function(v){return v==null?'—':v;},          color:function(){return 'var(--text)';} },
+    { key:'qty_projector', label:'Qty Projector',  fmt:function(v){return v==null?'—':v;},          color:function(){return 'var(--text)';} },
   ];
-  var SORTS = [
-    { id:'profit_desc',  label:'Laba ↓ terbaru' },
-    { id:'revenue_desc', label:'Revenue ↓ terbaru' },
-    { id:'profit_grow',  label:'Pertumbuhan laba ↑' },
-    { id:'profit_drop',  label:'Penurunan laba ↓' },
-  ];
-
-  function getVal(cell, metric) {
-    if (!cell) return null;
-    if (metric==='profit')   return cell.profit;
-    if (metric==='revenue')  return cell.revenue_gross;
-    if (metric==='cogs')     return cell.cogs;
-    if (metric==='margin')   return cell.profit_margin;
-    if (metric==='invoices') return cell.invoice_count;
-    if (metric==='wac')      return cell.wac_pct;
-    return null;
-  }
-
-  function fmtVal(v, metric) {
-    if (v===null||v===undefined) return '—';
-    if (metric==='margin'||metric==='wac') return v.toFixed(1)+'%';
-    if (metric==='invoices') return v;
-    return fmtRp(v);
-  }
-
-  // Color: only Profit and Margin have semantic direction. Revenue=blue. COGS/WAC/Invoice=neutral.
-  function deltaColor(delta, metric) {
-    if (delta===null) return 'var(--text3)';
-    if (metric==='profit'||metric==='margin') return delta>=0?'var(--green)':'var(--red)';
-    if (metric==='revenue') return delta>=0?'#60a5fa':'#f97316';
-    return 'var(--text3)';
-  }
-
-  function fmtDelta(cur, prev, metric) {
-    if (cur===null||prev===null) return null;
-    var delta = cur - prev;
-    var pct = (prev!==0) ? Math.round((delta/Math.abs(prev))*1000)/10 : null;
-    var sign = delta>=0?'+':'';
-    var dStr = (metric==='margin'||metric==='wac') ? sign+delta.toFixed(1)+'%'
-             : metric==='invoices' ? sign+delta
-             : sign+fmtRp(delta);
-    var pctStr = pct!==null ? ' ('+sign+pct+'%)' : '';
-    return { delta, dStr: dStr+pctStr };
-  }
 
   var rows = smData ? (smEntity==='adl'?smData.adl : smEntity==='group'?smData.group : smData.combined) : [];
   var months = smData ? smData.months : [];
-  var lastMonth = months.length>0 ? months[months.length-1] : null;
 
-  // Sort rows
+  // Sort by total profit last month desc
+  var lastMonth = months.length>0 ? months[months.length-1] : null;
   rows = (rows||[]).slice().sort(function(a,b) {
-    if (smSort==='profit_desc') {
-      var av=getVal(a.by_month&&a.by_month[lastMonth],'profit'); var bv=getVal(b.by_month&&b.by_month[lastMonth],'profit');
-      if (av===null&&bv===null) return 0; if (av===null) return 1; if (bv===null) return -1; return bv-av;
-    }
-    if (smSort==='revenue_desc') {
-      var av2=getVal(a.by_month&&a.by_month[lastMonth],'revenue'); var bv2=getVal(b.by_month&&b.by_month[lastMonth],'revenue');
-      if (av2===null&&bv2===null) return 0; if (av2===null) return 1; if (bv2===null) return -1; return bv2-av2;
-    }
-    // profit growth/drop: compare last two months
-    var prevMonth = months.length>1 ? months[months.length-2] : null;
-    if (!prevMonth) return 0;
-    var aDelta = (a.by_month&&a.by_month[lastMonth]&&a.by_month[prevMonth]) ? getVal(a.by_month[lastMonth],'profit')-getVal(a.by_month[prevMonth],'profit') : null;
-    var bDelta = (b.by_month&&b.by_month[lastMonth]&&b.by_month[prevMonth]) ? getVal(b.by_month[lastMonth],'profit')-getVal(b.by_month[prevMonth],'profit') : null;
-    if (aDelta===null&&bDelta===null) return 0; if (aDelta===null) return 1; if (bDelta===null) return -1;
-    return smSort==='profit_grow' ? bDelta-aDelta : aDelta-bDelta;
+    var av = a.by_month&&a.by_month[lastMonth] ? (a.by_month[lastMonth].profit||0) : -Infinity;
+    var bv = b.by_month&&b.by_month[lastMonth] ? (b.by_month[lastMonth].profit||0) : -Infinity;
+    return bv - av;
   });
 
-  // Summary: top gainer and dropper by last MoM profit delta
-  var prevM = months.length>1 ? months[months.length-2] : null;
-  var topGainer=null, topDropper=null;
-  if (prevM && lastMonth) {
-    (rows||[]).forEach(function(r) {
-      var cur=getVal(r.by_month&&r.by_month[lastMonth],'profit');
-      var prev=getVal(r.by_month&&r.by_month[prevM],'profit');
-      if (cur===null||prev===null) return;
-      var d=cur-prev;
-      if (!topGainer||d>topGainer.d) topGainer={name:r.salesman,d:d,cur:cur,prev:prev};
-      if (!topDropper||d<topDropper.d) topDropper={name:r.salesman,d:d,cur:cur,prev:prev};
-    });
-    if (topGainer&&topGainer.d<=0) topGainer=null;
-    if (topDropper&&topDropper.d>=0) topDropper=null;
-  }
-
-  var thStyle = { padding:'6px 8px', fontSize:11, color:'var(--text2)', fontWeight:600,
-    textAlign:'right', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap',
-    background:'rgba(108,99,255,0.07)' };
-  var tdStyle = { padding:'6px 8px', fontSize:12, textAlign:'right',
+  var NCOLS = COL_DEFS.length;
+  var thBase = { padding:'5px 8px', fontSize:11, color:'var(--text2)', fontWeight:600,
+    textAlign:'right', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' };
+  var tdBase = { padding:'5px 8px', fontSize:12, textAlign:'right',
     fontFamily:'DM Mono, monospace', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' };
-  var nameStyle = { padding:'6px 10px', fontSize:12, fontWeight:600, borderBottom:'1px solid var(--border)',
-    whiteSpace:'nowrap', color:'var(--text)', position:'sticky', left:0, background:'var(--bg2)', zIndex:1 };
+  var nameStyle = { padding:'6px 10px', fontSize:12, fontWeight:600,
+    borderBottom:'1px solid var(--border)', whiteSpace:'nowrap', color:'var(--text)',
+    position:'sticky', left:0, background:'var(--bg2)', zIndex:1, textAlign:'left' };
+
+  // Month header bg alternates slightly
+  function moBg(mi) { return mi%2===0 ? 'rgba(108,99,255,0.07)' : 'rgba(108,99,255,0.13)'; }
 
   return React.createElement('div', {style:cs},
     React.createElement('div',{style:{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14,alignItems:'center'}},
@@ -49922,12 +49852,6 @@ function SalesMatrixTab(p) {
         React.createElement('option',{value:'combined'},'Gabungan'),
         React.createElement('option',{value:'adl'},'ADL'),
         React.createElement('option',{value:'group'},'Group')
-      ),
-      React.createElement('select',{value:smMetric,onChange:function(e){setSmMetric(e.target.value);},style:selStyle},
-        METRICS.map(function(m){return React.createElement('option',{key:m.id,value:m.id},m.label);})
-      ),
-      React.createElement('select',{value:smSort,onChange:function(e){setSmSort(e.target.value);},style:selStyle},
-        SORTS.map(function(s){return React.createElement('option',{key:s.id,value:s.id},s.label);})
       ),
       React.createElement('input',{type:'month',value:smFrom,onChange:function(e){setSmFrom(e.target.value);},style:inputStyle}),
       React.createElement('span',{style:{fontSize:11,color:'var(--text3)'}},'s.d.'),
@@ -49938,70 +49862,57 @@ function SalesMatrixTab(p) {
     smErr && React.createElement('div',{style:{color:'var(--red)',fontSize:13,padding:12,background:'var(--bg3)',borderRadius:8,marginBottom:12}},'⚠️ '+smErr),
 
     !smLoading && !smErr && smData && React.createElement(React.Fragment,null,
-      (topGainer||topDropper) && React.createElement('div',{style:{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}},
-        topGainer && React.createElement('div',{style:{flex:1,minWidth:180,padding:'8px 12px',background:'rgba(34,197,94,0.08)',border:'1px solid rgba(34,197,94,0.2)',borderRadius:8,fontSize:12}},
-          React.createElement('div',{style:{fontWeight:700,color:'var(--green)',marginBottom:2}},'▲ Kenaikan laba terbesar'),
-          React.createElement('div',{style:{fontWeight:600}},topGainer.name),
-          React.createElement('div',{style:{color:'var(--text3)'}},'+'+ fmtRp(topGainer.d)+' vs bulan lalu')
-        ),
-        topDropper && React.createElement('div',{style:{flex:1,minWidth:180,padding:'8px 12px',background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',borderRadius:8,fontSize:12}},
-          React.createElement('div',{style:{fontWeight:700,color:'var(--red)',marginBottom:2}},'▼ Penurunan laba terbesar'),
-          React.createElement('div',{style:{fontWeight:600}},topDropper.name),
-          React.createElement('div',{style:{color:'var(--text3)'}},' '+fmtRp(topDropper.d)+' vs bulan lalu')
-        )
-      ),
-
       rows.length===0 && React.createElement('div',{style:{color:'var(--text3)',fontSize:13,padding:20}},'Tidak ada data.'),
       rows.length>0 && React.createElement('div',{style:{overflowX:'auto'}},
-        React.createElement('table',{style:{borderCollapse:'collapse',minWidth:Math.max(400,months.length*150+180)}},
+        React.createElement('table',{style:{borderCollapse:'collapse',tableLayout:'auto'}},
           React.createElement('thead',null,
+            // Row 1: Sales | [Month colspanned]
             React.createElement('tr',null,
-              React.createElement('th',{style:Object.assign({},thStyle,{textAlign:'left',background:'transparent',position:'sticky',left:0,zIndex:2})},'Sales'),
-              months.map(function(m){
-                return React.createElement('th',{key:m,colSpan:2,style:Object.assign({},thStyle,{textAlign:'center'})},m);
+              React.createElement('th',{style:Object.assign({},thBase,{textAlign:'left',position:'sticky',left:0,zIndex:2,background:'var(--bg2)',borderBottom:'2px solid var(--border)'}),rowSpan:2},'Sales'),
+              months.map(function(m,mi){
+                return React.createElement('th',{key:m,colSpan:NCOLS,
+                  style:Object.assign({},thBase,{textAlign:'center',background:moBg(mi),borderLeft:'2px solid var(--border)',borderBottom:'1px solid var(--border)'}),
+                },m);
               })
             ),
+            // Row 2: sub-column labels
             React.createElement('tr',null,
-              React.createElement('th',{style:Object.assign({},thStyle,{background:'transparent',position:'sticky',left:0,zIndex:2})},''),
               months.map(function(m,mi){
-                return React.createElement(React.Fragment,{key:m},
-                  React.createElement('th',{style:thStyle},'Nilai'),
-                  React.createElement('th',{style:Object.assign({},thStyle,{color:'var(--text3)'})},mi===0?'—':'vs sebelumnya')
-                );
+                return COL_DEFS.map(function(c,ci){
+                  return React.createElement('th',{key:m+c.key,
+                    style:Object.assign({},thBase,{background:moBg(mi),fontSize:10,
+                      borderLeft: ci===0?'2px solid var(--border)':'none',
+                      borderBottom:'2px solid var(--border)'})
+                  },c.label);
+                });
               })
             )
           ),
           React.createElement('tbody',null,
-            rows.map(function(row) {
-              return React.createElement('tr',{key:row.salesman},
+            rows.map(function(row,ri) {
+              var rowBg = ri%2===0 ? 'transparent' : 'rgba(255,255,255,0.02)';
+              return React.createElement('tr',{key:row.salesman,style:{background:rowBg}},
                 React.createElement('td',{style:nameStyle},row.salesman),
-                months.map(function(m,mi) {
+                months.map(function(m,mi){
                   var cell = row.by_month && row.by_month[m];
-                  var prevM2 = mi>0 ? months[mi-1] : null;
-                  var prevCell = prevM2 ? (row.by_month&&row.by_month[prevM2]) : null;
-                  var val = getVal(cell, smMetric);
-                  var prevVal = getVal(prevCell, smMetric);
-                  var df = mi>0 ? fmtDelta(val, prevVal, smMetric) : null;
-                  var valColor = (smMetric==='profit'||smMetric==='margin') ? profitColor(val)
-                    : smMetric==='revenue' ? (val>0?'#60a5fa':'var(--text)')
-                    : 'var(--text)';
-                  return React.createElement(React.Fragment,{key:m},
-                    React.createElement('td',{style:Object.assign({},tdStyle,{color:val!==null?valColor:'var(--text3)'})},
-                      fmtVal(val, smMetric)
-                    ),
-                    React.createElement('td',{style:Object.assign({},tdStyle,{fontSize:10,color:df?deltaColor(df.delta,smMetric):'var(--text3)'})},
-                      mi===0?'—': (df ? (df.delta>=0?'▲ ':'▼ ')+df.dStr : '—')
-                    )
-                  );
+                  return COL_DEFS.map(function(c,ci){
+                    var val = cell ? cell[c.key] : null;
+                    var display = val==null ? '—' : c.fmt(val);
+                    var color   = val==null ? 'var(--text3)' : c.color(val);
+                    return React.createElement('td',{key:m+c.key,
+                      style:Object.assign({},tdBase,{color:color,
+                        borderLeft: ci===0?'2px solid var(--border)':'none'})
+                    },display);
+                  });
                 })
               );
             })
           )
         )
       ),
-      React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginTop:8}},
-        rows.length+' sales • ',smData.generated_at?('Data: '+new Date(smData.generated_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})):'',
-        ' • Nilai ▲/▼ = perubahan vs bulan sebelumnya. HPP naik ≠ performa membaik.'
+      smData && React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginTop:8}},
+        rows.length+' sales',
+        smData.generated_at ? ' • Data: '+new Date(smData.generated_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : ''
       )
     )
   );
