@@ -492,11 +492,13 @@ var USER_ACCOUNTS = [
 {
   name: 'Admin',
   role: 'admin',
-  password: 'admin01'
+  password: 'admin01',
+  doc_pi: true
 }, {
   name: 'Ops',
   role: 'ops',
-  password: 'ops02'
+  password: 'ops02',
+  doc_pi: true
 },
 // Admin Pembelian & Online
 {
@@ -506,17 +508,20 @@ var USER_ACCOUNTS = [
 }, {
   name: 'Admin Online',
   role: 'admin_online',
-  password: 'adminol04'
+  password: 'adminol04',
+  doc_pi: true
 },
 // Supervisor
 {
   name: 'Liana',
   role: 'supervisor',
-  password: 'liana05'
+  password: 'liana05',
+  doc_supervisor: true
 }, {
   name: 'Angel',
   role: 'supervisor',
-  password: 'angel06'
+  password: 'angel06',
+  doc_owner: true
 }, {
   name: 'Santo',
   role: 'supervisor',
@@ -538,7 +543,8 @@ var USER_ACCOUNTS = [
 }, {
   name: 'Eliwaty',
   role: 'sales',
-  password: 'eliwaty11'
+  password: 'eliwaty11',
+  doc_finance: true
 }, {
   name: 'Tio',
   role: 'sales',
@@ -612,7 +618,9 @@ var USER_ACCOUNTS = [
 }, {
   name: 'PS DARTIK',
   role: 'cabang',
-  password: 'dartik27'
+  password: 'dartik27',
+  doc_pi: true,
+  doc_op: true
 }, {
   name: 'PS DWI',
   role: 'cabang',
@@ -634,7 +642,9 @@ var USER_ACCOUNTS = [
 }, {
   name: 'TC LUVI',
   role: 'cabang',
-  password: 'luvi32'
+  password: 'luvi32',
+  doc_pi: true,
+  doc_op: true
 }, {
   name: 'TC RIA',
   role: 'cabang',
@@ -680,6 +690,8 @@ var USER_ACCOUNTS = [
   role: 'absensi_only',
   password: 'gusti42'
 }];
+// Doc Archive permission helper — returns true if user has any doc-archive access
+var canDocArchive = function(u) { return !!(u && (u.doc_pi || u.doc_op || u.doc_finance || u.doc_supervisor || u.doc_owner)); };
 // Branch groups — PS (Poins) and TC (Dusit) are siloed; cannot see each other's data
 var BRANCH_GROUPS = {
   PS: ['PS TITI', 'PS DARTIK', 'PS DWI'],
@@ -4404,7 +4416,8 @@ function App() {
   .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
   .concat(STOCK_CALC_USERS.includes(userName) ? [{ id: 'stock_calculator', icon: '🧮', label: 'Kalkulator Stok' }] : [])
   .concat(STOCK_AGING_USERS.includes(userName) ? [{ id: 'stock_aging', icon: '📦', label: 'Review Stok' }] : [])
-  .concat(PROFIT_DASHBOARD_USERS.includes(userName) ? [{ id: 'profit_dashboard', icon: '💹', label: 'Profit Dashboard' }] : []);
+  .concat(PROFIT_DASHBOARD_USERS.includes(userName) ? [{ id: 'profit_dashboard', icon: '💹', label: 'Profit Dashboard' }] : [])
+  .concat((function(){ var u = USER_ACCOUNTS.find(function(a){ return a.name === userName; }); return canDocArchive(u) ? [{ id: 'doc_archive', icon: '📁', label: 'Arsip Dokumen' }] : []; })());
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -4866,7 +4879,7 @@ function App() {
     onUpdate: updateCourierTask,
     createdBy: userName,
     createdByRole: "admin_online"
-  }), STOCK_CALC_USERS.includes(userName) && page === 'stock_calculator' && /*#__PURE__*/React.createElement(StockCalculatorPage, null), STOCK_AGING_USERS.includes(userName) && page === 'stock_aging' && /*#__PURE__*/React.createElement(StockAgingPage, null), PROFIT_DASHBOARD_USERS.includes(userName) && page === 'profit_dashboard' && /*#__PURE__*/React.createElement(ProfitDashboardPage, null), canAccessPesanBarang && page === 'pesan_barang' && /*#__PURE__*/React.createElement(PesanBarangPage, {
+  }), STOCK_CALC_USERS.includes(userName) && page === 'stock_calculator' && /*#__PURE__*/React.createElement(StockCalculatorPage, null), STOCK_AGING_USERS.includes(userName) && page === 'stock_aging' && /*#__PURE__*/React.createElement(StockAgingPage, null), PROFIT_DASHBOARD_USERS.includes(userName) && page === 'profit_dashboard' && /*#__PURE__*/React.createElement(ProfitDashboardPage, null), (function(){ var u = USER_ACCOUNTS.find(function(a){ return a.name === userName; }); return canDocArchive(u) && page === 'doc_archive' && /*#__PURE__*/React.createElement(DocArchivePage, { userName: userName, userAccount: u }); })(), canAccessPesanBarang && page === 'pesan_barang' && /*#__PURE__*/React.createElement(PesanBarangPage, {
     orders: purchaseOrders,
     onSave: savePurchaseOrder,
     onUpdate: updatePurchaseOrder,
@@ -49229,6 +49242,626 @@ function BusinessAnalystPage() {
         )
       )
     )
+  );
+}
+
+// ─── DZ DOCUMENT ARCHIVE ─────────────────────────────────────────
+function DocArchivePage(props) {
+  var userName = props.userName;
+  var ua = props.userAccount || {};
+  // Derive local permission flags from USER_ACCOUNTS flags
+  var perm = {
+    canUploadPI: !!(ua.doc_pi || ua.doc_owner),
+    canUploadOP: !!(ua.doc_op || ua.doc_finance || ua.doc_owner),
+    canDelete:   !!ua.doc_owner,
+    canSetNA:    !!(ua.doc_supervisor || ua.doc_owner),
+    canReassign: !!(ua.doc_supervisor || ua.doc_owner),
+    isFinance:   !!ua.doc_finance,
+    isSupervisor:!!(ua.doc_supervisor || ua.doc_owner),
+  };
+
+  // JWT state
+  var _j1 = React.useState(null); var jwt = _j1[0]; var setJwt = _j1[1];
+  var _j2 = React.useState(false); var authLoading = _j2[0]; var setAuthLoading = _j2[1];
+  var _j3 = React.useState(null); var authErr = _j3[0]; var setAuthErr = _j3[1];
+  // View state
+  var _v1 = React.useState('list'); var view = _v1[0]; var setView = _v1[1]; // 'list'|'detail'|'pi-search'
+  var _v2 = React.useState(null); var selTx = _v2[0]; var setSelTx = _v2[1];
+  var _v3 = React.useState(null); var selTxFiles = _v3[0]; var setSelTxFiles = _v3[1];
+  var _v4 = React.useState(null); var selNa = _v4[0]; var setSelNa = _v4[1];
+  // List state
+  var _l1 = React.useState([]); var txList = _l1[0]; var setTxList = _l1[1];
+  var _l2 = React.useState(false); var listLoading = _l2[0]; var setListLoading = _l2[1];
+  var _l3 = React.useState(null); var listErr = _l3[0]; var setListErr = _l3[1];
+  var _l4 = React.useState(1); var listPage = _l4[0]; var setListPage = _l4[1];
+  var _l5 = React.useState(0); var listTotal = _l5[0]; var setListTotal = _l5[1];
+  var _l6 = React.useState('PI'); var filterType = _l6[0]; var setFilterType = _l6[1];
+  var _l7 = React.useState(''); var filterStatus = _l7[0]; var setFilterStatus = _l7[1];
+  var _l8 = React.useState(''); var filterTransNumber = _l8[0]; var setFilterTransNumber = _l8[1];
+  var _l9 = React.useState(''); var filterOwner = _l9[0]; var setFilterOwner = _l9[1];
+  var _l10 = React.useState('2026-11-01'); var filterDateFrom = _l10[0]; var setFilterDateFrom = _l10[1];
+  var _l11 = React.useState(''); var filterDateTo = _l11[0]; var setFilterDateTo = _l11[1];
+  // Claim modal state (for unclaimed PI rows)
+  var _cm = React.useState(null); var claimModal = _cm[0]; var setClaimModal = _cm[1];
+  // Summary state
+  var _s1 = React.useState(null); var summary = _s1[0]; var setSummary = _s1[1];
+  // PI search state
+  var _p1 = React.useState(''); var piQ = _p1[0]; var setPiQ = _p1[1];
+  var _p2 = React.useState(null); var piResults = _p2[0]; var setPiResults = _p2[1];
+  var _p3 = React.useState(false); var piLoading = _p3[0]; var setPiLoading = _p3[1];
+  var _p4 = React.useState(null); var piErr = _p4[0]; var setPiErr = _p4[1];
+  // Upload state
+  var _u1 = React.useState(false); var uploading = _u1[0]; var setUploading = _u1[1];
+  var _u2 = React.useState(null); var uploadErr = _u2[0]; var setUploadErr = _u2[1];
+  var _u3 = React.useState(''); var uploadDocType = _u3[0]; var setUploadDocType = _u3[1];
+  // Toast
+  var _t1 = React.useState(null); var toast = _t1[0]; var setToast = _t1[1];
+
+  function showToast(msg, type) {
+    setToast({ msg: msg, type: type || 'ok' });
+    setTimeout(function() { setToast(null); }, 3000);
+  }
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  React.useEffect(function() {
+    try {
+      var t = sessionStorage.getItem('doc_archive_jwt');
+      if (t) { setJwt(t); return; }
+    } catch(_) {}
+    if (!userName || !ua.password) return;
+    setAuthLoading(true);
+    // Send password over HTTPS — CF function verifies server-side (never stored plaintext in CF env).
+    // ts binds this request to a 5-minute window; replay of a captured request fails after 5 min.
+    fetch('/api/doc-archive-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: userName, password: ua.password, ts: Date.now() }),
+    })
+      .then(function(r) { return r.ok ? r.json() : r.json().then(function(d){ throw new Error(d.error || 'HTTP '+r.status); }); })
+      .then(function(d) {
+        if (!d.token) throw new Error('Token tidak diterima.');
+        try { sessionStorage.setItem('doc_archive_jwt', d.token); } catch(_) {}
+        setJwt(d.token);
+      })
+      .catch(function(e) { setAuthErr(e.message); })
+      .finally(function() { setAuthLoading(false); });
+  }, [userName]);
+
+  function clearToken() {
+    try { sessionStorage.removeItem('doc_archive_jwt'); } catch(_) {}
+    setJwt(null); setTxList([]); setListErr(null); setAuthErr(null);
+  }
+
+  function apiCall(path, opts) {
+    if (!jwt) return Promise.reject(new Error('Token belum siap.'));
+    var options = Object.assign({ headers: {} }, opts || {});
+    options.headers['Authorization'] = 'Bearer ' + jwt;
+    if (options.body && typeof options.body === 'object' && !(options.body instanceof ArrayBuffer)) {
+      options.headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(options.body);
+    }
+    return fetch('/api/doc-archive' + path, options)
+      .then(function(r) {
+        if (r.status === 401 || r.status === 403) {
+          if (r.status === 401) clearToken();
+          return r.json().then(function(d){ throw new Error(d.error || 'HTTP '+r.status); });
+        }
+        return r.json();
+      });
+  }
+
+  // ── Load summary ──────────────────────────────────────────────────────────
+  React.useEffect(function() {
+    if (!jwt) return;
+    apiCall('/summary').then(function(d) { setSummary(d.summary || null); }).catch(function(){});
+  }, [jwt]);
+
+  // ── Load transaction list ─────────────────────────────────────────────────
+  React.useEffect(function() {
+    if (!jwt || view !== 'list') return;
+    setListLoading(true); setListErr(null);
+    var qs = new URLSearchParams({ page: listPage, limit: 50 });
+    if (filterType)         qs.set('type', filterType);
+    if (filterStatus)       qs.set('status', filterStatus);
+    if (filterTransNumber)  qs.set('q', filterTransNumber);
+    if (filterOwner)        qs.set('owner', filterOwner);
+    if (filterDateFrom)     qs.set('dateFrom', filterDateFrom);
+    if (filterDateTo)       qs.set('dateTo', filterDateTo);
+    apiCall('/transactions?' + qs)
+      .then(function(d) { setTxList(d.rows || []); setListTotal(d.total || 0); })
+      .catch(function(e) { setListErr(e.message); })
+      .finally(function() { setListLoading(false); });
+  }, [jwt, view, listPage, filterType, filterStatus, filterTransNumber, filterOwner, filterDateFrom, filterDateTo]);
+
+  // ── Load transaction detail ───────────────────────────────────────────────
+  function loadDetail(txId) {
+    setView('detail'); setSelTx(null); setSelTxFiles(null); setSelNa(null);
+    apiCall('/transactions/' + txId)
+      .then(function(d) { setSelTx(d.transaction); setSelTxFiles(d.files || []); setSelNa(d.naOverride || null); })
+      .catch(function(e) { showToast(e.message, 'error'); setView('list'); });
+  }
+
+  // ── PI Search ─────────────────────────────────────────────────────────────
+  function doPiSearch() {
+    if (!piQ.trim()) return;
+    setPiLoading(true); setPiErr(null); setPiResults(null);
+    apiCall('/pi/search', { method: 'POST', body: { invoiceNumber: piQ.trim() } })
+      .then(function(d) { setPiResults(d.results || []); })
+      .catch(function(e) { setPiErr(e.message); })
+      .finally(function() { setPiLoading(false); });
+  }
+
+  function doPiClaim(invoiceId) {
+    apiCall('/pi/claim', { method: 'POST', body: { invoiceId: invoiceId } })
+      .then(function(d) {
+        if (d.ok) {
+          showToast(d.alreadyClaimed ? 'PI sudah diklaim sebelumnya.' : 'PI berhasil diklaim!', 'ok');
+          setPiResults(null); setPiQ(''); setView('list'); setListPage(1);
+          apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+        }
+      })
+      .catch(function(e) { showToast(e.message, 'error'); });
+  }
+
+  // ── File upload ───────────────────────────────────────────────────────────
+  function doUpload(txId, docType, file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { showToast('Ukuran file max 10MB.', 'error'); return; }
+    var allowedTypes = ['image/jpeg','image/jpg','image/png','image/webp','application/pdf'];
+    if (!allowedTypes.includes(file.type)) { showToast('Tipe file harus JPG, PNG, atau PDF.', 'error'); return; }
+
+    setUploading(true); setUploadErr(null);
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var base64 = e.target.result.split(',')[1];
+      apiCall('/transactions/' + txId + '/upload', {
+        method: 'POST',
+        body: { docType: docType, fileName: file.name, mimeType: file.type, fileSize: file.size, fileData: base64 },
+      })
+        .then(function(d) {
+          if (d.ok) {
+            showToast('File berhasil diupload!', 'ok');
+            setUploadDocType('');
+            loadDetail(txId); // reload detail
+            apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+          }
+        })
+        .catch(function(e) { setUploadErr(e.message); showToast(e.message, 'error'); })
+        .finally(function() { setUploading(false); });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── Download file ──────────────────────────────────────────────────────────
+  function doDownload(txId, fileId, fileName) {
+    apiCall('/transactions/' + txId + '/files/' + fileId + '/url')
+      .then(function(d) {
+        var a = document.createElement('a');
+        a.href = d.url; a.target = '_blank'; a.rel = 'noopener';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      })
+      .catch(function(e) { showToast(e.message, 'error'); });
+  }
+
+  // ── Soft delete file ──────────────────────────────────────────────────────
+  function doDeleteFile(txId, fileId) {
+    if (!window.confirm('Hapus file ini? (tidak bisa dibatalkan)')) return;
+    apiCall('/transactions/' + txId + '/files/' + fileId, { method: 'DELETE' })
+      .then(function(d) { if (d.ok) { showToast('File dihapus.', 'ok'); loadDetail(txId); } })
+      .catch(function(e) { showToast(e.message, 'error'); });
+  }
+
+  // ── Set NA ────────────────────────────────────────────────────────────────
+  function doSetNA(txId) {
+    var reason = window.prompt('Alasan N/A (wajib):');
+    if (!reason) return;
+    apiCall('/transactions/' + txId + '/na', { method: 'POST', body: { reason: reason } })
+      .then(function(d) { if (d.ok) { showToast('Status N/A disimpan.', 'ok'); loadDetail(txId); } })
+      .catch(function(e) { showToast(e.message, 'error'); });
+  }
+
+  function doRevokeNA(txId) {
+    apiCall('/transactions/' + txId + '/na', { method: 'DELETE' })
+      .then(function(d) { if (d.ok) { showToast('N/A dicabut.', 'ok'); loadDetail(txId); } })
+      .catch(function(e) { showToast(e.message, 'error'); });
+  }
+
+  // ── Assign owner ──────────────────────────────────────────────────────────
+  function doAssignOwner(txId) {
+    var owner = window.prompt('Nama owner baru (contoh: TC LUVI):');
+    if (!owner) return;
+    apiCall('/transactions/' + txId + '/assign-owner', { method: 'POST', body: { ownerUserId: owner.trim() } })
+      .then(function(d) { if (d.ok) { showToast('Owner diperbarui.', 'ok'); loadDetail(txId); } })
+      .catch(function(e) { showToast(e.message, 'error'); });
+  }
+
+  // ── Claim unclaimed PI (then open detail) ─────────────────────────────────
+  function claimThenOpen(accurateId) {
+    setClaimModal(null);
+    apiCall('/pi/claim', { method: 'POST', body: { invoiceId: accurateId } })
+      .then(function(d) {
+        if (d.ok) {
+          showToast(d.alreadyClaimed ? 'PI sudah diklaim sebelumnya.' : 'PI berhasil diklaim!', 'ok');
+          apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+          loadDetail(d.transactionId);
+        }
+      })
+      .catch(function(e) { showToast(e.message, 'error'); });
+  }
+
+  function refreshList() {
+    setListPage(1);
+    // trigger useEffect by toggling a dummy — just reload summary and reset page
+    apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+  }
+
+  // ── Styles ────────────────────────────────────────────────────────────────
+  var cs = { background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:10, padding:'14px 16px', marginBottom:14 };
+  var th = { padding:'6px 10px', fontSize:11, color:'var(--text2)', fontWeight:600, letterSpacing:'0.05em', borderBottom:'1px solid var(--border)', textAlign:'left' };
+  var td = { padding:'7px 10px', fontSize:13, borderBottom:'1px solid var(--border)', verticalAlign:'middle' };
+  var btn = function(label, onClick, style) {
+    return React.createElement('button', {
+      onClick: onClick,
+      style: Object.assign({ padding:'6px 12px', borderRadius:7, fontSize:12, fontWeight:500, cursor:'pointer', border:'1px solid var(--border)', background:'var(--bg3)', color:'var(--text)' }, style||{})
+    }, label);
+  };
+
+  function statusBadge(status) {
+    var map = { missing: ['Belum','var(--red)'], partial: ['Sebagian','var(--amber)'], complete: ['Lengkap','var(--green)'], not_applicable: ['N/A','var(--text3)'] };
+    var s = map[status] || [status,'var(--text3)'];
+    return React.createElement('span', { style:{ display:'inline-block', padding:'2px 8px', borderRadius:12, fontSize:11, fontWeight:600, background: s[1]+'22', color:s[1], border:'1px solid '+s[1]+'55' } }, s[0]);
+  }
+
+  function typeBadge(type) {
+    return React.createElement('span', { style:{ display:'inline-block', padding:'2px 7px', borderRadius:10, fontSize:10, fontWeight:700, background: type==='PI'?'rgba(99,102,241,0.15)':'rgba(34,197,94,0.15)', color: type==='PI'?'var(--accent2)':'var(--green)', border:'1px solid '+(type==='PI'?'rgba(99,102,241,0.3)':'rgba(34,197,94,0.3)') } }, type);
+  }
+
+  // ── Loading / auth error states ───────────────────────────────────────────
+  if (authLoading) return React.createElement('div', { style:{ padding:32, color:'var(--text3)', fontSize:14 } }, 'Memuat akses Arsip Dokumen…');
+  if (authErr) return React.createElement('div', { style:{ padding:32 } },
+    React.createElement('div', { style:{ color:'var(--red)', marginBottom:12, fontSize:14 } }, 'Gagal mengakses Arsip Dokumen: ' + authErr),
+    btn('Coba Lagi', function(){ setAuthErr(null); clearToken(); }, { background:'var(--accent)', color:'#fff', border:'none' })
+  );
+  if (!jwt) return React.createElement('div', { style:{ padding:32, color:'var(--text3)' } }, 'Menginisialisasi…');
+
+  // ── Summary bar (monitoring dashboard) ───────────────────────────────────
+  function SummaryBar() {
+    if (!summary) return null;
+    var types = ['PI','OP'].filter(function(t){ return (summary[t]||{}).total > 0; });
+    if (!types.length) return null;
+
+    function StatCard(s) {
+      var completeRate = s.total ? Math.round(s.complete / s.total * 100) : 0;
+      var missingRate  = s.total ? Math.round(s.missing  / s.total * 100) : 0;
+      var barComplete  = s.total ? Math.round(s.complete  / s.total * 100) : 0;
+      var barPartial   = s.total ? Math.round(s.partial   / s.total * 100) : 0;
+      var barMissing   = s.total ? Math.round(s.missing   / s.total * 100) : 0;
+      var barNA        = 100 - barComplete - barPartial - barMissing;
+      var allComplete  = s.complete === s.total;
+      return React.createElement('div', { style:{ flex:1, minWidth:200, background:'var(--bg2)', borderRadius:12, padding:'14px 16px', border:'1px solid var(--border)', boxShadow:'0 1px 4px rgba(0,0,0,0.1)' } },
+        // Header row
+        React.createElement('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 } },
+          React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:8 } },
+            typeBadge(s.type),
+            React.createElement('span', { style:{ fontSize:13, fontWeight:600 } }, s.total + ' transaksi')
+          ),
+          allComplete
+            ? React.createElement('span', { style:{ fontSize:11, color:'var(--green)', fontWeight:600 } }, '✓ Semua lengkap')
+            : React.createElement('span', { style:{ fontSize:11, color: missingRate > 50 ? 'var(--red)' : 'var(--amber)', fontWeight:600 } }, missingRate + '% belum')
+        ),
+        // Progress bar
+        React.createElement('div', { style:{ height:6, borderRadius:4, background:'var(--bg3)', overflow:'hidden', display:'flex', marginBottom:10 } },
+          barComplete > 0 && React.createElement('div', { style:{ width:barComplete+'%', background:'var(--green)', transition:'width 0.3s' } }),
+          barPartial  > 0 && React.createElement('div', { style:{ width:barPartial+'%',  background:'var(--amber)', transition:'width 0.3s' } }),
+          barMissing  > 0 && React.createElement('div', { style:{ width:barMissing+'%',  background:'var(--red)',   transition:'width 0.3s' } }),
+          barNA       > 0 && React.createElement('div', { style:{ width:barNA+'%',       background:'var(--text3)', transition:'width 0.3s', opacity:'0.4' } })
+        ),
+        // Stats row
+        React.createElement('div', { style:{ display:'flex', gap:12, fontSize:12, flexWrap:'wrap' } },
+          React.createElement('span', { style:{ color:'var(--red)',   cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('missing');       setListPage(1); } }, '● ' + s.missing  + ' belum'),
+          s.partial > 0 && React.createElement('span', { style:{ color:'var(--amber)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('partial');       setListPage(1); } }, '● ' + s.partial  + ' sebagian'),
+          React.createElement('span', { style:{ color:'var(--green)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('complete');      setListPage(1); } }, '● ' + s.complete + ' lengkap'),
+          s.not_applicable > 0 && React.createElement('span', { style:{ color:'var(--text3)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('not_applicable'); setListPage(1); } }, '● ' + s.not_applicable + ' N/A')
+        )
+      );
+    }
+
+    return React.createElement('div', { style:{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:18 } },
+      types.map(function(t) {
+        var d = summary[t] || {};
+        return React.createElement(StatCard, { key:t, type:t, missing:d.missing||0, partial:d.partial||0, complete:d.complete||0, not_applicable:d.not_applicable||0, total:d.total||0 });
+      })
+    );
+  }
+
+  // ── PI Search view ────────────────────────────────────────────────────────
+  function PiSearchView() {
+    return React.createElement('div', null,
+      React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:8, marginBottom:16 } },
+        btn('← Kembali', function(){ setView('list'); setPiResults(null); setPiQ(''); setPiErr(null); }),
+        React.createElement('h3', { style:{ margin:0, fontSize:16, fontWeight:600 } }, 'Cari & Klaim Faktur Pembelian (PI)')
+      ),
+      React.createElement('div', cs,
+        React.createElement('div', { style:{ display:'flex', gap:8, marginBottom:12 } },
+          React.createElement('input', {
+            type:'text', placeholder:'Nomor faktur pembelian (contoh: PI.2026.11.xxxxx)',
+            value: piQ, onChange: function(e){ setPiQ(e.target.value); },
+            onKeyDown: function(e){ if(e.key==='Enter') doPiSearch(); },
+            style:{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:13 }
+          }),
+          btn('Cari', doPiSearch, { background:'var(--accent)', color:'#fff', border:'none', padding:'8px 16px' })
+        ),
+        piLoading && React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Mencari…'),
+        piErr && React.createElement('div', { style:{ color:'var(--red)', fontSize:13 } }, piErr),
+        piResults && !piLoading && (
+          piResults.length === 0
+            ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13 } }, 'Tidak ditemukan. Pastikan format nomor faktur benar dan tanggal ≥ 1 Nov 2026.')
+            : React.createElement('div', { style:{ overflowX:'auto' } },
+                React.createElement('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:13 } },
+                  React.createElement('thead', null, React.createElement('tr', null,
+                    ['Nomor Faktur','Tanggal','Supplier','Total','Status',''].map(function(h){ return React.createElement('th',{key:h,style:th},h); })
+                  )),
+                  React.createElement('tbody', null, piResults.map(function(r) {
+                    return React.createElement('tr', { key: r.invoiceId },
+                      React.createElement('td',{style:td}, React.createElement('code',{style:{fontSize:12}},r.invoiceNumber)),
+                      React.createElement('td',{style:td}, r.transDate ? new Date(r.transDate).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) : '—'),
+                      React.createElement('td',{style:td}, r.vendorName||'—'),
+                      React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'monospace'})}, r.totalAmount ? 'Rp '+Number(r.totalAmount).toLocaleString('id-ID') : '—'),
+                      React.createElement('td',{style:td}, r.claimed ? React.createElement('span',{style:{color:'var(--text3)',fontSize:12}}, 'Diklaim: '+r.claimedBy) : React.createElement('span',{style:{color:'var(--green)',fontSize:12}},'Tersedia')),
+                      React.createElement('td',{style:td},
+                        r.claimed && r.claimedBy === userName
+                          ? btn('Lihat', function(){ /* navigate to claimed tx */ }, { fontSize:11 })
+                          : !r.claimed
+                            ? btn('Klaim', function(){ doPiClaim(r.invoiceId); }, { background:'var(--accent)',color:'#fff',border:'none',fontSize:11 })
+                            : null
+                      )
+                    );
+                  }))
+                )
+              )
+        )
+      )
+    );
+  }
+
+  // ── Transaction detail view ───────────────────────────────────────────────
+  function DetailView() {
+    if (!selTx) return React.createElement('div',{style:{padding:24,color:'var(--text3)'}},'Memuat…');
+    var tx = selTx;
+    var allowedDocTypes = tx.trans_type === 'PI' ? ['foto_invoice','lainnya'] : ['bukti_pengeluaran','bukti_bayar','lainnya'];
+    var canUpload = tx.trans_type === 'PI' ? perm.canUploadPI : perm.canUploadOP;
+    var activeFiles = (selTxFiles||[]).filter(function(f){ return !f.is_deleted; });
+    var deletedFiles = (selTxFiles||[]).filter(function(f){ return f.is_deleted; });
+
+    return React.createElement('div', null,
+      React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:8, marginBottom:16 } },
+        btn('← Kembali', function(){ setView('list'); setSelTx(null); }),
+        React.createElement('h3', { style:{ margin:0, fontSize:16, fontWeight:600 } }, 'Detail Transaksi')
+      ),
+      // Transaction info
+      React.createElement('div', { style: Object.assign({},cs,{marginBottom:14}) },
+        React.createElement('div', { style:{ display:'flex', flexWrap:'wrap', gap:16, marginBottom:8 } },
+          React.createElement('div',null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2,textTransform:'uppercase',letterSpacing:'0.06em'}},'Nomor'), React.createElement('div',{style:{fontSize:14,fontWeight:600,fontFamily:'monospace'}},tx.trans_number)),
+          React.createElement('div',null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2,textTransform:'uppercase',letterSpacing:'0.06em'}},'Tanggal'), React.createElement('div',{style:{fontSize:13}},tx.trans_date ? new Date(tx.trans_date).toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'}) : '—')),
+          React.createElement('div',null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2,textTransform:'uppercase',letterSpacing:'0.06em'}},'Tipe'), typeBadge(tx.trans_type)),
+          React.createElement('div',null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2,textTransform:'uppercase',letterSpacing:'0.06em'}},'Status'), statusBadge(tx.doc_status)),
+          tx.amount && React.createElement('div',null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2,textTransform:'uppercase',letterSpacing:'0.06em'}},'Jumlah'), React.createElement('div',{style:{fontSize:13,fontFamily:'monospace'}},'Rp '+Number(tx.amount).toLocaleString('id-ID'))),
+          tx.counterparty_name && React.createElement('div',null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2,textTransform:'uppercase',letterSpacing:'0.06em'}},'Pihak'), React.createElement('div',{style:{fontSize:13}},tx.counterparty_name)),
+          tx.owner_user_id && React.createElement('div',null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2,textTransform:'uppercase',letterSpacing:'0.06em'}},'Owner'), React.createElement('div',{style:{fontSize:13}},tx.owner_user_id))
+        ),
+        selNa && React.createElement('div', { style:{ marginTop:8, padding:'8px 12px', background:'var(--bg3)', borderRadius:7, border:'1px solid var(--border)', fontSize:12, color:'var(--text2)' } },
+          'N/A: ', selNa.reason, ' — oleh ', selNa.set_by,
+          perm.canSetNA && React.createElement('button', { onClick:function(){ doRevokeNA(tx.id); }, style:{ marginLeft:12, fontSize:11, cursor:'pointer', color:'var(--red)', background:'none', border:'none', textDecoration:'underline' } }, 'Cabut')
+        ),
+        React.createElement('div', { style:{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' } },
+          perm.canSetNA && !selNa && btn('Set N/A', function(){ doSetNA(tx.id); }, { fontSize:11 }),
+          perm.canReassign && btn('Ganti Owner', function(){ doAssignOwner(tx.id); }, { fontSize:11 })
+        )
+      ),
+      // File list
+      React.createElement('div', cs,
+        React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:10 } }, 'Dokumen (' + activeFiles.length + ')'),
+        activeFiles.length === 0
+          ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13, marginBottom:10 } }, 'Belum ada dokumen.')
+          : React.createElement('div', { style:{ display:'flex', flexDirection:'column', gap:8 } },
+              activeFiles.map(function(f) {
+                return React.createElement('div', { key:f.id, style:{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', background:'var(--bg)', borderRadius:8, border:'1px solid var(--border)' } },
+                  React.createElement('div', null,
+                    React.createElement('div', { style:{ fontSize:13, fontWeight:500 } }, f.file_name),
+                    React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2 } }, f.doc_type + ' · ' + (f.mime_type||'') + ' · ' + (f.file_size ? Math.round(f.file_size/1024)+'KB' : '') + ' · ' + new Date(f.uploaded_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) + ' oleh ' + f.uploaded_by)
+                  ),
+                  React.createElement('div', { style:{ display:'flex', gap:6 } },
+                    btn('Lihat', function(){ doDownload(tx.id, f.id, f.file_name); }, { fontSize:11, background:'transparent' }),
+                    perm.canDelete && btn('Hapus', function(){ doDeleteFile(tx.id, f.id); }, { fontSize:11, color:'var(--red)', background:'transparent' })
+                  )
+                );
+              })
+            ),
+        deletedFiles.length > 0 && React.createElement('div', { style:{ marginTop:8, fontSize:11, color:'var(--text3)' } }, deletedFiles.length + ' file telah dihapus.')
+      ),
+      // Upload section
+      canUpload && tx.doc_status !== 'not_applicable' && React.createElement('div', cs,
+        React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:10 } }, 'Upload Dokumen'),
+        React.createElement('div', { style:{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 } },
+          allowedDocTypes.map(function(dt) {
+            return React.createElement('button', { key:dt, onClick:function(){ setUploadDocType(dt); }, style:{ padding:'5px 12px', borderRadius:7, fontSize:12, cursor:'pointer', background: uploadDocType===dt?'rgba(99,102,241,0.2)':'var(--bg)', color: uploadDocType===dt?'var(--accent2)':'var(--text2)', border: uploadDocType===dt?'1px solid rgba(99,102,241,0.4)':'1px solid var(--border)' } },
+              { foto_invoice:'Foto Invoice', bukti_pengeluaran:'Bukti Pengeluaran', bukti_bayar:'Bukti Bayar', lainnya:'Dokumen Lainnya' }[dt] || dt
+            );
+          })
+        ),
+        uploadDocType && React.createElement('div', null,
+          React.createElement('input', {
+            type:'file', accept:'.jpg,.jpeg,.png,.webp,.pdf',
+            onChange: function(e){ var f=e.target.files&&e.target.files[0]; if(f) doUpload(tx.id, uploadDocType, f); },
+            style:{ fontSize:13 }, disabled: uploading
+          }),
+          uploading && React.createElement('span', { style:{ marginLeft:8, fontSize:12, color:'var(--text3)' } }, 'Mengupload…'),
+          uploadErr && React.createElement('div', { style:{ marginTop:6, fontSize:12, color:'var(--red)' } }, uploadErr)
+        )
+      )
+    );
+  }
+
+  // ── List view ─────────────────────────────────────────────────────────────
+  function ListView() {
+    var inputStyle = { padding:'6px 10px', borderRadius:7, border:'1px solid var(--border)', background:'var(--bg2)', color:'var(--text)', fontSize:13 };
+    var activeFilters = filterStatus || filterTransNumber || filterOwner || filterDateTo;
+
+    function handleRowClick(tx) {
+      if (tx.id === null || tx.id === undefined) {
+        // Unclaimed PI — show claim modal
+        setClaimModal(tx);
+      } else {
+        loadDetail(tx.id);
+      }
+    }
+
+    return React.createElement('div', null,
+      // ── Filter bar ──
+      React.createElement('div', { style:{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:10, padding:'10px 14px', marginBottom:14 } },
+        React.createElement('div', { style:{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:6 } },
+          // Tipe
+          React.createElement('select', { value:filterType, onChange:function(e){ setFilterType(e.target.value); setListPage(1); }, style:inputStyle },
+            React.createElement('option',{value:''},'Semua Tipe'),
+            React.createElement('option',{value:'PI'},'PI - Faktur Pembelian'),
+            React.createElement('option',{value:'OP'},'OP - Pengeluaran')
+          ),
+          // Status
+          React.createElement('select', { value:filterStatus, onChange:function(e){ setFilterStatus(e.target.value); setListPage(1); }, style:inputStyle },
+            React.createElement('option',{value:''},'Semua Status'),
+            React.createElement('option',{value:'missing'},'● Belum'),
+            React.createElement('option',{value:'partial'},'● Sebagian'),
+            React.createElement('option',{value:'complete'},'● Lengkap'),
+            React.createElement('option',{value:'not_applicable'},'● N/A')
+          ),
+          // Nomor transaksi
+          React.createElement('input', { type:'text', placeholder:'Cari nomor faktur…', value:filterTransNumber,
+            onChange:function(e){ setFilterTransNumber(e.target.value); setListPage(1); },
+            style:Object.assign({},inputStyle,{width:180}) }),
+          // Owner (supervisor only)
+          perm.isSupervisor && React.createElement('input', { type:'text', placeholder:'Filter owner…', value:filterOwner,
+            onChange:function(e){ setFilterOwner(e.target.value); setListPage(1); },
+            style:Object.assign({},inputStyle,{width:140}) }),
+          activeFilters && btn('× Reset', function(){
+            setFilterStatus(''); setFilterTransNumber(''); setFilterOwner(''); setFilterDateTo('');
+            setFilterDateFrom('2026-11-01'); setListPage(1);
+          }, { fontSize:11, color:'var(--text3)', background:'transparent', border:'1px solid var(--border)' }),
+          React.createElement('span',{style:{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}, listTotal + ' transaksi')
+        ),
+        // Date range
+        React.createElement('div', { style:{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' } },
+          React.createElement('span', { style:{ fontSize:12, color:'var(--text3)' } }, 'Periode:'),
+          React.createElement('input', { type:'date', value:filterDateFrom,
+            onChange:function(e){ setFilterDateFrom(e.target.value); setListPage(1); },
+            style:Object.assign({},inputStyle,{fontSize:12}) }),
+          React.createElement('span', { style:{ fontSize:12, color:'var(--text3)' } }, '—'),
+          React.createElement('input', { type:'date', value:filterDateTo,
+            onChange:function(e){ setFilterDateTo(e.target.value); setListPage(1); },
+            style:Object.assign({},inputStyle,{fontSize:12}) })
+        )
+      ),
+
+      listLoading && React.createElement('div',{style:{color:'var(--text3)',fontSize:13,padding:'20px 0',textAlign:'center'}},'Memuat…'),
+      listErr && React.createElement('div',{style:{color:'var(--red)',fontSize:13,padding:'8px 0'}},listErr),
+      !listLoading && !listErr && (
+        txList.length === 0
+          ? React.createElement('div',{style:{color:'var(--text3)',fontSize:13,padding:'32px 0',textAlign:'center'}},
+              activeFilters ? 'Tidak ada transaksi dengan filter ini.' :
+              filterStatus === 'missing' ? '✓ Tidak ada transaksi yang belum lengkap!' :
+              'Tidak ada data transaksi untuk periode ini.'
+            )
+          : React.createElement('div',{style:{overflowX:'auto'}},
+              React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
+                React.createElement('thead',null,React.createElement('tr',null,
+                  ['Nomor','Tanggal','Tipe','Nama Pihak','Jumlah','Owner','Status',''].map(function(h){return React.createElement('th',{key:h,style:th},h);})
+                )),
+                React.createElement('tbody',null, txList.map(function(tx, idx){
+                  var isUnclaimed = tx.id === null || tx.id === undefined;
+                  var rowKey = isUnclaimed ? ('ph-' + tx.accurate_id + '-' + idx) : tx.id;
+                  return React.createElement('tr', {
+                    key: rowKey,
+                    style:{ cursor:'pointer', opacity: isUnclaimed ? 0.8 : 1,
+                            background: isUnclaimed ? 'transparent' : 'transparent' },
+                    onClick: function(){ handleRowClick(tx); }
+                  },
+                    React.createElement('td',{style:Object.assign({},td,{fontFamily:'monospace',fontSize:11})},tx.trans_number||'—'),
+                    React.createElement('td',{style:td},tx.trans_date?new Date(tx.trans_date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'—'),
+                    React.createElement('td',{style:td},typeBadge(tx.trans_type)),
+                    React.createElement('td',{style:Object.assign({},td,{maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})},tx.counterparty_name||'—'),
+                    React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'monospace'})},tx.amount?'Rp '+Number(tx.amount).toLocaleString('id-ID'):'—'),
+                    React.createElement('td',{style:Object.assign({},td,{fontSize:11,color:'var(--text3)'})},
+                      isUnclaimed
+                        ? React.createElement('span',{style:{color:'var(--red)',fontSize:11}},'—')
+                        : tx.owner_user_id
+                          ? tx.owner_user_id
+                          : React.createElement('span',{style:{color:'var(--amber)',fontSize:11,fontStyle:'italic'}},'Unassigned')
+                    ),
+                    React.createElement('td',{style:td},statusBadge(tx.doc_status)),
+                    React.createElement('td',{style:td},
+                      isUnclaimed
+                        ? React.createElement('span',{style:{fontSize:11,color:'var(--accent2)',fontWeight:600}},'Klaim ›')
+                        : React.createElement('span',{style:{color:'var(--text3)',fontSize:18}},'›')
+                    )
+                  );
+                }))
+              )
+            )
+      ),
+      txList.length > 0 && React.createElement('div',{style:{display:'flex',gap:8,marginTop:12,justifyContent:'center'}},
+        listPage > 1 && btn('← Prev', function(){ setListPage(listPage-1); }),
+        React.createElement('span',{style:{fontSize:12,color:'var(--text3)',padding:'6px 8px'}},'Hal. '+listPage+' · '+listTotal+' total'),
+        txList.length === 50 && btn('Next →', function(){ setListPage(listPage+1); })
+      ),
+
+      // ── Claim modal for unclaimed PI ──
+      claimModal && React.createElement('div', {
+        style:{ position:'fixed', inset:0, zIndex:10000, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 },
+        onClick: function(e){ if(e.target===e.currentTarget) setClaimModal(null); }
+      },
+        React.createElement('div', { style:{ background:'var(--bg)', border:'1px solid var(--border)', borderRadius:14, padding:24, maxWidth:420, width:'100%', boxShadow:'0 8px 32px rgba(0,0,0,0.4)' } },
+          React.createElement('div', { style:{ fontWeight:700, fontSize:16, marginBottom:16 } }, '📋 Klaim Faktur Pembelian'),
+          React.createElement('div', { style:{ background:'var(--bg2)', borderRadius:10, padding:'12px 14px', marginBottom:16, fontSize:13 } },
+            React.createElement('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px 16px' } },
+              React.createElement('div', null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2}},'NOMOR'), React.createElement('code',{style:{fontSize:12}},claimModal.trans_number||'—')),
+              React.createElement('div', null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2}},'TANGGAL'), React.createElement('div',null,claimModal.trans_date ? new Date(claimModal.trans_date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) : '—')),
+              React.createElement('div', null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2}},'SUPPLIER'), React.createElement('div',null,claimModal.counterparty_name||'—')),
+              React.createElement('div', null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2}},'TOTAL'), React.createElement('div',{style:{fontFamily:'monospace'}},claimModal.amount?'Rp '+Number(claimModal.amount).toLocaleString('id-ID'):'—'))
+            )
+          ),
+          React.createElement('div', { style:{ fontSize:12, color:'var(--text3)', marginBottom:16 } },
+            perm.canUploadPI
+              ? 'Dengan mengklaim, faktur ini akan dikaitkan ke akun ' + userName + '. Anda bisa upload foto invoice setelahnya.'
+              : 'Klik "Buka & Monitor" untuk melihat detail dan mengatur status dokumen.'
+          ),
+          React.createElement('div', { style:{ display:'flex', gap:8, justifyContent:'flex-end' } },
+            btn('Batal', function(){ setClaimModal(null); }),
+            btn(
+              perm.canUploadPI ? 'Klaim untuk ' + userName : 'Buka & Monitor',
+              function(){ claimThenOpen(claimModal.accurate_id); },
+              { background:'var(--accent)', color:'#fff', border:'none' }
+            )
+          )
+        )
+      )
+    );
+  }
+
+  // ── Main render ───────────────────────────────────────────────────────────
+  return React.createElement('div', { style:{ padding:'20px 24px', maxWidth:1100, margin:'0 auto' } },
+    React.createElement('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 } },
+      React.createElement('div', null,
+        React.createElement('h2', { style:{ margin:0, fontSize:20, fontWeight:700 } }, '📁 Arsip Dokumen'),
+        React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2 } }, 'Monitoring kelengkapan dokumen · ADL · Nov 2026 →')
+      ),
+      perm.isSupervisor && summary && React.createElement('div', { style:{ fontSize:12, color:'var(--text3)', textAlign:'right' } },
+        'Total: ', React.createElement('strong',{style:{color:'var(--text)'}}, summary.total||0), ' transaksi'
+      )
+    ),
+    SummaryBar(),
+    toast && React.createElement('div', { style:{ position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)', zIndex:9999, background: toast.type==='error'?'rgba(239,68,68,0.9)':'rgba(34,197,94,0.9)', color:'#fff', padding:'10px 18px', borderRadius:10, fontSize:13, fontWeight:500, boxShadow:'0 4px 20px rgba(0,0,0,0.3)' } }, toast.msg),
+    view === 'list'      && React.createElement(ListView, null),
+    view === 'pi-search' && React.createElement(PiSearchView, null),
+    view === 'detail'    && React.createElement(DetailView, null)
   );
 }
 
