@@ -544,6 +544,7 @@ var USER_ACCOUNTS = [
   name: 'Eliwaty',
   role: 'sales',
   password: 'eliwaty11',
+  doc_pi: true,
   doc_finance: true
 }, {
   name: 'Tio',
@@ -49251,13 +49252,12 @@ function DocArchivePage(props) {
   var ua = props.userAccount || {};
   // Derive local permission flags from USER_ACCOUNTS flags
   var perm = {
-    canUploadPI: !!(ua.doc_pi || ua.doc_owner),
-    canUploadOP: !!(ua.doc_op || ua.doc_finance || ua.doc_owner),
-    canDelete:   !!ua.doc_owner,
-    canSetNA:    !!(ua.doc_supervisor || ua.doc_owner),
-    canReassign: !!(ua.doc_supervisor || ua.doc_owner),
-    isFinance:   !!ua.doc_finance,
-    isSupervisor:!!(ua.doc_supervisor || ua.doc_owner),
+    canUploadPI:  !!(ua.doc_pi || ua.doc_owner),
+    canUploadOP:  !!(ua.doc_op || ua.doc_finance || ua.doc_owner),
+    canDelete:    !!ua.doc_owner,
+    canSetNA:     !!(ua.doc_supervisor || ua.doc_owner),
+    canReassign:  !!(ua.doc_supervisor || ua.doc_owner),
+    isSupervisor: !!(ua.doc_supervisor || ua.doc_owner),
   };
 
   // JWT state
@@ -49265,7 +49265,7 @@ function DocArchivePage(props) {
   var _j2 = React.useState(false); var authLoading = _j2[0]; var setAuthLoading = _j2[1];
   var _j3 = React.useState(null); var authErr = _j3[0]; var setAuthErr = _j3[1];
   // View state
-  var _v1 = React.useState('list'); var view = _v1[0]; var setView = _v1[1]; // 'list'|'detail'|'pi-search'
+  var _v1 = React.useState('list'); var view = _v1[0]; var setView = _v1[1]; // 'list'|'detail'|'pi-search'|'submit'
   var _v2 = React.useState(null); var selTx = _v2[0]; var setSelTx = _v2[1];
   var _v3 = React.useState(null); var selTxFiles = _v3[0]; var setSelTxFiles = _v3[1];
   var _v4 = React.useState(null); var selNa = _v4[0]; var setSelNa = _v4[1];
@@ -49275,12 +49275,14 @@ function DocArchivePage(props) {
   var _l3 = React.useState(null); var listErr = _l3[0]; var setListErr = _l3[1];
   var _l4 = React.useState(1); var listPage = _l4[0]; var setListPage = _l4[1];
   var _l5 = React.useState(0); var listTotal = _l5[0]; var setListTotal = _l5[1];
+  var _st = React.useState(0); var syncTick = _st[0]; var setSyncTick = _st[1];
   var _l6 = React.useState('PI'); var filterType = _l6[0]; var setFilterType = _l6[1];
   var _l7 = React.useState(''); var filterStatus = _l7[0]; var setFilterStatus = _l7[1];
   var _l8 = React.useState(''); var filterTransNumber = _l8[0]; var setFilterTransNumber = _l8[1];
   var _l9 = React.useState(''); var filterOwner = _l9[0]; var setFilterOwner = _l9[1];
   var _l10 = React.useState('2026-11-01'); var filterDateFrom = _l10[0]; var setFilterDateFrom = _l10[1];
   var _l11 = React.useState(''); var filterDateTo = _l11[0]; var setFilterDateTo = _l11[1];
+  var _l12 = React.useState(''); var filterSjNo = _l12[0]; var setFilterSjNo = _l12[1];
   // Claim modal state (for unclaimed PI rows)
   var _cm = React.useState(null); var claimModal = _cm[0]; var setClaimModal = _cm[1];
   // Summary state
@@ -49294,6 +49296,14 @@ function DocArchivePage(props) {
   var _u1 = React.useState(false); var uploading = _u1[0]; var setUploading = _u1[1];
   var _u2 = React.useState(null); var uploadErr = _u2[0]; var setUploadErr = _u2[1];
   var _u3 = React.useState(''); var uploadDocType = _u3[0]; var setUploadDocType = _u3[1];
+  var _u4 = React.useState(''); var uploadDocNumber = _u4[0]; var setUploadDocNumber = _u4[1];
+  // Quick Submit (Surat Jalan) state
+  var _qs1 = React.useState(''); var qsPiNumber = _qs1[0]; var setQsPiNumber = _qs1[1];
+  var _qs2 = React.useState(''); var qsSjNumber = _qs2[0]; var setQsSjNumber = _qs2[1];
+  var _qs3 = React.useState(null); var qsFile = _qs3[0]; var setQsFile = _qs3[1];
+  var _qs4 = React.useState(false); var qsLoading = _qs4[0]; var setQsLoading = _qs4[1];
+  var _qs5 = React.useState(null); var qsErr = _qs5[0]; var setQsErr = _qs5[1];
+  var _qs6 = React.useState(null); var qsResult = _qs6[0]; var setQsResult = _qs6[1];
   // Toast
   var _t1 = React.useState(null); var toast = _t1[0]; var setToast = _t1[1];
 
@@ -49356,6 +49366,19 @@ function DocArchivePage(props) {
     apiCall('/summary').then(function(d) { setSummary(d.summary || null); }).catch(function(){});
   }, [jwt]);
 
+  // ── On-demand PI sync saat halaman dibuka ─────────────────────────────────
+  // Trigger incremental sync ke Accurate sehingga PI terbaru langsung muncul
+  // tanpa menunggu interval 10 menit. Setelah 4 detik, reload list dan summary.
+  React.useEffect(function() {
+    if (!jwt) return;
+    apiCall('/sync/pi', { method: 'POST' }).catch(function(){});
+    var t = setTimeout(function() {
+      apiCall('/summary').then(function(d) { setSummary(d.summary || null); }).catch(function(){});
+      setSyncTick(function(v) { return v + 1; }); // trigger list reload
+    }, 4000);
+    return function() { clearTimeout(t); };
+  }, [jwt]);
+
   // ── Load transaction list ─────────────────────────────────────────────────
   React.useEffect(function() {
     if (!jwt || view !== 'list') return;
@@ -49367,11 +49390,12 @@ function DocArchivePage(props) {
     if (filterOwner)        qs.set('owner', filterOwner);
     if (filterDateFrom)     qs.set('dateFrom', filterDateFrom);
     if (filterDateTo)       qs.set('dateTo', filterDateTo);
+    if (filterSjNo)         qs.set('sjNo', filterSjNo);
     apiCall('/transactions?' + qs)
       .then(function(d) { setTxList(d.rows || []); setListTotal(d.total || 0); })
       .catch(function(e) { setListErr(e.message); })
       .finally(function() { setListLoading(false); });
-  }, [jwt, view, listPage, filterType, filterStatus, filterTransNumber, filterOwner, filterDateFrom, filterDateTo]);
+  }, [jwt, view, listPage, syncTick, filterType, filterStatus, filterTransNumber, filterOwner, filterDateFrom, filterDateTo, filterSjNo]);
 
   // ── Load transaction detail ───────────────────────────────────────────────
   function loadDetail(txId) {
@@ -49404,7 +49428,7 @@ function DocArchivePage(props) {
   }
 
   // ── File upload ───────────────────────────────────────────────────────────
-  function doUpload(txId, docType, file) {
+  function doUpload(txId, docType, file, docNumber) {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) { showToast('Ukuran file max 10MB.', 'error'); return; }
     var allowedTypes = ['image/jpeg','image/jpg','image/png','image/webp','application/pdf'];
@@ -49416,7 +49440,7 @@ function DocArchivePage(props) {
       var base64 = e.target.result.split(',')[1];
       apiCall('/transactions/' + txId + '/upload', {
         method: 'POST',
-        body: { docType: docType, fileName: file.name, mimeType: file.type, fileSize: file.size, fileData: base64 },
+        body: { docType: docType, docNumber: docNumber||null, fileName: file.name, mimeType: file.type, fileSize: file.size, fileData: base64 },
       })
         .then(function(d) {
           if (d.ok) {
@@ -49507,7 +49531,14 @@ function DocArchivePage(props) {
   };
 
   function statusBadge(status) {
-    var map = { missing: ['Belum','var(--red)'], partial: ['Sebagian','var(--amber)'], complete: ['Lengkap','var(--green)'], not_applicable: ['N/A','var(--text3)'] };
+    var map = {
+      missing:       ['Belum',       'var(--red)'],
+      partial:       ['Sebagian',    'var(--amber)'],
+      complete:      ['Lengkap',     'var(--green)'],
+      not_applicable:['N/A',         'var(--text3)'],
+      pending_match: ['Pending Match','var(--coral)'],
+      no_match:      ['Tidak Cocok', 'var(--red)'],
+    };
     var s = map[status] || [status,'var(--text3)'];
     return React.createElement('span', { style:{ display:'inline-block', padding:'2px 8px', borderRadius:12, fontSize:11, fontWeight:600, background: s[1]+'22', color:s[1], border:'1px solid '+s[1]+'55' } }, s[0]);
   }
@@ -49561,7 +49592,8 @@ function DocArchivePage(props) {
           React.createElement('span', { style:{ color:'var(--red)',   cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('missing');       setListPage(1); } }, '● ' + s.missing  + ' belum'),
           s.partial > 0 && React.createElement('span', { style:{ color:'var(--amber)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('partial');       setListPage(1); } }, '● ' + s.partial  + ' sebagian'),
           React.createElement('span', { style:{ color:'var(--green)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('complete');      setListPage(1); } }, '● ' + s.complete + ' lengkap'),
-          s.not_applicable > 0 && React.createElement('span', { style:{ color:'var(--text3)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('not_applicable'); setListPage(1); } }, '● ' + s.not_applicable + ' N/A')
+          s.not_applicable > 0 && React.createElement('span', { style:{ color:'var(--text3)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('not_applicable'); setListPage(1); } }, '● ' + s.not_applicable + ' N/A'),
+          s.pending_match > 0 && React.createElement('span', { style:{ color:'var(--coral)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('pending_match'); setListPage(1); } }, '● ' + s.pending_match + ' pending match')
         )
       );
     }
@@ -49569,7 +49601,7 @@ function DocArchivePage(props) {
     return React.createElement('div', { style:{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:18 } },
       types.map(function(t) {
         var d = summary[t] || {};
-        return React.createElement(StatCard, { key:t, type:t, missing:d.missing||0, partial:d.partial||0, complete:d.complete||0, not_applicable:d.not_applicable||0, total:d.total||0 });
+        return React.createElement(StatCard, { key:t, type:t, missing:d.missing||0, partial:d.partial||0, complete:d.complete||0, not_applicable:d.not_applicable||0, pending_match:d.pending_match||0, total:d.total||0 });
       })
     );
   }
@@ -49628,7 +49660,7 @@ function DocArchivePage(props) {
   function DetailView() {
     if (!selTx) return React.createElement('div',{style:{padding:24,color:'var(--text3)'}},'Memuat…');
     var tx = selTx;
-    var allowedDocTypes = tx.trans_type === 'PI' ? ['foto_invoice','lainnya'] : ['bukti_pengeluaran','bukti_bayar','lainnya'];
+    var allowedDocTypes = tx.trans_type === 'PI' ? ['invoice_supplier','lainnya'] : ['bukti_pengeluaran','bukti_bayar','lainnya'];
     var canUpload = tx.trans_type === 'PI' ? perm.canUploadPI : perm.canUploadOP;
     var activeFiles = (selTxFiles||[]).filter(function(f){ return !f.is_deleted; });
     var deletedFiles = (selTxFiles||[]).filter(function(f){ return f.is_deleted; });
@@ -49668,7 +49700,13 @@ function DocArchivePage(props) {
                 return React.createElement('div', { key:f.id, style:{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', background:'var(--bg)', borderRadius:8, border:'1px solid var(--border)' } },
                   React.createElement('div', null,
                     React.createElement('div', { style:{ fontSize:13, fontWeight:500 } }, f.file_name),
-                    React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2 } }, f.doc_type + ' · ' + (f.mime_type||'') + ' · ' + (f.file_size ? Math.round(f.file_size/1024)+'KB' : '') + ' · ' + new Date(f.uploaded_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) + ' oleh ' + f.uploaded_by)
+                    React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2 } },
+                      ({surat_jalan:'Surat Jalan',invoice_supplier:'Invoice Supplier',bukti_pengeluaran:'Bukti Pengeluaran',bukti_bayar:'Bukti Bayar',lainnya:'Lainnya',foto_invoice:'Foto Invoice'}[f.doc_type]||f.doc_type)
+                      + (f.doc_number ? ' · No: ' + f.doc_number : '')
+                      + ' · ' + (f.mime_type||'') + ' · ' + (f.file_size ? Math.round(f.file_size/1024)+'KB' : '')
+                      + ' · ' + new Date(f.uploaded_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})
+                      + ' oleh ' + f.uploaded_by
+                    )
                   ),
                   React.createElement('div', { style:{ display:'flex', gap:6 } },
                     btn('Lihat', function(){ doDownload(tx.id, f.id, f.file_name); }, { fontSize:11, background:'transparent' }),
@@ -49679,20 +49717,28 @@ function DocArchivePage(props) {
             ),
         deletedFiles.length > 0 && React.createElement('div', { style:{ marginTop:8, fontSize:11, color:'var(--text3)' } }, deletedFiles.length + ' file telah dihapus.')
       ),
-      // Upload section
+      // Upload section — filter doc types by permission
       canUpload && tx.doc_status !== 'not_applicable' && React.createElement('div', cs,
         React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:10 } }, 'Upload Dokumen'),
         React.createElement('div', { style:{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 } },
           allowedDocTypes.map(function(dt) {
-            return React.createElement('button', { key:dt, onClick:function(){ setUploadDocType(dt); }, style:{ padding:'5px 12px', borderRadius:7, fontSize:12, cursor:'pointer', background: uploadDocType===dt?'rgba(99,102,241,0.2)':'var(--bg)', color: uploadDocType===dt?'var(--accent2)':'var(--text2)', border: uploadDocType===dt?'1px solid rgba(99,102,241,0.4)':'1px solid var(--border)' } },
-              { foto_invoice:'Foto Invoice', bukti_pengeluaran:'Bukti Pengeluaran', bukti_bayar:'Bukti Bayar', lainnya:'Dokumen Lainnya' }[dt] || dt
+            var dtLabel = {surat_jalan:'Surat Jalan',invoice_supplier:'Invoice Supplier',bukti_pengeluaran:'Bukti Pengeluaran',bukti_bayar:'Bukti Bayar',lainnya:'Dokumen Lainnya'}[dt]||dt;
+            return React.createElement('button', { key:dt, onClick:function(){ setUploadDocType(dt); setUploadDocNumber(''); }, style:{ padding:'5px 12px', borderRadius:7, fontSize:12, cursor:'pointer', background: uploadDocType===dt?'rgba(99,102,241,0.2)':'var(--bg)', color: uploadDocType===dt?'var(--accent2)':'var(--text2)', border: uploadDocType===dt?'1px solid rgba(99,102,241,0.4)':'1px solid var(--border)' } },
+              dtLabel
             );
           })
         ),
         uploadDocType && React.createElement('div', null,
+          uploadDocType === 'invoice_supplier' && React.createElement('input', {
+            type:'text',
+            placeholder: 'Nomor Invoice Supplier (opsional)',
+            value: uploadDocNumber,
+            onChange: function(e){ setUploadDocNumber(e.target.value); },
+            style:{ marginBottom:8, padding:'7px 10px', borderRadius:7, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:13, width:'100%' }
+          }),
           React.createElement('input', {
             type:'file', accept:'.jpg,.jpeg,.png,.webp,.pdf',
-            onChange: function(e){ var f=e.target.files&&e.target.files[0]; if(f) doUpload(tx.id, uploadDocType, f); },
+            onChange: function(e){ var f=e.target.files&&e.target.files[0]; if(f) doUpload(tx.id, uploadDocType, f, uploadDocNumber||null); },
             style:{ fontSize:13 }, disabled: uploading
           }),
           uploading && React.createElement('span', { style:{ marginLeft:8, fontSize:12, color:'var(--text3)' } }, 'Mengupload…'),
@@ -49732,19 +49778,25 @@ function DocArchivePage(props) {
             React.createElement('option',{value:'missing'},'● Belum'),
             React.createElement('option',{value:'partial'},'● Sebagian'),
             React.createElement('option',{value:'complete'},'● Lengkap'),
-            React.createElement('option',{value:'not_applicable'},'● N/A')
+            React.createElement('option',{value:'not_applicable'},'● N/A'),
+            React.createElement('option',{value:'pending_match'},'● Pending Match'),
+            React.createElement('option',{value:'no_match'},'● Tidak Cocok')
           ),
           // Nomor transaksi
-          React.createElement('input', { type:'text', placeholder:'Cari nomor faktur…', value:filterTransNumber,
+          React.createElement('input', { type:'text', placeholder:'Cari nomor PI…', value:filterTransNumber,
             onChange:function(e){ setFilterTransNumber(e.target.value); setListPage(1); },
-            style:Object.assign({},inputStyle,{width:180}) }),
+            style:Object.assign({},inputStyle,{width:160}) }),
+          // SJ number filter
+          filterType !== 'OP' && React.createElement('input', { type:'text', placeholder:'No. Surat Jalan…', value:filterSjNo||'',
+            onChange:function(e){ setFilterSjNo && setFilterSjNo(e.target.value); setListPage(1); },
+            style:Object.assign({},inputStyle,{width:150}) }),
           // Owner (supervisor only)
           perm.isSupervisor && React.createElement('input', { type:'text', placeholder:'Filter owner…', value:filterOwner,
             onChange:function(e){ setFilterOwner(e.target.value); setListPage(1); },
-            style:Object.assign({},inputStyle,{width:140}) }),
+            style:Object.assign({},inputStyle,{width:130}) }),
           activeFilters && btn('× Reset', function(){
             setFilterStatus(''); setFilterTransNumber(''); setFilterOwner(''); setFilterDateTo('');
-            setFilterDateFrom('2026-11-01'); setListPage(1);
+            setFilterDateFrom('2026-11-01'); setFilterSjNo && setFilterSjNo(''); setListPage(1);
           }, { fontSize:11, color:'var(--text3)', background:'transparent', border:'1px solid var(--border)' }),
           React.createElement('span',{style:{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}, listTotal + ' transaksi')
         ),
@@ -49773,7 +49825,7 @@ function DocArchivePage(props) {
           : React.createElement('div',{style:{overflowX:'auto'}},
               React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
                 React.createElement('thead',null,React.createElement('tr',null,
-                  ['Nomor','Tanggal','Tipe','Nama Pihak','Jumlah','Owner','Status',''].map(function(h){return React.createElement('th',{key:h,style:th},h);})
+                  ['Nomor PI','Tanggal','Tipe','Supplier','No. SJ','Owner','Status',''].map(function(h){return React.createElement('th',{key:h,style:th},h);})
                 )),
                 React.createElement('tbody',null, txList.map(function(tx, idx){
                   var isUnclaimed = tx.id === null || tx.id === undefined;
@@ -49787,8 +49839,8 @@ function DocArchivePage(props) {
                     React.createElement('td',{style:Object.assign({},td,{fontFamily:'monospace',fontSize:11})},tx.trans_number||'—'),
                     React.createElement('td',{style:td},tx.trans_date?new Date(tx.trans_date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'—'),
                     React.createElement('td',{style:td},typeBadge(tx.trans_type)),
-                    React.createElement('td',{style:Object.assign({},td,{maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})},tx.counterparty_name||'—'),
-                    React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'monospace'})},tx.amount?'Rp '+Number(tx.amount).toLocaleString('id-ID'):'—'),
+                    React.createElement('td',{style:Object.assign({},td,{maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})},tx.counterparty_name||'—'),
+                    React.createElement('td',{style:Object.assign({},td,{fontSize:11,color:'var(--text3)',maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})},tx.sj_number||React.createElement('span',{style:{color:'var(--text3)',opacity:0.4}},'—')),
                     React.createElement('td',{style:Object.assign({},td,{fontSize:11,color:'var(--text3)'})},
                       isUnclaimed
                         ? React.createElement('span',{style:{color:'var(--red)',fontSize:11}},'—')
@@ -49846,6 +49898,81 @@ function DocArchivePage(props) {
     );
   }
 
+  // ── Submit Dokumen PI ─────────────────────────────────────────────────────
+  function SubmitView() {
+    function doQuickSubmit() {
+      if (!qsPiNumber.trim()) { setQsErr('Nomor PI Accurate wajib diisi.'); return; }
+      if (!qsFile)             { setQsErr('File Invoice Supplier wajib dipilih.'); return; }
+      if (qsFile.size > 10*1024*1024) { setQsErr('Ukuran file max 10MB.'); return; }
+      setQsLoading(true); setQsErr(null); setQsResult(null);
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var b64 = e.target.result.split(',')[1];
+        apiCall('/quick-submit', { method:'POST', body:{
+          transType:'PI', transNumber: qsPiNumber.trim().toUpperCase(),
+          docType:'invoice_supplier', docNumber: qsSjNumber.trim()||null,
+          fileName: qsFile.name, mimeType: qsFile.type, fileData: b64
+        }})
+          .then(function(d) {
+            if (d.ok) {
+              setQsResult(d);
+              showToast(d.message, 'ok');
+              apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+            }
+          })
+          .catch(function(e){ setQsErr(e.message); })
+          .finally(function(){ setQsLoading(false); });
+      };
+      reader.readAsDataURL(qsFile);
+    }
+    function reset() { setQsPiNumber(''); setQsSjNumber(''); setQsFile(null); setQsErr(null); setQsResult(null); }
+    return React.createElement('div', null,
+      React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:8, marginBottom:20 } },
+        btn('← Monitor', function(){ setView('list'); reset(); }),
+        React.createElement('h3', { style:{ margin:0, fontSize:16, fontWeight:600 } }, '📤 Submit Invoice Supplier PI')
+      ),
+      React.createElement('div', cs,
+        React.createElement('div', { style:{ fontSize:13, color:'var(--text2)', marginBottom:16, padding:'10px 12px', background:'var(--bg3)', borderRadius:8, borderLeft:'3px solid var(--accent)' } },
+          'Upload Invoice Supplier dari supplier untuk melengkapi dokumen PI.'
+        ),
+        qsResult
+          ? React.createElement('div', null,
+              React.createElement('div', { style:{ padding:'16px', background: qsResult.matched?'rgba(34,197,94,0.1)':'rgba(245,158,11,0.1)', borderRadius:10, border:'1px solid '+(qsResult.matched?'rgba(34,197,94,0.3)':'rgba(245,158,11,0.3)'), marginBottom:16 } },
+                React.createElement('div', { style:{ fontWeight:600, marginBottom:4, color: qsResult.matched?'var(--green)':'var(--amber)' } }, qsResult.matched?'✓ Berhasil dicocokkan ke Accurate':'⏳ Pending Match'),
+                React.createElement('div', { style:{ fontSize:12, color:'var(--text2)' } }, qsResult.message),
+                React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:4 } }, 'Transaction ID: ' + qsResult.transactionId)
+              ),
+              React.createElement('div', { style:{ display:'flex', gap:8 } },
+                btn('Lihat Transaksi', function(){ loadDetail(qsResult.transactionId); }, { background:'var(--accent)', color:'#fff', border:'none' }),
+                btn('Submit Lagi', function(){ reset(); }, { })
+              )
+            )
+          : React.createElement('div', null,
+              React.createElement('div', { style:{ display:'grid', gap:14, marginBottom:16 } },
+                React.createElement('div', null,
+                  React.createElement('label', null, 'Nomor PI Accurate *'),
+                  React.createElement('input', { type:'text', placeholder:'Contoh: PI.2026.11.00001', value:qsPiNumber, onChange:function(e){ setQsPiNumber(e.target.value); }, style:{ fontFamily:'monospace', fontSize:13 } })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', null, 'Nomor Invoice Supplier'),
+                  React.createElement('input', { type:'text', placeholder:'Nomor invoice dari supplier (opsional)', value:qsSjNumber, onChange:function(e){ setQsSjNumber(e.target.value); } })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', null, 'Foto / Scan Invoice Supplier *'),
+                  React.createElement('input', { type:'file', accept:'.jpg,.jpeg,.png,.webp,.pdf',
+                    onChange:function(e){ setQsFile(e.target.files&&e.target.files[0]||null); } }),
+                  qsFile && React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:4 } }, qsFile.name + ' (' + Math.round(qsFile.size/1024) + 'KB)')
+                )
+              ),
+              qsErr && React.createElement('div', { style:{ color:'var(--red)', fontSize:13, marginBottom:10 } }, qsErr),
+              React.createElement('button', { onClick:doQuickSubmit, disabled:qsLoading,
+                style:{ background:'var(--accent)', color:'#fff', border:'none', borderRadius:8, padding:'10px 22px', fontSize:14, fontWeight:600, cursor:'pointer', opacity:qsLoading?0.6:1 }
+              }, qsLoading ? 'Menyimpan…' : 'Submit Invoice Supplier')
+            )
+      )
+    );
+  }
+
   // ── Main render ───────────────────────────────────────────────────────────
   return React.createElement('div', { style:{ padding:'20px 24px', maxWidth:1100, margin:'0 auto' } },
     React.createElement('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 } },
@@ -49853,15 +49980,22 @@ function DocArchivePage(props) {
         React.createElement('h2', { style:{ margin:0, fontSize:20, fontWeight:700 } }, '📁 Arsip Dokumen'),
         React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2 } }, 'Monitoring kelengkapan dokumen · ADL · Nov 2026 →')
       ),
-      perm.isSupervisor && summary && React.createElement('div', { style:{ fontSize:12, color:'var(--text3)', textAlign:'right' } },
-        'Total: ', React.createElement('strong',{style:{color:'var(--text)'}}, summary.total||0), ' transaksi'
+      React.createElement('div', { style:{ display:'flex', gap:8, alignItems:'center' } },
+        perm.canUploadPI && view !== 'submit' && React.createElement('button', {
+          onClick:function(){ setView('submit'); },
+          style:{ background:'var(--accent)', color:'#fff', border:'none', borderRadius:8, padding:'8px 16px', fontSize:13, fontWeight:600, cursor:'pointer' }
+        }, '📤 Submit Invoice'),
+        perm.isSupervisor && summary && React.createElement('div', { style:{ fontSize:12, color:'var(--text3)', textAlign:'right' } },
+          'Total: ', React.createElement('strong',{style:{color:'var(--text)'}}, summary.total||0), ' transaksi'
+        )
       )
     ),
-    SummaryBar(),
+    (view === 'list' || view === 'pi-search') && SummaryBar(),
     toast && React.createElement('div', { style:{ position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)', zIndex:9999, background: toast.type==='error'?'rgba(239,68,68,0.9)':'rgba(34,197,94,0.9)', color:'#fff', padding:'10px 18px', borderRadius:10, fontSize:13, fontWeight:500, boxShadow:'0 4px 20px rgba(0,0,0,0.3)' } }, toast.msg),
     view === 'list'      && React.createElement(ListView, null),
     view === 'pi-search' && React.createElement(PiSearchView, null),
-    view === 'detail'    && React.createElement(DetailView, null)
+    view === 'detail'    && React.createElement(DetailView, null),
+    view === 'submit'    && React.createElement(SubmitView, null)
   );
 }
 
