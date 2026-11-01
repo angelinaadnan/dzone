@@ -49266,6 +49266,8 @@ function DocArchivePage(props) {
   var _j3 = React.useState(null); var authErr = _j3[0]; var setAuthErr = _j3[1];
   // View state
   var _v1 = React.useState('list'); var view = _v1[0]; var setView = _v1[1]; // 'list'|'detail'|'pi-search'|'submit'
+  var _st2 = React.useState('PI'); var submitType = _st2[0]; var setSubmitType = _st2[1]; // 'PI'|'OP'
+  var _sm = React.useState(false); var showSubmitMenu = _sm[0]; var setShowSubmitMenu = _sm[1];
   var _v2 = React.useState(null); var selTx = _v2[0]; var setSelTx = _v2[1];
   var _v3 = React.useState(null); var selTxFiles = _v3[0]; var setSelTxFiles = _v3[1];
   var _v4 = React.useState(null); var selNa = _v4[0]; var setSelNa = _v4[1];
@@ -49589,7 +49591,7 @@ function DocArchivePage(props) {
         ),
         // Stats row
         React.createElement('div', { style:{ display:'flex', gap:12, fontSize:12, flexWrap:'wrap' } },
-          React.createElement('span', { style:{ color:'var(--red)',   cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('missing');       setListPage(1); } }, '● ' + s.missing  + ' belum'),
+          React.createElement('span', { style:{ color:'var(--red)',   cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('missing');       setListPage(1); } }, '● ' + s.missing  + (s.type==='PI' ? ' inv. belum' : ' bukti belum')),
           s.partial > 0 && React.createElement('span', { style:{ color:'var(--amber)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('partial');       setListPage(1); } }, '● ' + s.partial  + ' sebagian'),
           React.createElement('span', { style:{ color:'var(--green)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('complete');      setListPage(1); } }, '● ' + s.complete + ' lengkap'),
           s.not_applicable > 0 && React.createElement('span', { style:{ color:'var(--text3)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('not_applicable'); setListPage(1); } }, '● ' + s.not_applicable + ' N/A'),
@@ -49783,13 +49785,9 @@ function DocArchivePage(props) {
             React.createElement('option',{value:'no_match'},'● Tidak Cocok')
           ),
           // Nomor transaksi
-          React.createElement('input', { type:'text', placeholder:'Cari nomor PI…', value:filterTransNumber,
+          React.createElement('input', { type:'text', placeholder: filterType === 'PI' ? 'Cari nomor PI…' : filterType === 'OP' ? 'Cari nomor OP…' : 'Cari nomor transaksi…', value:filterTransNumber,
             onChange:function(e){ setFilterTransNumber(e.target.value); setListPage(1); },
-            style:Object.assign({},inputStyle,{width:160}) }),
-          // SJ number filter
-          filterType !== 'OP' && React.createElement('input', { type:'text', placeholder:'No. Surat Jalan…', value:filterSjNo||'',
-            onChange:function(e){ setFilterSjNo && setFilterSjNo(e.target.value); setListPage(1); },
-            style:Object.assign({},inputStyle,{width:150}) }),
+            style:Object.assign({},inputStyle,{width:175}) }),
           // Owner (supervisor only)
           perm.isSupervisor && React.createElement('input', { type:'text', placeholder:'Filter owner…', value:filterOwner,
             onChange:function(e){ setFilterOwner(e.target.value); setListPage(1); },
@@ -49802,11 +49800,11 @@ function DocArchivePage(props) {
         ),
         // Date range
         React.createElement('div', { style:{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' } },
-          React.createElement('span', { style:{ fontSize:12, color:'var(--text3)' } }, 'Periode:'),
+          React.createElement('span', { style:{ fontSize:12, color:'var(--text3)' } }, 'Dari:'),
           React.createElement('input', { type:'date', value:filterDateFrom,
             onChange:function(e){ setFilterDateFrom(e.target.value); setListPage(1); },
             style:Object.assign({},inputStyle,{fontSize:12}) }),
-          React.createElement('span', { style:{ fontSize:12, color:'var(--text3)' } }, '—'),
+          React.createElement('span', { style:{ fontSize:12, color:'var(--text3)' } }, 'Sampai:'),
           React.createElement('input', { type:'date', value:filterDateTo,
             onChange:function(e){ setFilterDateTo(e.target.value); setListPage(1); },
             style:Object.assign({},inputStyle,{fontSize:12}) })
@@ -49825,36 +49823,45 @@ function DocArchivePage(props) {
           : React.createElement('div',{style:{overflowX:'auto'}},
               React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
                 React.createElement('thead',null,React.createElement('tr',null,
-                  ['Nomor PI','Tanggal','Tipe','Supplier','No. SJ','Owner','Status',''].map(function(h){return React.createElement('th',{key:h,style:th},h);})
+                  (filterType==='PI' ? ['Nomor PI','Tanggal','Supplier','No. Invoice Supplier','Owner','Status',''] : filterType==='OP' ? ['Nomor OP','Keterangan Pengeluaran','Tanggal','Nominal','Owner','Status Bukti',''] : ['Nomor','Tipe','Tanggal','Pihak','Status','']).map(function(h){return React.createElement('th',{key:h,style:th},h);})
                 )),
                 React.createElement('tbody',null, txList.map(function(tx, idx){
                   var isUnclaimed = tx.id === null || tx.id === undefined;
                   var rowKey = isUnclaimed ? ('ph-' + tx.accurate_id + '-' + idx) : tx.id;
-                  return React.createElement('tr', {
-                    key: rowKey,
-                    style:{ cursor:'pointer', opacity: isUnclaimed ? 0.8 : 1,
-                            background: isUnclaimed ? 'transparent' : 'transparent' },
-                    onClick: function(){ handleRowClick(tx); }
-                  },
-                    React.createElement('td',{style:Object.assign({},td,{fontFamily:'monospace',fontSize:11})},tx.trans_number||'—'),
-                    React.createElement('td',{style:td},tx.trans_date?new Date(tx.trans_date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'—'),
-                    React.createElement('td',{style:td},typeBadge(tx.trans_type)),
-                    React.createElement('td',{style:Object.assign({},td,{maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})},tx.counterparty_name||'—'),
-                    React.createElement('td',{style:Object.assign({},td,{fontSize:11,color:'var(--text3)',maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})},tx.sj_number||React.createElement('span',{style:{color:'var(--text3)',opacity:0.4}},'—')),
-                    React.createElement('td',{style:Object.assign({},td,{fontSize:11,color:'var(--text3)'})},
-                      isUnclaimed
-                        ? React.createElement('span',{style:{color:'var(--red)',fontSize:11}},'—')
-                        : tx.owner_user_id
-                          ? tx.owner_user_id
-                          : React.createElement('span',{style:{color:'var(--amber)',fontSize:11,fontStyle:'italic'}},'Unassigned')
-                    ),
-                    React.createElement('td',{style:td},statusBadge(tx.doc_status)),
-                    React.createElement('td',{style:td},
-                      isUnclaimed
-                        ? React.createElement('span',{style:{fontSize:11,color:'var(--accent2)',fontWeight:600}},'Klaim ›')
-                        : React.createElement('span',{style:{color:'var(--text3)',fontSize:18}},'›')
-                    )
-                  );
+                  var dateStr = tx.trans_date ? new Date(tx.trans_date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+                  var ownerTd = React.createElement('td',{key:'ow',style:Object.assign({},td,{fontSize:11,color:'var(--text3)'})},
+                    isUnclaimed ? React.createElement('span',{style:{color:'var(--red)',fontSize:11}},'—') :
+                    tx.owner_user_id ? tx.owner_user_id : React.createElement('span',{style:{color:'var(--amber)',fontSize:11,fontStyle:'italic'}},'Unassigned'));
+                  var statusTd = React.createElement('td',{key:'st',style:td},statusBadge(tx.doc_status));
+                  var actionTd = React.createElement('td',{key:'ac',style:td},
+                    isUnclaimed ? React.createElement('span',{style:{fontSize:11,color:'var(--accent2)',fontWeight:600}},'Klaim ›') : React.createElement('span',{style:{color:'var(--text3)',fontSize:18}},'›'));
+                  var cells;
+                  if (filterType === 'PI') {
+                    cells = [
+                      React.createElement('td',{key:'n',style:Object.assign({},td,{fontFamily:'monospace',fontSize:11})},tx.trans_number||'—'),
+                      React.createElement('td',{key:'d',style:td},dateStr),
+                      React.createElement('td',{key:'s',style:Object.assign({},td,{maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})},tx.counterparty_name||'—'),
+                      React.createElement('td',{key:'i',style:Object.assign({},td,{fontSize:11,color:'var(--text3)',maxWidth:140,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})},tx.invoice_number||React.createElement('span',{style:{opacity:0.4}},'—')),
+                      ownerTd, statusTd, actionTd
+                    ];
+                  } else if (filterType === 'OP') {
+                    cells = [
+                      React.createElement('td',{key:'n',style:Object.assign({},td,{fontFamily:'monospace',fontSize:11})},tx.trans_number||'—'),
+                      React.createElement('td',{key:'k',style:Object.assign({},td,{maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})},tx.counterparty_name||'—'),
+                      React.createElement('td',{key:'d',style:td},dateStr),
+                      React.createElement('td',{key:'m',style:Object.assign({},td,{fontFamily:'monospace',fontSize:12,textAlign:'right'})},tx.amount?'Rp '+Number(tx.amount).toLocaleString('id-ID'):'—'),
+                      ownerTd, statusTd, actionTd
+                    ];
+                  } else {
+                    cells = [
+                      React.createElement('td',{key:'n',style:Object.assign({},td,{fontFamily:'monospace',fontSize:11})},tx.trans_number||'—'),
+                      React.createElement('td',{key:'t',style:td},typeBadge(tx.trans_type)),
+                      React.createElement('td',{key:'d',style:td},dateStr),
+                      React.createElement('td',{key:'p',style:Object.assign({},td,{maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'})},tx.counterparty_name||'—'),
+                      statusTd, actionTd
+                    ];
+                  }
+                  return React.createElement.apply(React, ['tr', {key:rowKey, style:{cursor:'pointer', opacity: isUnclaimed ? 0.85 : 1}, onClick:function(){ handleRowClick(tx); }}].concat(cells));
                 }))
               )
             )
@@ -49898,19 +49905,22 @@ function DocArchivePage(props) {
     );
   }
 
-  // ── Submit Dokumen PI ─────────────────────────────────────────────────────
+  // ── Submit Dokumen PI / OP ────────────────────────────────────────────────
   function SubmitView() {
+    var isOP = submitType === 'OP';
     function doQuickSubmit() {
-      if (!qsPiNumber.trim()) { setQsErr('Nomor PI Accurate wajib diisi.'); return; }
-      if (!qsFile)             { setQsErr('File Invoice Supplier wajib dipilih.'); return; }
+      if (!qsPiNumber.trim()) { setQsErr((isOP ? 'Nomor OP' : 'Nomor PI') + ' Accurate wajib diisi.'); return; }
+      if (!qsFile)             { setQsErr((isOP ? 'File Bukti Pengeluaran' : 'File Invoice Supplier') + ' wajib dipilih.'); return; }
       if (qsFile.size > 10*1024*1024) { setQsErr('Ukuran file max 10MB.'); return; }
       setQsLoading(true); setQsErr(null); setQsResult(null);
       var reader = new FileReader();
       reader.onload = function(e) {
         var b64 = e.target.result.split(',')[1];
         apiCall('/quick-submit', { method:'POST', body:{
-          transType:'PI', transNumber: qsPiNumber.trim().toUpperCase(),
-          docType:'invoice_supplier', docNumber: qsSjNumber.trim()||null,
+          transType: submitType,
+          transNumber: qsPiNumber.trim().toUpperCase(),
+          docType: isOP ? 'bukti_pengeluaran' : 'invoice_supplier',
+          docNumber: qsSjNumber.trim()||null,
           fileName: qsFile.name, mimeType: qsFile.type, fileData: b64
         }})
           .then(function(d) {
@@ -49929,16 +49939,19 @@ function DocArchivePage(props) {
     return React.createElement('div', null,
       React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:8, marginBottom:20 } },
         btn('← Monitor', function(){ setView('list'); reset(); }),
-        React.createElement('h3', { style:{ margin:0, fontSize:16, fontWeight:600 } }, '📤 Submit Invoice Supplier PI')
+        React.createElement('h3', { style:{ margin:0, fontSize:16, fontWeight:600 } },
+          isOP ? '📤 Submit Bukti Pengeluaran OP' : '📤 Submit Invoice Supplier PI')
       ),
       React.createElement('div', cs,
-        React.createElement('div', { style:{ fontSize:13, color:'var(--text2)', marginBottom:16, padding:'10px 12px', background:'var(--bg3)', borderRadius:8, borderLeft:'3px solid var(--accent)' } },
-          'Upload Invoice Supplier dari supplier untuk melengkapi dokumen PI.'
+        React.createElement('div', { style:{ fontSize:13, color:'var(--text2)', marginBottom:16, padding:'10px 12px', background:'var(--bg3)', borderRadius:8, borderLeft:'3px solid '+(isOP ? 'var(--green)' : 'var(--accent)') } },
+          isOP
+            ? 'Upload bukti pengeluaran (nota, kuitansi, atau foto) untuk transaksi biaya operasional.'
+            : 'Upload Invoice Supplier dari supplier untuk melengkapi dokumen pembelian PI.'
         ),
         qsResult
           ? React.createElement('div', null,
               React.createElement('div', { style:{ padding:'16px', background: qsResult.matched?'rgba(34,197,94,0.1)':'rgba(245,158,11,0.1)', borderRadius:10, border:'1px solid '+(qsResult.matched?'rgba(34,197,94,0.3)':'rgba(245,158,11,0.3)'), marginBottom:16 } },
-                React.createElement('div', { style:{ fontWeight:600, marginBottom:4, color: qsResult.matched?'var(--green)':'var(--amber)' } }, qsResult.matched?'✓ Berhasil dicocokkan ke Accurate':'⏳ Pending Match'),
+                React.createElement('div', { style:{ fontWeight:600, marginBottom:4, color: qsResult.matched?'var(--green)':'var(--amber)' } }, qsResult.matched?'✓ Berhasil':'⏳ Tersimpan (Pending Match)'),
                 React.createElement('div', { style:{ fontSize:12, color:'var(--text2)' } }, qsResult.message),
                 React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:4 } }, 'Transaction ID: ' + qsResult.transactionId)
               ),
@@ -49950,15 +49963,15 @@ function DocArchivePage(props) {
           : React.createElement('div', null,
               React.createElement('div', { style:{ display:'grid', gap:14, marginBottom:16 } },
                 React.createElement('div', null,
-                  React.createElement('label', null, 'Nomor PI Accurate *'),
-                  React.createElement('input', { type:'text', placeholder:'Contoh: PI.2026.11.00001', value:qsPiNumber, onChange:function(e){ setQsPiNumber(e.target.value); }, style:{ fontFamily:'monospace', fontSize:13 } })
+                  React.createElement('label', null, (isOP ? 'Nomor OP' : 'Nomor PI') + ' Accurate *'),
+                  React.createElement('input', { type:'text', placeholder: isOP ? 'Contoh: OP.2026.11.00001' : 'Contoh: PI.2026.11.00001', value:qsPiNumber, onChange:function(e){ setQsPiNumber(e.target.value); }, style:{ fontFamily:'monospace', fontSize:13 } })
                 ),
-                React.createElement('div', null,
+                !isOP && React.createElement('div', null,
                   React.createElement('label', null, 'Nomor Invoice Supplier'),
                   React.createElement('input', { type:'text', placeholder:'Nomor invoice dari supplier (opsional)', value:qsSjNumber, onChange:function(e){ setQsSjNumber(e.target.value); } })
                 ),
                 React.createElement('div', null,
-                  React.createElement('label', null, 'Foto / Scan Invoice Supplier *'),
+                  React.createElement('label', null, isOP ? 'Foto / Scan Bukti Pengeluaran *' : 'Foto / Scan Invoice Supplier *'),
                   React.createElement('input', { type:'file', accept:'.jpg,.jpeg,.png,.webp,.pdf',
                     onChange:function(e){ setQsFile(e.target.files&&e.target.files[0]||null); } }),
                   qsFile && React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:4 } }, qsFile.name + ' (' + Math.round(qsFile.size/1024) + 'KB)')
@@ -49966,8 +49979,8 @@ function DocArchivePage(props) {
               ),
               qsErr && React.createElement('div', { style:{ color:'var(--red)', fontSize:13, marginBottom:10 } }, qsErr),
               React.createElement('button', { onClick:doQuickSubmit, disabled:qsLoading,
-                style:{ background:'var(--accent)', color:'#fff', border:'none', borderRadius:8, padding:'10px 22px', fontSize:14, fontWeight:600, cursor:'pointer', opacity:qsLoading?0.6:1 }
-              }, qsLoading ? 'Menyimpan…' : 'Submit Invoice Supplier')
+                style:{ background: isOP ? 'var(--green)' : 'var(--accent)', color:'#fff', border:'none', borderRadius:8, padding:'10px 22px', fontSize:14, fontWeight:600, cursor:'pointer', opacity:qsLoading?0.6:1 }
+              }, qsLoading ? 'Menyimpan…' : (isOP ? 'Submit Bukti Pengeluaran' : 'Submit Invoice Supplier'))
             )
       )
     );
@@ -49981,10 +49994,28 @@ function DocArchivePage(props) {
         React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2 } }, 'Monitoring kelengkapan dokumen · ADL · Nov 2026 →')
       ),
       React.createElement('div', { style:{ display:'flex', gap:8, alignItems:'center' } },
-        perm.canUploadPI && view !== 'submit' && React.createElement('button', {
-          onClick:function(){ setView('submit'); },
-          style:{ background:'var(--accent)', color:'#fff', border:'none', borderRadius:8, padding:'8px 16px', fontSize:13, fontWeight:600, cursor:'pointer' }
-        }, '📤 Submit Invoice'),
+        (perm.canUploadPI || perm.canUploadOP) && view !== 'submit' && React.createElement('div', { style:{ position:'relative' } },
+          React.createElement('button', {
+            onClick:function(){
+              if (perm.canUploadPI && perm.canUploadOP) { setShowSubmitMenu(function(v){ return !v; }); }
+              else { setSubmitType(perm.canUploadPI ? 'PI' : 'OP'); setView('submit'); setShowSubmitMenu(false); }
+            },
+            style:{ background:'var(--accent)', color:'#fff', border:'none', borderRadius:8, padding:'8px 16px', fontSize:13, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }
+          }, '+ Submit Dokumen', (perm.canUploadPI && perm.canUploadOP) ? React.createElement('span',{style:{fontSize:10,opacity:0.8}},'▾') : null),
+          showSubmitMenu && React.createElement(React.Fragment, null,
+            React.createElement('div', { style:{ position:'fixed', inset:0, zIndex:999 }, onClick:function(){ setShowSubmitMenu(false); } }),
+            React.createElement('div', { style:{ position:'absolute', top:'calc(100% + 6px)', right:0, background:'var(--bg)', border:'1px solid var(--border)', borderRadius:10, padding:4, zIndex:1000, boxShadow:'0 4px 20px rgba(0,0,0,0.35)', minWidth:260 } },
+              perm.canUploadPI && React.createElement('button', {
+                onClick:function(){ setSubmitType('PI'); setView('submit'); setShowSubmitMenu(false); },
+                style:{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', borderRadius:7, border:'none', background:'transparent', color:'var(--text)', fontSize:13, cursor:'pointer' }
+              }, React.createElement('div',{style:{fontWeight:600}},'📄 Purchase Invoice (PI)'), React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginTop:2}},'Upload Invoice Supplier')),
+              perm.canUploadOP && React.createElement('button', {
+                onClick:function(){ setSubmitType('OP'); setView('submit'); setShowSubmitMenu(false); },
+                style:{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', borderRadius:7, border:'none', background:'transparent', color:'var(--text)', fontSize:13, cursor:'pointer' }
+              }, React.createElement('div',{style:{fontWeight:600}},'💳 Other Payment (OP)'), React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginTop:2}},'Upload Bukti Pengeluaran'))
+            )
+          )
+        ),
         perm.isSupervisor && summary && React.createElement('div', { style:{ fontSize:12, color:'var(--text3)', textAlign:'right' } },
           'Total: ', React.createElement('strong',{style:{color:'var(--text)'}}, summary.total||0), ' transaksi'
         )
