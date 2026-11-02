@@ -49299,6 +49299,9 @@ function DocArchivePage(props) {
   var _u2 = React.useState(null); var uploadErr = _u2[0]; var setUploadErr = _u2[1];
   var _u3 = React.useState(''); var uploadDocType = _u3[0]; var setUploadDocType = _u3[1];
   var _u4 = React.useState(''); var uploadDocNumber = _u4[0]; var setUploadDocNumber = _u4[1];
+  var _u5 = React.useState(null); var uploadFile = _u5[0]; var setUploadFile = _u5[1];
+  var _u6 = React.useState(null); var editingDocNumFileId = _u6[0]; var setEditingDocNumFileId = _u6[1];
+  var _u7 = React.useState(''); var editDocNumVal = _u7[0]; var setEditDocNumVal = _u7[1];
   // Quick Submit (Surat Jalan) state
   var _qs1 = React.useState(''); var qsPiNumber = _qs1[0]; var setQsPiNumber = _qs1[1];
   var _qs2 = React.useState(''); var qsSjNumber = _qs2[0]; var setQsSjNumber = _qs2[1];
@@ -49456,6 +49459,16 @@ function DocArchivePage(props) {
         .finally(function() { setUploading(false); });
     };
     reader.readAsDataURL(file);
+  }
+
+  // ── Edit doc_number ───────────────────────────────────────────────────────
+  function doEditDocNumber(txId, fileId, newNum) {
+    apiCall('/transactions/' + txId + '/files/' + fileId + '/doc-number', {
+      method: 'PATCH',
+      body: { docNumber: newNum.trim() || null },
+    }).then(function(d) {
+      if (d.ok) { showToast('Nomor diperbarui.', 'ok'); setEditingDocNumFileId(null); loadDetail(txId); }
+    }).catch(function(e) { showToast(e.message, 'error'); });
   }
 
   // ── Download file ──────────────────────────────────────────────────────────
@@ -49699,20 +49712,38 @@ function DocArchivePage(props) {
           ? React.createElement('div', { style:{ color:'var(--text3)', fontSize:13, marginBottom:10 } }, 'Belum ada dokumen.')
           : React.createElement('div', { style:{ display:'flex', flexDirection:'column', gap:8 } },
               activeFiles.map(function(f) {
-                return React.createElement('div', { key:f.id, style:{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', background:'var(--bg)', borderRadius:8, border:'1px solid var(--border)' } },
-                  React.createElement('div', null,
-                    React.createElement('div', { style:{ fontSize:13, fontWeight:500 } }, f.file_name),
-                    React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2 } },
-                      ({surat_jalan:'Surat Jalan',invoice_supplier:'Invoice Supplier',bukti_pengeluaran:'Bukti Pengeluaran',bukti_bayar:'Bukti Bayar',lainnya:'Lainnya',foto_invoice:'Foto Invoice'}[f.doc_type]||f.doc_type)
-                      + (f.doc_number ? ' · No: ' + f.doc_number : '')
-                      + ' · ' + (f.mime_type||'') + ' · ' + (f.file_size ? Math.round(f.file_size/1024)+'KB' : '')
-                      + ' · ' + new Date(f.uploaded_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})
-                      + ' oleh ' + f.uploaded_by
+                var isInvSupplier = f.doc_type === 'invoice_supplier';
+                var isEditingThis = editingDocNumFileId === f.id;
+                return React.createElement('div', { key:f.id, style:{ padding:'8px 12px', background:'var(--bg)', borderRadius:8, border:'1px solid var(--border)' } },
+                  React.createElement('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between' } },
+                    React.createElement('div', null,
+                      React.createElement('div', { style:{ fontSize:13, fontWeight:500 } }, f.file_name),
+                      React.createElement('div', { style:{ fontSize:11, color:'var(--text3)', marginTop:2 } },
+                        ({surat_jalan:'Surat Jalan',invoice_supplier:'Invoice Supplier',bukti_pengeluaran:'Bukti Pengeluaran',bukti_bayar:'Bukti Bayar',lainnya:'Scan Lainnya',foto_invoice:'Scan Invoice'}[f.doc_type]||f.doc_type)
+                        + (f.doc_number ? ' · No: ' + f.doc_number : (isInvSupplier ? ' · (no. belum diisi)' : ''))
+                        + ' · ' + (f.mime_type||'') + ' · ' + (f.file_size ? Math.round(f.file_size/1024)+'KB' : '')
+                        + ' · ' + new Date(f.uploaded_at).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})
+                        + ' oleh ' + f.uploaded_by
+                      )
+                    ),
+                    React.createElement('div', { style:{ display:'flex', gap:6, flexShrink:0 } },
+                      isInvSupplier && canUpload && btn(isEditingThis ? 'Batal' : 'Edit No.', function(){
+                        if (isEditingThis) { setEditingDocNumFileId(null); }
+                        else { setEditingDocNumFileId(f.id); setEditDocNumVal(f.doc_number||''); }
+                      }, { fontSize:11, background:'transparent', color:'var(--accent2)' }),
+                      btn('Lihat', function(){ doDownload(tx.id, f.id, f.file_name); }, { fontSize:11, background:'transparent' }),
+                      perm.canDelete && btn('Hapus', function(){ doDeleteFile(tx.id, f.id); }, { fontSize:11, color:'var(--red)', background:'transparent' })
                     )
                   ),
-                  React.createElement('div', { style:{ display:'flex', gap:6 } },
-                    btn('Lihat', function(){ doDownload(tx.id, f.id, f.file_name); }, { fontSize:11, background:'transparent' }),
-                    perm.canDelete && btn('Hapus', function(){ doDeleteFile(tx.id, f.id); }, { fontSize:11, color:'var(--red)', background:'transparent' })
+                  isEditingThis && React.createElement('div', { style:{ marginTop:8, display:'flex', gap:6 } },
+                    React.createElement('input', {
+                      type:'text', placeholder:'Nomor Invoice Supplier',
+                      value: editDocNumVal,
+                      onChange: function(e){ setEditDocNumVal(e.target.value); },
+                      style:{ flex:1, padding:'6px 10px', borderRadius:7, border:'1px solid var(--border2)', background:'var(--bg2)', color:'var(--text)', fontSize:12 },
+                      onKeyDown: function(e){ if(e.key==='Enter') doEditDocNumber(tx.id, f.id, editDocNumVal); }
+                    }),
+                    btn('Simpan', function(){ doEditDocNumber(tx.id, f.id, editDocNumVal); }, { fontSize:11 })
                   )
                 );
               })
@@ -49724,8 +49755,8 @@ function DocArchivePage(props) {
         React.createElement('div', { style:{ fontWeight:600, fontSize:14, marginBottom:10 } }, 'Upload Dokumen'),
         React.createElement('div', { style:{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 } },
           allowedDocTypes.map(function(dt) {
-            var dtLabel = {surat_jalan:'Surat Jalan',invoice_supplier:'Invoice Supplier',bukti_pengeluaran:'Bukti Pengeluaran',bukti_bayar:'Bukti Bayar',lainnya:'Dokumen Lainnya'}[dt]||dt;
-            return React.createElement('button', { key:dt, onClick:function(){ setUploadDocType(dt); setUploadDocNumber(''); }, style:{ padding:'5px 12px', borderRadius:7, fontSize:12, cursor:'pointer', background: uploadDocType===dt?'rgba(99,102,241,0.2)':'var(--bg)', color: uploadDocType===dt?'var(--accent2)':'var(--text2)', border: uploadDocType===dt?'1px solid rgba(99,102,241,0.4)':'1px solid var(--border)' } },
+            var dtLabel = {surat_jalan:'Surat Jalan',invoice_supplier:'Invoice Supplier',bukti_pengeluaran:'Bukti Pengeluaran',bukti_bayar:'Bukti Bayar',lainnya:'Scan Lainnya'}[dt]||dt;
+            return React.createElement('button', { key:dt, onClick:function(){ setUploadDocType(dt); setUploadDocNumber(''); setUploadFile(null); }, style:{ padding:'5px 12px', borderRadius:7, fontSize:12, cursor:'pointer', background: uploadDocType===dt?'rgba(99,102,241,0.2)':'var(--bg)', color: uploadDocType===dt?'var(--accent2)':'var(--text2)', border: uploadDocType===dt?'1px solid rgba(99,102,241,0.4)':'1px solid var(--border)' } },
               dtLabel
             );
           })
@@ -49738,12 +49769,28 @@ function DocArchivePage(props) {
             onChange: function(e){ setUploadDocNumber(e.target.value); },
             style:{ marginBottom:8, padding:'7px 10px', borderRadius:7, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:13, width:'100%' }
           }),
-          React.createElement('input', {
-            type:'file', accept:'.jpg,.jpeg,.png,.webp,.pdf',
-            onChange: function(e){ var f=e.target.files&&e.target.files[0]; if(f) doUpload(tx.id, uploadDocType, f, uploadDocNumber||null); },
-            style:{ fontSize:13 }, disabled: uploading
-          }),
-          uploading && React.createElement('span', { style:{ marginLeft:8, fontSize:12, color:'var(--text3)' } }, 'Mengupload…'),
+          React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' } },
+            React.createElement('label', {
+              style:{ display:'inline-block', padding:'7px 14px', borderRadius:7, border:'1px solid var(--border2)', background:'var(--bg2)', color:'var(--text2)', fontSize:12, cursor:'pointer', whiteSpace:'nowrap' }
+            },
+              uploadFile ? '📄 ' + uploadFile.name : '+ Pilih scan dokumen (PDF/JPG/PNG)',
+              React.createElement('input', {
+                type:'file', accept:'.jpg,.jpeg,.png,.webp,.pdf',
+                style:{ display:'none' },
+                onChange: function(e){ var f=e.target.files&&e.target.files[0]; if(f) setUploadFile(f); },
+                disabled: uploading
+              })
+            ),
+            uploadFile && !uploading && React.createElement('button', {
+              onClick: function(){ doUpload(tx.id, uploadDocType, uploadFile, uploadDocNumber||null); setUploadFile(null); },
+              style:{ padding:'7px 14px', borderRadius:7, background:'var(--accent)', color:'#fff', fontSize:12, border:'none', cursor:'pointer' }
+            }, 'Upload'),
+            uploadFile && !uploading && React.createElement('button', {
+              onClick: function(){ setUploadFile(null); },
+              style:{ fontSize:11, background:'transparent', border:'none', color:'var(--text3)', cursor:'pointer' }
+            }, '✕ Batal')
+          ),
+          uploading && React.createElement('span', { style:{ marginTop:6, display:'block', fontSize:12, color:'var(--text3)' } }, 'Mengupload…'),
           uploadErr && React.createElement('div', { style:{ marginTop:6, fontSize:12, color:'var(--red)' } }, uploadErr)
         )
       )
