@@ -4417,7 +4417,7 @@ function App() {
   .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
   .concat(STOCK_CALC_USERS.includes(userName) ? [{ id: 'stock_calculator', icon: '🧮', label: 'Kalkulator Stok' }] : [])
   .concat(STOCK_AGING_USERS.includes(userName) ? [{ id: 'stock_aging', icon: '📦', label: 'Review Stok' }] : [])
-  .concat(PROFIT_DASHBOARD_USERS.includes(userName) ? [{ id: 'profit_dashboard', icon: '💹', label: 'Profit Dashboard' }] : [])
+  .concat(PROFIT_DASHBOARD_USERS.includes(userName) ? [{ id: 'profit_dashboard', icon: '📊', label: 'Performance Dashboard' }] : [])
   .concat((function(){ var u = USER_ACCOUNTS.find(function(a){ return a.name === userName; }); return canDocArchive(u) ? [{ id: 'doc_archive', icon: '📁', label: 'Arsip Dokumen' }] : []; })());
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -50297,7 +50297,7 @@ function ProfitDashboardPage() {
     try { return JSON.parse(localStorage.getItem('orderflow_session') || '{}').name || ''; } catch(_) { return ''; }
   })();
 
-  // Auto-auth on mount: try cached token, else request new one automatically
+  // Auto-auth on mount
   React.useEffect(function() {
     try {
       var t = sessionStorage.getItem('profit_jwt');
@@ -50325,33 +50325,52 @@ function ProfitDashboardPage() {
 
   function clearToken() {
     try { sessionStorage.removeItem('profit_jwt'); } catch(_) {}
-    setProfitJwt(null); setData(null); setErr(null); setAuthErr(null);
+    setProfitJwt(null); setPerfData(null); setPerfErr(null); setProfitData(null); setAuthErr(null);
   }
 
+  // Fetch performance data when mode/year/month or jwt changes
   React.useEffect(function() {
-    if (!period || !profitJwt) return;
-    var parts = period.split('-');
-    var y = parseInt(parts[0], 10); var m = parseInt(parts[1], 10);
-    setLoading(true); setErr(null); setData(null);
-    fetch('/api/profit-dashboard?year=' + y + '&month=' + m, {
-      headers: { 'Authorization': 'Bearer ' + profitJwt },
-    })
+    if (!profitJwt) return;
+    setPerfLoading(true); setPerfErr(null); setPerfData(null);
+    var qs;
+    if (perfMode === 'quarterly') {
+      qs = 'year=' + selYear + '&mode=quarterly';
+    } else if (perfMode === 'yearly') {
+      qs = 'year=' + selYear + '&mode=yearly';
+    } else {
+      qs = 'year=' + selYear + '&month=' + selMonth;
+    }
+    fetch('/api/performance-dashboard?' + qs, { headers: { 'Authorization': 'Bearer ' + profitJwt } })
       .then(function(r) {
-        if (r.status === 401 || r.status === 403) {
-          clearToken();
-          return r.json().then(function(d){ throw new Error(d.error || 'Sesi berakhir, muat ulang halaman.'); });
-        }
+        if (r.status === 401 || r.status === 403) { clearToken(); return r.json().then(function(d){ throw new Error(d.error || 'Sesi berakhir.'); }); }
         if (!r.ok) return r.json().then(function(d){ throw new Error(d.error || 'HTTP ' + r.status); });
         return r.json();
       })
-      .then(function(d) { if (d && d.error) throw new Error(d.error); setData(d); })
-      .catch(function(e) { setErr(e.message); })
-      .finally(function() { setLoading(false); });
-  }, [period, profitJwt]);
+      .then(function(d) { if (d && d.error) throw new Error(d.error); setPerfData(d); })
+      .catch(function(e) { setPerfErr(e.message); })
+      .finally(function() { setPerfLoading(false); });
+  }, [perfMode, selYear, selMonth, profitJwt]);
 
-  // Fetch sales matrix when tab is active
+  // Lazy-load detail profit when expanded (monthly only)
   React.useEffect(function() {
-    if (activeTab !== 'salesmatrix' || !profitJwt) return;
+    if (!profitExpanded || !profitJwt || perfMode !== 'monthly') return;
+    if (profitData) return;
+    setProfitLoading(true);
+    fetch('/api/profit-dashboard?year=' + selYear + '&month=' + selMonth, { headers: { 'Authorization': 'Bearer ' + profitJwt } })
+      .then(function(r) {
+        if (r.status === 401 || r.status === 403) { clearToken(); return r.json().then(function(d){ throw new Error(d.error || 'Sesi berakhir.'); }); }
+        if (!r.ok) return r.json().then(function(d){ throw new Error(d.error || 'HTTP ' + r.status); });
+        return r.json();
+      })
+      .then(function(d) { if (d && d.error) throw new Error(d.error); setProfitData(d); })
+      .catch(function(e) { /* silent */ })
+      .finally(function() { setProfitLoading(false); });
+  }, [profitExpanded, profitJwt, selYear, selMonth, perfMode]);
+
+  // Fetch sales matrix when detail profit expanded
+  React.useEffect(function() {
+    if (!profitExpanded || !profitJwt) return;
+    if (smData) return;
     setSmLoading(true); setSmErr(null);
     var qs = new URLSearchParams({ from: smFrom, to: smTo });
     fetch('/api/profit-sales-matrix?' + qs, { headers: { 'Authorization': 'Bearer ' + profitJwt } })
@@ -50363,25 +50382,191 @@ function ProfitDashboardPage() {
       .then(function(d) { setSmData(d); })
       .catch(function(e) { setSmErr(e.message); })
       .finally(function() { setSmLoading(false); });
-  }, [activeTab, profitJwt, smFrom, smTo]);
+  }, [profitExpanded, profitJwt, smFrom, smTo]);
 
   var fmt = function(v) { if (v===null||v===undefined) return '—'; var n=Number(v); return n>=1e9?(n/1e9).toFixed(2)+'M':n>=1e6?(n/1e6).toFixed(1)+'jt':Math.round(n).toLocaleString('id-ID'); };
   var fmtRp = function(v) { if (v===null||v===undefined) return '—'; return 'Rp '+fmt(v); };
+  var fmtPct = function(v) { return v===null||v===undefined?'—':v+'%'; };
   var profitColor = function(v) { return v===null||v===undefined?'var(--text2)':Number(v)>=0?'var(--green)':'var(--red)'; };
+
+  var CHAN_COLORS = {
+    Corporate: { bg:'#E6F1FB', text:'#185FA5' },
+    Retail:    { bg:'#EAF3DE', text:'#3B6D11' },
+    Online:    { bg:'#FAEEDA', text:'#854F0B' },
+  };
+  var CHAN_COLORS_DARK = {
+    Corporate: { bg:'rgba(24,95,165,0.18)', text:'#7DB8F7' },
+    Retail:    { bg:'rgba(59,109,17,0.18)', text:'#8DC54A' },
+    Online:    { bg:'rgba(133,79,11,0.18)', text:'#F5B96E' },
+  };
+  var BRANDS = ['Lenovo','Advan','Asus','HP','Acer','Axioo','Viewsonic','MSI','Samsung','Zyrex','Dell','Dll'];
+  var CHANNELS = ['Corporate','Retail','Online'];
 
   var cs = { background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'16px 20px', marginBottom:16 };
   var th = { padding:'6px 10px', fontSize:11, color:'var(--text2)', fontWeight:600, letterSpacing:'0.05em', borderBottom:'1px solid var(--border)', textAlign:'left' };
   var td = { padding:'7px 10px', fontSize:13, borderBottom:'1px solid var(--border)' };
-  var tabBtn = function(id,label) {
+
+  var tabBtn = function(id, label, activeSt, setActiveSt) {
     return React.createElement('button', {
-      key:id, onClick:function(){ setActiveTab(id); },
+      key:id, onClick:function(){ setActiveSt(id); },
       style:{ padding:'6px 14px', borderRadius:8, fontSize:13, fontWeight:500,
-        background: activeTab===id?'rgba(108,99,255,0.2)':'transparent',
-        color: activeTab===id?'var(--accent2)':'var(--text2)',
-        border: activeTab===id?'1px solid rgba(108,99,255,0.4)':'1px solid transparent',
+        background: activeSt===id?'rgba(108,99,255,0.2)':'transparent',
+        color: activeSt===id?'var(--accent2)':'var(--text2)',
+        border: activeSt===id?'1px solid rgba(108,99,255,0.4)':'1px solid transparent',
         cursor:'pointer' }
     }, label);
   };
+
+  // Aggregate perf rows by channel/brand/period
+  function aggRows(filterChan) {
+    if (!perfData || !perfData.rows) return [];
+    return perfData.rows.filter(function(r) {
+      return filterChan === 'all' || r.channel === filterChan;
+    });
+  }
+
+  // Summarize by brand across periods
+  function brandSummary(filterChan) {
+    var rows = aggRows(filterChan);
+    var map = {};
+    rows.forEach(function(r) {
+      if (!map[r.brand]) map[r.brand] = { brand:r.brand, qty:0, revenue:0, cogs:0, profit:0, revenue_wac:0, has_wac:false };
+      var b = map[r.brand];
+      b.qty += r.qty||0;
+      b.revenue += r.revenue_line||0;
+      if (r.cogs !== null) { b.cogs += r.cogs||0; b.has_wac = true; }
+      if (r.profit !== null) b.profit += r.profit||0;
+      if (r.revenue_line) b.revenue_wac += r.revenue_line||0;
+    });
+    var total = { brand:'TOTAL', qty:0, revenue:0, cogs:0, profit:0, revenue_wac:0, has_wac:false };
+    BRANDS.forEach(function(b) {
+      if (map[b]) { total.qty+=map[b].qty; total.revenue+=map[b].revenue; if(map[b].has_wac){total.cogs+=map[b].cogs;total.profit+=map[b].profit;total.revenue_wac+=map[b].revenue_wac;total.has_wac=true;} }
+    });
+    return { byBrand: map, total: total };
+  }
+
+  // Quarterly: brand × quarter pivot
+  function brandQuarterPivot(filterChan) {
+    var rows = aggRows(filterChan);
+    var periods = perfData ? perfData.periods : [];
+    var map = {};
+    rows.forEach(function(r) {
+      if (!map[r.brand]) { map[r.brand] = {}; periods.forEach(function(p){ map[r.brand][p]={qty:0,revenue:0,profit:null,revenue_wac:0}; }); }
+      var bp = map[r.brand][r.period_label||r.period];
+      if (!bp) return;
+      bp.qty += r.qty||0;
+      bp.revenue += r.revenue_line||0;
+      if (r.profit !== null) { bp.profit = (bp.profit||0) + r.profit; bp.revenue_wac += r.revenue_line||0; }
+    });
+    return { map: map, periods: periods };
+  }
+
+  // Channel summary totals
+  function chanTotals() {
+    if (!perfData || !perfData.rows) return {};
+    var out = {};
+    CHANNELS.forEach(function(ch) {
+      var rows = perfData.rows.filter(function(r){ return r.channel===ch; });
+      var qty=0, rev=0, inv=new Set(), profit=0, rev_wac=0, has_wac=false;
+      rows.forEach(function(r){
+        qty+=r.qty||0; rev+=r.revenue_line||0;
+        if(r.profit!==null){profit+=r.profit||0;rev_wac+=r.revenue_line||0;has_wac=true;}
+      });
+      out[ch] = { qty:qty, revenue:rev, profit:has_wac?profit:null, margin:has_wac&&rev_wac>0?Math.round(1000*profit/rev_wac)/10:null };
+    });
+    return out;
+  }
+
+  function SummaryCards(props) {
+    var s = props.summary; if (!s) return null;
+    var wac = s.wac_coverage||{};
+    var cards = [
+      { label:'Invoice', val:(s.invoice_count||0).toLocaleString('id-ID'), sub:null, color:'var(--text)' },
+      { label:'Revenue', val:fmtRp(s.revenue_gross), sub:null, color:'var(--text)' },
+      { label:'HPP (COGS)', val:fmtRp(s.cogs), sub:null, color:'var(--text)' },
+      { label:'Laba Kotor', val:fmtRp(s.profit), sub:s.profit_margin!=null?'Margin '+s.profit_margin+'%':null, color:profitColor(s.profit) },
+      { label:'WAC Coverage', val:wac.pct!=null?wac.pct+'%':'—', sub:wac.total_lines?(wac.lines_with_wac+'/'+wac.total_lines+' lines'):null, color:wac.pct>=80?'var(--green)':wac.pct>=50?'var(--amber)':'var(--text2)' },
+    ];
+    return React.createElement('div',{style:{display:'flex',gap:12,flexWrap:'wrap',marginBottom:16}},
+      cards.map(function(c){
+        return React.createElement('div',{key:c.label,style:{flex:1,minWidth:120,background:'var(--bg3)',borderRadius:10,padding:'12px 14px',border:'1px solid var(--border)'}},
+          React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:4,letterSpacing:'0.06em',textTransform:'uppercase'}},c.label),
+          React.createElement('div',{style:{fontSize:17,fontWeight:700,fontFamily:'DM Mono, monospace',color:c.color}},c.val),
+          c.sub&&React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginTop:2}},c.sub)
+        );
+      })
+    );
+  }
+
+  function OldChannelTable(props) {
+    var rows=props.rows||[]; if(!rows.length) return React.createElement('div',{style:{color:'var(--text3)',fontSize:13}},'Tidak ada data channel.');
+    return React.createElement('div',{style:{overflowX:'auto'}},
+      React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
+        React.createElement('thead',null,React.createElement('tr',null,
+          React.createElement('th',{style:Object.assign({},th,{width:160})},'Channel'),
+          React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Inv'),
+          React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Revenue'),
+          React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Laba'),
+          React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Margin')
+        )),
+        React.createElement('tbody',null,
+          rows.map(function(r){
+            return React.createElement('tr',{key:r.key},
+              React.createElement('td',{style:td},r.key),
+              React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},(r.invoice_count||0).toLocaleString('id-ID')),
+              React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},fmtRp(r.revenue_line)),
+              React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace',color:profitColor(r.profit)})},fmtRp(r.profit)),
+              React.createElement('td',{style:Object.assign({},td,{textAlign:'right'})},r.profit_margin!=null?r.profit_margin+'%':'—')
+            );
+          })
+        )
+      )
+    );
+  }
+
+  function OldSalesTable(props) {
+    var rows=props.rows||[]; var showCompany=props.showCompany||false;
+    if(!rows.length) return React.createElement('div',{style:{color:'var(--text3)',fontSize:13}},'Tidak ada data salesperson.');
+    var UNKNOWN=['Tidak Ada','Tidak Diketahui','Belum Ditentukan'];
+    var sorted=rows.slice().sort(function(a,b){
+      var au=UNKNOWN.indexOf(a.key)>=0,bu=UNKNOWN.indexOf(b.key)>=0;
+      if(au&&!bu)return 1;if(!au&&bu)return -1;
+      if(a.profit===null&&b.profit===null)return(b.revenue_line||0)-(a.revenue_line||0);
+      if(a.profit===null)return 1;if(b.profit===null)return -1;
+      return b.profit-a.profit;
+    });
+    return React.createElement('div',null,
+      React.createElement('div',{style:{overflowX:'auto'}},
+        React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:12}},
+          React.createElement('thead',null,React.createElement('tr',null,
+            showCompany&&React.createElement('th',{style:Object.assign({},th,{width:48,fontSize:10})},'Entitas'),
+            React.createElement('th',{style:Object.assign({},th,{minWidth:130})},'Salesperson'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Inv'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Revenue'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'HPP'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Laba'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Margin'),
+            React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'WAC%')
+          )),
+          React.createElement('tbody',null,
+            sorted.map(function(r,idx){
+              var isUnknown=UNKNOWN.indexOf(r.key)>=0;
+              return React.createElement('tr',{key:(r._company||'')+':'+r.key+':'+idx,style:{background:isUnknown?'rgba(128,128,128,0.06)':'transparent'}},
+                showCompany&&React.createElement('td',{style:Object.assign({},td,{fontSize:10,color:'var(--text3)',whiteSpace:'nowrap'})},r._company||''),
+                React.createElement('td',{style:Object.assign({},td,{color:isUnknown?'var(--text3)':'var(--text)',fontStyle:isUnknown?'italic':'normal'})},isUnknown?'Belum Ditentukan':r.key),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},(r.invoice_count||0).toLocaleString('id-ID')),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},fmtRp(r.revenue_line)),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},fmtRp(r.cogs)),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace',color:profitColor(r.profit)})},fmtRp(r.profit)),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right'})},r.profit_margin!=null?r.profit_margin+'%':'—'),
+                React.createElement('td',{style:Object.assign({},td,{textAlign:'right'})},r.wac_pct!=null?r.wac_pct+'%':'—')
+              );
+            })
+          )
+        )
+      )
+    );
+  }
 
   function SummaryCards(props) {
     var s = props.summary;
@@ -50486,147 +50671,10 @@ function ProfitDashboardPage() {
     );
   }
 
-  function MonthlyMatrix(props) {
-    var adlTrend = props.adlTrend||[]; var groupTrend = props.groupTrend||[];
-    if (!adlTrend.length) return React.createElement('div',{style:{color:'var(--text3)',fontSize:13}},'Data trend belum tersedia.');
-    var months = adlTrend.map(function(r){return r.month;});
-    var adlMap={}, grpMap={};
-    adlTrend.forEach(function(r){adlMap[r.month]=r;});
-    groupTrend.forEach(function(r){grpMap[r.month]=r;});
-    var mthHdr = { padding:'6px 8px', fontSize:11, color:'var(--text2)', fontWeight:600, textAlign:'center',
-      borderBottom:'1px solid var(--border)', background:'rgba(108,99,255,0.07)', whiteSpace:'nowrap' };
-    var subHdr = { padding:'4px 8px', fontSize:10, color:'var(--text3)', fontWeight:600, textAlign:'right',
-      borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' };
-    var mCell = { padding:'7px 8px', fontSize:12, textAlign:'right', fontFamily:'DM Mono, monospace', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' };
-    var lCell = { padding:'7px 10px', fontSize:12, fontWeight:600, color:'var(--text2)', borderBottom:'1px solid var(--border)', whiteSpace:'nowrap' };
-    var metrics = [
-      { label:'Invoice',
-        fn: function(r){ return r?(r.invoice_count||0).toLocaleString('id-ID'):'0'; },
-        color: function(){ return 'var(--text)'; } },
-      { label:'Revenue',
-        fn: function(r){ return fmtRp(r&&r.revenue_gross!=null?r.revenue_gross:null); },
-        color: function(){ return 'var(--text)'; } },
-      { label:'HPP/COGS',
-        fn: function(r){ return r&&r.cogs!=null?fmtRp(r.cogs):'—'; },
-        color: function(r){ return r&&r.cogs!=null?'var(--text)':'var(--text3)'; } },
-      { label:'Laba Kotor',
-        fn: function(r){ return r&&r.profit!=null?fmtRp(r.profit):'—'; },
-        color: function(r){ return r&&r.profit!=null?profitColor(r.profit):'var(--text3)'; } },
-      { label:'Margin %',
-        fn: function(r){ return r&&r.profit_margin!=null?(r.profit_margin+'%'):'—'; },
-        color: function(r){ return r&&r.profit_margin!=null?profitColor(r.profit_margin):'var(--text3)'; } },
-      { label:'WAC Coverage',
-        fn: function(r){
-          var w=r&&r.wac_coverage;
-          return w?w.pct+'% ('+w.lines_with_wac+'/'+w.total_lines+')':'—';
-        },
-        color: function(r){
-          var w=r&&r.wac_coverage;
-          return !w?'var(--text3)':w.pct>=80?'var(--green)':w.pct>=50?'var(--amber)':'var(--text2)';
-        } },
-    ];
-    return React.createElement('div',null,
-      React.createElement('div',{style:{overflowX:'auto'}},
-        React.createElement('table',{style:{borderCollapse:'collapse',fontSize:12,minWidth:Math.max(500,months.length*180+120)}},
-          React.createElement('thead',null,
-            React.createElement('tr',null,
-              React.createElement('th',{style:Object.assign({},th,{width:110,background:'transparent'})},'Metrik'),
-              months.map(function(m){
-                return React.createElement('th',{key:m,colSpan:2,style:mthHdr},m);
-              })
-            ),
-            React.createElement('tr',null,
-              React.createElement('th',{style:Object.assign({},th,{background:'transparent'})},''),
-              months.map(function(m){
-                return [
-                  React.createElement('th',{key:m+':a',style:subHdr},'ADL'),
-                  React.createElement('th',{key:m+':g',style:subHdr},'Group'),
-                ];
-              })
-            )
-          ),
-          React.createElement('tbody',null,
-            metrics.map(function(metric){
-              return React.createElement('tr',{key:metric.label},
-                React.createElement('td',{style:lCell},metric.label),
-                months.map(function(m){
-                  var ar=adlMap[m], gr=grpMap[m];
-                  return [
-                    React.createElement('td',{key:m+':a',style:Object.assign({},mCell,{color:metric.color(ar)})},metric.fn(ar)),
-                    React.createElement('td',{key:m+':g',style:Object.assign({},mCell,{color:metric.color(gr)})},metric.fn(gr)),
-                  ];
-                })
-              );
-            })
-          )
-        )
-      ),
-      React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginTop:8,fontStyle:'italic'}},
-        '— = tidak ada data WAC untuk bulan tersebut (profit tidak dapat dihitung). Laba dihitung hanya dari baris yang memiliki WAC.')
-    );
-  }
-
-  function TrendTable(props) {
-    var rows = props.rows||[];
-    if (!rows.length) return null;
-    return React.createElement('div',{style:{overflowX:'auto'}},
-      React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
-        React.createElement('thead',null,React.createElement('tr',null,
-          React.createElement('th',{style:th},'Bulan'),
-          React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Inv'),
-          React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Revenue')
-        )),
-        React.createElement('tbody',null,
-          rows.map(function(r){
-            return React.createElement('tr',{key:r.month},
-              React.createElement('td',{style:td},r.month),
-              React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},(r.invoice_count||0).toLocaleString('id-ID')),
-              React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},fmtRp(r.revenue_gross))
-            );
-          })
-        )
-      )
-    );
-  }
-
-  function EntityView(props) {
-    var d = props.data; var label = props.label;
-    if (!d) return null;
-    return React.createElement(React.Fragment, null,
-      React.createElement('h3', { style:{ fontSize:14, fontWeight:600, color:'var(--text2)', marginBottom:12, textTransform:'uppercase', letterSpacing:'0.06em' } }, label),
-      React.createElement(SummaryCards, { summary: d.summary }),
-      d.by_channel && d.by_channel.length > 0 && React.createElement('div', { style: cs },
-        React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}}, 'Per Channel'),
-        React.createElement(ChannelTable, { rows: d.by_channel })
-      ),
-      d.by_salesman && d.by_salesman.length > 0 && React.createElement('div', { style: cs },
-        React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}},'Per Salesperson'),
-        React.createElement(SalesTable, { rows: d.by_salesman })
-      ),
-      d.revenue_trend && d.revenue_trend.length > 0 && React.createElement('div', { style: cs },
-        React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}}, 'Trend 6 Bulan'),
-        React.createElement(TrendTable, { rows: d.revenue_trend })
-      )
-    );
-  }
-
-  var periodLabel = (function(){
-    if (!period) return '';
-    var parts = period.split('-');
-    return new Date(parseInt(parts[0],10), parseInt(parts[1],10)-1, 1).toLocaleDateString('id-ID',{month:'long',year:'numeric'});
-  })();
-
-  var combinedSales = (function(){
-    if (!data) return [];
-    var adlSales = (data.adl&&data.adl.by_salesman||[]).map(function(r){return Object.assign({},r,{_company:'ADL'});});
-    var grpSales = (data.group&&data.group.by_salesman||[]).map(function(r){return Object.assign({},r,{_company:'Group'});});
-    return adlSales.concat(grpSales);
-  })();
-
-  // Loading / error state (auto-auth, no PIN form needed)
+  // Auth gate
   if (!profitJwt) {
     return React.createElement('div', { style:{ padding:'20px 24px', maxWidth:480, margin:'0 auto' } },
-      React.createElement('h2', { style:{ fontSize:20, fontWeight:700, marginBottom:8 } }, '💹 Profit Dashboard'),
+      React.createElement('h2', { style:{ fontSize:20, fontWeight:700, marginBottom:8 } }, '📊 Performance Dashboard'),
       authLoading
         ? React.createElement('div',{style:{textAlign:'center',padding:60,color:'var(--text3)'}},'⏳ Memuat...')
         : React.createElement('div', { style:{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'24px 28px', marginTop:24, textAlign:'center' } },
@@ -50636,63 +50684,271 @@ function ProfitDashboardPage() {
     );
   }
 
+  var MONTHS_ID = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  var periodLabel = perfMode==='monthly'
+    ? (MONTHS_ID[selMonth-1]||selMonth) + ' ' + selYear
+    : perfMode==='quarterly' ? 'Q1–Q4 ' + selYear
+    : (selYear-2) + '–' + selYear;
+
+  var ctotals = chanTotals();
+
+  var selStyle = { padding:'5px 9px', borderRadius:7, border:'1px solid var(--border2)', background:'var(--bg3)', color:'var(--text)', fontSize:12, cursor:'pointer' };
+
   return React.createElement('div', { style:{ padding:'20px 24px', maxWidth:1200, margin:'0 auto' } },
-    React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:12, marginBottom:20, flexWrap:'wrap' } },
-      React.createElement('h2', { style:{ fontSize:20, fontWeight:700, margin:0, flex:1 } }, '💹 Profit Dashboard'),
-      React.createElement('input', {
-        type:'month', value:period,
-        onChange:function(e){ setPeriod(e.target.value); },
-        style:{ padding:'6px 10px', borderRadius:8, border:'1px solid var(--border2)', background:'var(--bg3)', color:'var(--text)', fontSize:14 }
-      }),
-      React.createElement('button', {
-        onClick:clearToken,
-        title:'Keluar dari sesi dashboard (hapus token)',
-        style:{ padding:'6px 10px', borderRadius:8, border:'1px solid var(--border2)', background:'transparent',
-          color:'var(--text3)', fontSize:12, cursor:'pointer' }
-      }, '🔒 Kunci')
-    ),
 
-    loading && React.createElement('div',{style:{textAlign:'center',padding:60,color:'var(--text3)'}},'⏳ Memuat data profit...'),
-    err && React.createElement('div',{style:{padding:20,color:'var(--red)',background:'var(--bg2)',borderRadius:12,border:'1px solid var(--border)',marginBottom:16}},'⚠️ ',err),
-
-    data && React.createElement(React.Fragment, null,
-      React.createElement('div',{style:{fontSize:12,color:'var(--text3)',marginBottom:16}},'Data: ',periodLabel,' • Diperbarui: ',new Date(data.generated_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})),
-
-      React.createElement('div',{style:{display:'flex',gap:6,marginBottom:20,flexWrap:'wrap'}},
-        tabBtn('combined','Gabungan'),
-        tabBtn('adl','ADL (PT)'),
-        tabBtn('group','Group'),
-        tabBtn('matrix','📊 Matriks Bulanan'),
-        tabBtn('salesmatrix','📈 Matriks Sales')
-      ),
-
-      activeTab === 'combined' && data.combined && React.createElement('div', { style:cs },
-        React.createElement('h3',{style:{fontSize:14,fontWeight:600,color:'var(--text2)',marginBottom:12,textTransform:'uppercase',letterSpacing:'0.06em'}},'Gabungan ADL + Group'),
-        React.createElement(SummaryCards,{summary:data.combined.summary}),
-        combinedSales.length > 0 && React.createElement('div',{style:{marginTop:4}},
-          React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}},'Per Salesperson (Semua Entitas)'),
-          React.createElement(SalesTable, { rows: combinedSales, showCompany: true })
-        )
-      ),
-      activeTab === 'adl'    && React.createElement(EntityView, { data:data.adl,   label:'ADL (PT Anugerah Digital Lestari)' }),
-      activeTab === 'group'  && React.createElement(EntityView, { data:data.group, label:'Group (Digitalzone Group)' }),
-      activeTab === 'matrix' && React.createElement('div',{style:cs},
-        React.createElement('h3',{style:{fontSize:14,fontWeight:600,color:'var(--text2)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}},'Perbandingan Bulanan'),
-        React.createElement('div',{style:{fontSize:12,color:'var(--text3)',marginBottom:12}},'6 bulan terakhir — ADL vs Group'),
-        React.createElement(MonthlyMatrix, {
-          adlTrend:   data.adl&&data.adl.monthly_profit_trend||data.adl&&data.adl.revenue_trend||[],
-          groupTrend: data.group&&data.group.monthly_profit_trend||data.group&&data.group.revenue_trend||[]
+    // ── Header ───────────────────────────────────────────────────────────────
+    React.createElement('div', { style:{ display:'flex', alignItems:'center', gap:10, marginBottom:18, flexWrap:'wrap' } },
+      React.createElement('h2', { style:{ fontSize:20, fontWeight:700, margin:0, flex:1 } }, '📊 Performance Dashboard'),
+      React.createElement('div',{style:{display:'flex',gap:4}},
+        ['monthly','quarterly','yearly'].map(function(m){
+          var lbl = m==='monthly'?'Bulanan':m==='quarterly'?'Kuartal':'Tahunan';
+          return React.createElement('button',{key:m,onClick:function(){setPerfMode(m);setPerfData(null);},
+            style:{padding:'5px 12px',borderRadius:7,fontSize:12,fontWeight:500,cursor:'pointer',
+              background:perfMode===m?'rgba(108,99,255,0.2)':'transparent',
+              color:perfMode===m?'var(--accent2)':'var(--text2)',
+              border:perfMode===m?'1px solid rgba(108,99,255,0.4)':'1px solid var(--border2)'}},lbl);
         })
       ),
-      activeTab === 'salesmatrix' && React.createElement(SalesMatrixTab, {
-        smData:smData, smLoading:smLoading, smErr:smErr,
-        smMetric:smMetric, setSmMetric:setSmMetric,
-        smEntity:smEntity, setSmEntity:setSmEntity,
-        smSort:smSort, setSmSort:setSmSort,
-        smFrom:smFrom, setSmFrom:setSmFrom,
-        smTo:smTo, setSmTo:setSmTo,
-        cs:cs, fmtRp:fmtRp, profitColor:profitColor,
-      })
+      perfMode==='monthly' && React.createElement(React.Fragment,null,
+        React.createElement('select',{value:selMonth,onChange:function(e){setSelMonth(parseInt(e.target.value,10));},style:selStyle},
+          MONTHS_ID.map(function(n,i){return React.createElement('option',{key:i+1,value:i+1},n);})),
+        React.createElement('select',{value:selYear,onChange:function(e){setSelYear(parseInt(e.target.value,10));},style:selStyle},
+          [2024,2025,2026,2027].map(function(y){return React.createElement('option',{key:y,value:y},y);}))
+      ),
+      (perfMode==='quarterly'||perfMode==='yearly') && React.createElement('select',{value:selYear,onChange:function(e){setSelYear(parseInt(e.target.value,10));},style:selStyle},
+        [2024,2025,2026,2027].map(function(y){return React.createElement('option',{key:y,value:y},y);})),
+      React.createElement('button',{onClick:clearToken,title:'Keluar sesi',
+        style:{padding:'5px 9px',borderRadius:7,border:'1px solid var(--border2)',background:'transparent',color:'var(--text3)',fontSize:12,cursor:'pointer'}},'🔒')
+    ),
+
+    perfLoading && React.createElement('div',{style:{textAlign:'center',padding:60,color:'var(--text3)'}},'⏳ Memuat data...'),
+    perfErr && React.createElement('div',{style:{padding:16,color:'var(--red)',background:'var(--bg2)',borderRadius:10,border:'1px solid var(--border)',marginBottom:16,fontSize:13}},'⚠️ ',perfErr),
+
+    perfData && React.createElement(React.Fragment,null,
+
+      React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:14}},'Periode: ',periodLabel,' • Diperbarui: ',new Date(perfData.generated_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})),
+
+      // ── Channel blocks ─────────────────────────────────────────────────────
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:20}},
+        CHANNELS.map(function(ch){
+          var t=ctotals[ch]||{};
+          var cc=CHAN_COLORS[ch];
+          return React.createElement('div',{key:ch,
+            style:{borderRadius:12,padding:'14px 16px',border:'2px solid transparent',cursor:'pointer',
+              background:chanFilter===ch?cc.bg:'var(--bg2)',
+              borderColor:chanFilter===ch?cc.text:'var(--border)',
+              color:chanFilter===ch?cc.text:'var(--text)'},
+            onClick:function(){setChanFilter(chanFilter===ch?'all':ch);}},
+            React.createElement('div',{style:{fontSize:11,fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:6,opacity:0.7}},ch),
+            React.createElement('div',{style:{fontSize:18,fontWeight:800,fontFamily:'DM Mono, monospace'}},fmtRp(t.revenue)),
+            React.createElement('div',{style:{fontSize:11,marginTop:4,opacity:0.8}},
+              'Qty ',t.qty||0,'  •  Margin ',t.margin!=null?t.margin+'%':'—')
+          );
+        })
+      ),
+
+      // ── Main tabs ──────────────────────────────────────────────────────────
+      React.createElement('div',{style:{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}},
+        [['brand','Brand'],['margin','Margin']].map(function(pair){
+          return tabBtn(pair[0],pair[1],mainTab,setMainTab);
+        })
+      ),
+
+      // ── Brand tab ─────────────────────────────────────────────────────────
+      mainTab==='brand' && React.createElement('div',{style:cs},
+        React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}},
+          perfMode==='monthly'?'Penjualan per Brand — '+periodLabel:perfMode==='quarterly'?'Penjualan per Brand (Kuartal '+selYear+')':'Penjualan per Brand ('+((selYear-2)+'–'+selYear)+')'),
+        perfMode==='quarterly'
+          ? (function(){
+              var piv=brandQuarterPivot(chanFilter);
+              var periods=piv.periods; var map=piv.map;
+              var thQ={padding:'5px 8px',fontSize:11,color:'var(--text2)',fontWeight:600,textAlign:'center',borderBottom:'1px solid var(--border)',background:'rgba(108,99,255,0.07)',whiteSpace:'nowrap'};
+              var subHdr={padding:'4px 7px',fontSize:10,color:'var(--text3)',fontWeight:600,textAlign:'right',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'};
+              var mc={padding:'6px 8px',fontSize:12,textAlign:'right',fontFamily:'DM Mono, monospace',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'};
+              return React.createElement('div',{style:{overflowX:'auto'}},
+                React.createElement('table',{style:{borderCollapse:'collapse',fontSize:12}},
+                  React.createElement('thead',null,
+                    React.createElement('tr',null,
+                      React.createElement('th',{style:Object.assign({},th,{minWidth:90})},'Brand'),
+                      periods.map(function(p){return React.createElement('th',{key:p,colSpan:2,style:thQ},p);})
+                    ),
+                    React.createElement('tr',null,
+                      React.createElement('th',{style:th},''),
+                      periods.map(function(p){return[
+                        React.createElement('th',{key:p+':q',style:subHdr},'Qty'),
+                        React.createElement('th',{key:p+':r',style:subHdr},'Revenue'),
+                      ];})
+                    )
+                  ),
+                  React.createElement('tbody',null,
+                    BRANDS.map(function(b){
+                      var bm=map[b]; if(!bm&&!Object.keys(map).some(function(k){return k===b;})) return null;
+                      return React.createElement('tr',{key:b},
+                        React.createElement('td',{style:Object.assign({},td,{fontWeight:500})},b),
+                        periods.map(function(p){
+                          var cell=bm&&bm[p]||{qty:0,revenue:0};
+                          return[
+                            React.createElement('td',{key:p+':q',style:mc},cell.qty||0),
+                            React.createElement('td',{key:p+':r',style:mc},fmtRp(cell.revenue)),
+                          ];
+                        })
+                      );
+                    })
+                  )
+                )
+              );
+            })()
+          : (function(){
+              var bs=brandSummary(chanFilter); var bmap=bs.byBrand; var tot=bs.total;
+              var totalRev=tot.revenue||1;
+              var totalQty=tot.qty||1;
+              return React.createElement('div',{style:{overflowX:'auto'}},
+                React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
+                  React.createElement('thead',null,React.createElement('tr',null,
+                    React.createElement('th',{style:th},'Brand'),
+                    React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Qty'),
+                    React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'%Qty'),
+                    React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Revenue'),
+                    React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'%Rev'),
+                    React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Margin')
+                  )),
+                  React.createElement('tbody',null,
+                    BRANDS.map(function(b){
+                      var r=bmap[b]; if(!r) return null;
+                      var margin=r.has_wac&&r.revenue_wac>0?Math.round(1000*r.profit/r.revenue_wac)/10:null;
+                      return React.createElement('tr',{key:b},
+                        React.createElement('td',{style:td},b),
+                        React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},r.qty),
+                        React.createElement('td',{style:Object.assign({},td,{textAlign:'right',color:'var(--text3)'})},(Math.round(100*r.qty/totalQty))+'%'),
+                        React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},fmtRp(r.revenue)),
+                        React.createElement('td',{style:Object.assign({},td,{textAlign:'right',color:'var(--text3)'})},(Math.round(100*r.revenue/totalRev))+'%'),
+                        React.createElement('td',{style:Object.assign({},td,{textAlign:'right',color:margin!==null?profitColor(margin):'var(--text3)'})},margin!==null?margin+'%':'—')
+                      );
+                    }),
+                    React.createElement('tr',{style:{fontWeight:700,background:'var(--bg3)'}},
+                      React.createElement('td',{style:td},'TOTAL'),
+                      React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},tot.qty),
+                      React.createElement('td',{style:Object.assign({},td,{textAlign:'right'})},'100%'),
+                      React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},fmtRp(tot.revenue)),
+                      React.createElement('td',{style:Object.assign({},td,{textAlign:'right'})},'100%'),
+                      React.createElement('td',{style:Object.assign({},td,{textAlign:'right'})},
+                        tot.has_wac&&tot.revenue_wac>0?Math.round(1000*tot.profit/tot.revenue_wac)/10+'%':'—')
+                    )
+                  )
+                )
+              );
+            })()
+      ),
+
+      // ── Margin tab ────────────────────────────────────────────────────────
+      mainTab==='margin' && React.createElement('div',null,
+        // Per channel
+        React.createElement('div',{style:cs},
+          React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}},'Margin per Channel'),
+          React.createElement('div',{style:{overflowX:'auto'}},
+            React.createElement('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:13}},
+              React.createElement('thead',null,React.createElement('tr',null,
+                React.createElement('th',{style:th},'Channel'),
+                React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Revenue'),
+                React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Laba'),
+                React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Margin')
+              )),
+              React.createElement('tbody',null,
+                CHANNELS.map(function(ch){
+                  var t=ctotals[ch]||{};
+                  var cc=CHAN_COLORS[ch];
+                  return React.createElement('tr',{key:ch},
+                    React.createElement('td',{style:Object.assign({},td,{fontWeight:600})},
+                      React.createElement('span',{style:{padding:'2px 8px',borderRadius:6,background:cc.bg,color:cc.text,fontSize:12}},ch)),
+                    React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},fmtRp(t.revenue)),
+                    React.createElement('td',{style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace',color:profitColor(t.profit)})},fmtRp(t.profit)),
+                    React.createElement('td',{style:Object.assign({},td,{textAlign:'right',color:t.margin!==null?profitColor(t.margin):'var(--text3)'})},t.margin!==null?t.margin+'%':'—')
+                  );
+                })
+              )
+            )
+          )
+        ),
+        // Per brand × channel
+        React.createElement('div',{style:cs},
+          React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}},'Margin per Brand × Channel'),
+          React.createElement('div',{style:{overflowX:'auto'}},
+            React.createElement('table',{style:{borderCollapse:'collapse',fontSize:12}},
+              React.createElement('thead',null,React.createElement('tr',null,
+                React.createElement('th',{style:th},'Brand'),
+                CHANNELS.map(function(ch){
+                  var cc=CHAN_COLORS[ch];
+                  return React.createElement('th',{key:ch,colSpan:2,style:Object.assign({},th,{textAlign:'center',background:cc.bg,color:cc.text})},ch);
+                })
+              ),
+              React.createElement('tr',null,
+                React.createElement('th',{style:th},''),
+                CHANNELS.map(function(ch){return[
+                  React.createElement('th',{key:ch+':r',style:Object.assign({},th,{textAlign:'right'})},'Revenue'),
+                  React.createElement('th',{key:ch+':m',style:Object.assign({},th,{textAlign:'right'})},'Margin'),
+                ];})
+              )),
+              React.createElement('tbody',null,
+                BRANDS.map(function(b){
+                  var hasAny=false;
+                  var cells=CHANNELS.map(function(ch){
+                    var bs2=brandSummary(ch); var bmap2=bs2.byBrand;
+                    var r=bmap2[b];
+                    if(r) hasAny=true;
+                    var margin=r&&r.has_wac&&r.revenue_wac>0?Math.round(1000*r.profit/r.revenue_wac)/10:null;
+                    return [
+                      React.createElement('td',{key:ch+':r',style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},r?fmtRp(r.revenue):'—'),
+                      React.createElement('td',{key:ch+':m',style:Object.assign({},td,{textAlign:'right',color:margin!==null?profitColor(margin):'var(--text3)'})},margin!==null?margin+'%':'—'),
+                    ];
+                  });
+                  if(!hasAny) return null;
+                  return React.createElement('tr',{key:b},
+                    React.createElement('td',{style:Object.assign({},td,{fontWeight:500})},b),
+                    cells
+                  );
+                })
+              )
+            )
+          )
+        )
+      )
+    ),
+
+    // ── Detail Profit (lazy, monthly only) ─────────────────────────────────
+    perfMode==='monthly' && React.createElement('div',{style:{marginTop:8}},
+      React.createElement('button',{
+        onClick:function(){ setProfitExpanded(!profitExpanded); },
+        style:{display:'flex',alignItems:'center',gap:8,padding:'10px 16px',borderRadius:10,border:'1px solid var(--border)',
+          background:'var(--bg2)',color:'var(--text2)',fontSize:13,cursor:'pointer',fontWeight:500,width:'100%'}},
+        React.createElement('span',null,profitExpanded?'▾':'▸'),
+        React.createElement('span',null,'Detail Profit (ADL + Group)')
+      ),
+      profitExpanded && React.createElement('div',{style:{marginTop:12}},
+        profitLoading && React.createElement('div',{style:{textAlign:'center',padding:40,color:'var(--text3)'}},'⏳ Memuat detail profit...'),
+        !profitLoading && profitData && React.createElement('div',null,
+          profitData.adl && React.createElement('div',{style:cs},
+            React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}}, 'ADL — '+periodLabel),
+            React.createElement(SummaryCards,{summary:profitData.adl&&profitData.adl.summary}),
+            profitData.adl&&profitData.adl.by_channel&&profitData.adl.by_channel.length>0&&React.createElement(OldChannelTable,{rows:profitData.adl.by_channel}),
+            profitData.adl&&profitData.adl.by_salesman&&profitData.adl.by_salesman.length>0&&React.createElement(OldSalesTable,{rows:profitData.adl.by_salesman})
+          ),
+          profitData.group && React.createElement('div',{style:cs},
+            React.createElement('div',{style:{fontWeight:600,fontSize:13,marginBottom:10,color:'var(--text2)'}},'Group — '+periodLabel),
+            React.createElement(SummaryCards,{summary:profitData.group&&profitData.group.summary}),
+            profitData.group&&profitData.group.by_channel&&profitData.group.by_channel.length>0&&React.createElement(OldChannelTable,{rows:profitData.group.by_channel}),
+            profitData.group&&profitData.group.by_salesman&&profitData.group.by_salesman.length>0&&React.createElement(OldSalesTable,{rows:profitData.group.by_salesman})
+          )
+        ),
+        React.createElement(SalesMatrixTab,{
+          smData:smData, smLoading:smLoading, smErr:smErr,
+          smMetric:smMetric, setSmMetric:setSmMetric,
+          smEntity:smEntity, setSmEntity:setSmEntity,
+          smSort:smSort, setSmSort:setSmSort,
+          smFrom:smFrom, setSmFrom:setSmFrom,
+          smTo:smTo, setSmTo:setSmTo,
+          cs:cs, fmtRp:fmtRp, profitColor:profitColor,
+        })
+      )
     )
   );
 }
