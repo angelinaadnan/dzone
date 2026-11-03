@@ -51044,7 +51044,7 @@ function ProfitDashboardPage() {
       React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:14}},'Periode: ',periodLabel,' • Diperbarui: ',new Date(perfData.generated_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})),
 
       // ── Business Analysis ──────────────────────────────────────────────────
-      React.createElement(BusinessAnalysis,{ perfData:perfData, prevPerfData:prevPerfData, ctotals:ctotals, periodLabel:periodLabel, perfMode:perfMode, selYear:selYear, selMonth:selMonth }),
+      sessionUser !== 'Santo' && React.createElement(BusinessAnalysis,{ perfData:perfData, prevPerfData:prevPerfData, ctotals:ctotals, periodLabel:periodLabel, perfMode:perfMode, selYear:selYear, selMonth:selMonth }),
 
       // ── Channel blocks ─────────────────────────────────────────────────────
       React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:20}},
