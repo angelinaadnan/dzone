@@ -50532,7 +50532,7 @@ function BusinessAnalysis(props) {
             })
           ),'#8b5cf6')
 
-      ).filter(Boolean),
+      ),
 
       // Do / Don't
       React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:16}},
@@ -50563,8 +50563,10 @@ function ProfitDashboardPage() {
   var now = new Date();
   // Period mode + selection
   var _pm = React.useState('monthly'); var perfMode = _pm[0]; var setPerfMode = _pm[1];
-  var _py = React.useState(now.getFullYear()); var selYear = _py[0]; var setSelYear = _py[1];
-  var _pmo = React.useState(now.getMonth()+1); var selMonth = _pmo[0]; var setSelMonth = _pmo[1];
+  var _defY = now.getMonth()===0?now.getFullYear()-1:now.getFullYear();
+  var _defM = now.getMonth()===0?12:now.getMonth();
+  var _py = React.useState(_defY); var selYear = _py[0]; var setSelYear = _py[1];
+  var _pmo = React.useState(_defM); var selMonth = _pmo[0]; var setSelMonth = _pmo[1];
   // Performance data
   var _pd = React.useState(null); var perfData = _pd[0]; var setPerfData = _pd[1];
   var _pl = React.useState(false); var perfLoading = _pl[0]; var setPerfLoading = _pl[1];
