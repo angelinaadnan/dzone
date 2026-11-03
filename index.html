@@ -4405,10 +4405,6 @@ function App() {
     id: 'branch_request',
     icon: '📦',
     label: 'Request Barang'
-  }, {
-    id: 'business_analyst',
-    icon: '🧠',
-    label: 'Business Analyst'
   }]) : role === 'cabang' ? ROLE_NAV[role].filter(function (n) {
     return n.id !== 'branch_request' || BRANCH_REQUEST_ALLOWED.includes(userName);
   }) : ROLE_NAV[role]).filter(function (n) {
