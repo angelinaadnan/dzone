@@ -50258,6 +50258,307 @@ function StockCalculatorPage() {
 }
 
 // ─── PERFORMANCE DASHBOARD ────────────────────────────────────────
+
+function BusinessAnalysis(props) {
+  var perfData=props.perfData, prevPerfData=props.prevPerfData, ctotals=props.ctotals;
+  var periodLabel=props.periodLabel, perfMode=props.perfMode;
+  var selYear=props.selYear, selMonth=props.selMonth;
+  var _open=React.useState(true); var open=_open[0]; var setOpen=_open[1];
+
+  if (!perfData || !perfData.rows || !perfData.rows.length) return null;
+
+  var rows=perfData.rows;
+  var BRANDS=['Lenovo','Advan','Asus','HP','Acer','Axioo','Viewsonic','MSI','Samsung','Zyrex','Dell','Dll'];
+  var CHANNELS=['Corporate','Retail','Online'];
+  var PREMIUM_BRANDS=['Dell','Viewsonic','MSI','HP'];
+
+  var fmt=function(v){if(v===null||v===undefined)return'—';var n=Number(v);return n>=1e9?(n/1e9).toFixed(2)+'M':n>=1e6?(n/1e6).toFixed(1)+'jt':Math.round(n).toLocaleString('id-ID');};
+  var fmtRp=function(v){return'Rp '+fmt(v);};
+  var pctDelta=function(cur,prev){if(!prev||prev===0)return null;return Math.round((cur-prev)/prev*100);};
+  var arw=function(d){return d===null?'':d>0?'▲':'▼';};
+  var arwColor=function(d){return d===null?'var(--text3)':d>0?'var(--green)':'var(--red)';};
+
+  // ── Brand aggregates (current) ──────────────────────────────────────────────
+  var brandMap={};
+  // Also track per-brand-per-channel for mismatch detection
+  var brandChanMap={};
+  rows.forEach(function(r){
+    if(!brandMap[r.brand]) brandMap[r.brand]={rev:0,qty:0,cogs:0,profit:0,revWac:0,hasCogs:false};
+    var b=brandMap[r.brand];
+    b.rev+=r.revenue_line||0; b.qty+=r.qty||0;
+    if(r.cogs!==null){b.cogs+=r.cogs||0;b.hasCogs=true;}
+    if(r.profit!==null){b.profit+=r.profit||0;b.revWac+=r.revenue_line||0;}
+    // brand×channel
+    var bck=r.brand+'|'+r.channel;
+    if(!brandChanMap[bck]) brandChanMap[bck]={brand:r.brand,channel:r.channel,rev:0,qty:0};
+    brandChanMap[bck].rev+=r.revenue_line||0;
+    brandChanMap[bck].qty+=r.qty||0;
+  });
+  BRANDS.forEach(function(b){if(!brandMap[b])brandMap[b]={rev:0,qty:0,cogs:0,profit:0,revWac:0,hasCogs:false};});
+
+  var totalRev=0,totalQty=0,totalProfit=0,totalRevWac=0,hasProfit=false;
+  BRANDS.forEach(function(b){
+    var bm=brandMap[b];
+    totalRev+=bm.rev; totalQty+=bm.qty;
+    if(bm.hasCogs){totalProfit+=bm.profit;totalRevWac+=bm.revWac;hasProfit=true;}
+  });
+  var overallMargin=hasProfit&&totalRevWac>0?Math.round(100*totalProfit/totalRevWac):null;
+
+  // ── Prev period aggregates ──────────────────────────────────────────────────
+  var prevBrandMap={};
+  var prevChanRevMap={};
+  if(prevPerfData&&prevPerfData.rows){
+    prevPerfData.rows.forEach(function(r){
+      if(!prevBrandMap[r.brand]) prevBrandMap[r.brand]={rev:0,qty:0};
+      prevBrandMap[r.brand].rev+=r.revenue_line||0;
+      prevBrandMap[r.brand].qty+=r.qty||0;
+      prevChanRevMap[r.channel]=(prevChanRevMap[r.channel]||0)+(r.revenue_line||0);
+    });
+  }
+  var hasPrev=prevPerfData&&prevPerfData.rows&&prevPerfData.rows.length>0;
+  var totalPrevRev=Object.values(prevChanRevMap).reduce(function(s,v){return s+v;},0);
+  var totalMoM=totalPrevRev>0?pctDelta(totalRev,totalPrevRev):null;
+
+  // ── Brand stats ─────────────────────────────────────────────────────────────
+  var brandStats=BRANDS.map(function(b){
+    var bm=brandMap[b]; if(!bm||bm.rev===0) return null;
+    var margin=bm.revWac>0?Math.round(100*bm.profit/bm.revWac):null;
+    var cogsPerUnit=bm.hasCogs&&bm.qty>0?Math.round(bm.cogs/bm.qty):null;
+    var profitPerUnit=bm.hasCogs&&bm.qty>0?Math.round(bm.profit/bm.qty):null;
+    var prevB=prevBrandMap[b]||null;
+    var revDelta=prevB&&prevB.rev>0?pctDelta(bm.rev,prevB.rev):null;
+    return {b:b,rev:bm.rev,qty:bm.qty,margin:margin,cogsPerUnit:cogsPerUnit,profitPerUnit:profitPerUnit,revDelta:revDelta,hasCogs:bm.hasCogs};
+  }).filter(Boolean);
+
+  // ── Brand quadrant ──────────────────────────────────────────────────────────
+  var qtyVals=brandStats.map(function(x){return x.qty;}).sort(function(a,b){return a-b;});
+  var medQty=qtyVals.length?qtyVals[Math.floor(qtyVals.length/2)]:1;
+  var marginVals=brandStats.filter(function(x){return x.margin!==null;}).map(function(x){return x.margin;}).sort(function(a,b){return a-b;});
+  var medMargin=marginVals.length?marginVals[Math.floor(marginVals.length/2)]:5;
+  var bintang=[],premium=[],volume=[],reviewQ=[];
+  brandStats.forEach(function(x){
+    if(x.margin===null) return;
+    var hi=x.qty>=medQty,hm=x.margin>=medMargin;
+    if(hi&&hm) bintang.push(x);
+    else if(!hi&&hm) premium.push(x);
+    else if(hi&&!hm) volume.push(x);
+    else reviewQ.push(x);
+  });
+
+  // ── Channel MoM ─────────────────────────────────────────────────────────────
+  var chanMoM=CHANNELS.map(function(ch){
+    var cur=(ctotals[ch]||{}).revenue||0;
+    var prev=prevChanRevMap[ch]||0;
+    var delta=prev>0?pctDelta(cur,prev):null;
+    return {ch:ch,cur:cur,prev:prev,delta:delta,margin:(ctotals[ch]||{}).margin};
+  });
+  var downChans=chanMoM.filter(function(x){return x.delta!==null&&x.delta<-5;});
+  var upChans=chanMoM.filter(function(x){return x.delta!==null&&x.delta>5;});
+  var brandDrops=brandStats.filter(function(x){return x.revDelta!==null&&x.revDelta<-15;}).sort(function(a,b){return a.revDelta-b.revDelta;}).slice(0,3);
+  var brandRise=brandStats.filter(function(x){return x.revDelta!==null&&x.revDelta>20;}).sort(function(a,b){return b.revDelta-a.revDelta;}).slice(0,2);
+
+  // ── 1. Concentration risk ───────────────────────────────────────────────────
+  var topBrandByRev=brandStats.slice().sort(function(a,b){return b.rev-a.rev;})[0];
+  var topBrandShare=topBrandByRev&&totalRev>0?Math.round(100*topBrandByRev.rev/totalRev):0;
+  var topChanMoM=chanMoM.slice().sort(function(a,b){return b.cur-a.cur;})[0];
+  var topChanShare=topChanMoM&&totalRev>0?Math.round(100*topChanMoM.cur/totalRev):0;
+  var concRisk=(topBrandShare>=50||topChanShare>=65);
+
+  // ── 2. Profit per unit ranking ──────────────────────────────────────────────
+  var profPerUnitRank=brandStats.filter(function(x){return x.profitPerUnit!==null&&x.profitPerUnit>0;})
+    .slice().sort(function(a,b){return b.profitPerUnit-a.profitPerUnit;}).slice(0,4);
+
+  // ── 3. Channel-brand mismatch ───────────────────────────────────────────────
+  var mismatches=[];
+  PREMIUM_BRANDS.forEach(function(pb){
+    var bm=brandMap[pb]; if(!bm||bm.rev===0) return;
+    var onlineRev=(brandChanMap[pb+'|Online']||{}).rev||0;
+    var onlinePct=bm.rev>0?Math.round(100*onlineRev/bm.rev):0;
+    if(onlinePct>=40) mismatches.push({brand:pb,pct:onlinePct});
+  });
+
+  // ── 4. Missing brands (existed last month, gone now) ───────────────────────
+  var missingBrands=[];
+  if(hasPrev){
+    BRANDS.forEach(function(b){
+      var hadPrev=prevBrandMap[b]&&prevBrandMap[b].rev>0;
+      var hasCur=brandMap[b]&&brandMap[b].rev>0;
+      if(hadPrev&&!hasCur) missingBrands.push({b:b,prevRev:prevBrandMap[b].rev});
+    });
+  }
+
+  // ── 5. Proyeksi akhir bulan ─────────────────────────────────────────────────
+  var proyeksi=null;
+  if(perfMode==='monthly'){
+    var nowD=new Date();
+    if(selYear===nowD.getFullYear()&&selMonth===nowD.getMonth()+1){
+      var daysPassed=nowD.getDate();
+      var daysInMonth=new Date(selYear,selMonth,0).getDate();
+      if(daysPassed>0&&daysPassed<daysInMonth){
+        var projRev=Math.round(totalRev/daysPassed*daysInMonth);
+        var projDelta=totalPrevRev>0?pctDelta(projRev,totalPrevRev):null;
+        proyeksi={projRev:projRev,daysPassed:daysPassed,daysInMonth:daysInMonth,projDelta:projDelta};
+      }
+    }
+  }
+
+  // ── Summary paragraph ────────────────────────────────────────────────────────
+  var top3Brands=brandStats.slice().sort(function(a,b){return b.rev-a.rev;}).slice(0,3).map(function(x){return x.b;});
+  var bestRevChan=chanMoM.slice().sort(function(a,b){return b.cur-a.cur;})[0];
+  var para='Periode '+periodLabel+': omzet '+fmtRp(totalRev)+', '+totalQty.toLocaleString('id-ID')+' unit.';
+  if(bestRevChan&&bestRevChan.cur>0) para+=' Channel terbesar: '+bestRevChan.ch+'.';
+  if(top3Brands.length) para+=' Brand terlaris: '+top3Brands.join(', ')+'.';
+  if(overallMargin!==null) para+=' Margin keseluruhan '+overallMargin+'%'+(overallMargin>=12?' (sehat ✓)':overallMargin>=7?' (cukup, perlu dijaga)':' — perlu perbaikan segera.');
+  if(perfMode==='monthly'&&hasPrev&&totalMoM!==null) para+=' Dibanding bulan lalu: '+(totalMoM>0?'+':'')+totalMoM+'%.';
+
+  // ── Action items ─────────────────────────────────────────────────────────────
+  var todos=[],donts=[];
+  if(bintang.length) todos.push('⭐ FOKUS pada '+bintang.map(function(x){return x.b+' ('+x.margin+'%)';}).join(', ')+' — margin bagus + volume tinggi. Prioritaskan stok dan promosi.');
+  if(premium.length) todos.push('💎 Stok tipis untuk '+premium.map(function(x){return x.b+' margin '+x.margin+'%'+(x.cogsPerUnit?' modal ±'+fmtRp(x.cogsPerUnit)+'/unit':'');}).join(' | ')+'. Jual sekali sudah untung besar — tapi hitung bunga stok jika tidak laku >30 hari.');
+  upChans.forEach(function(x){ todos.push('📈 Channel '+x.ch+' naik '+x.delta+'% MoM ('+fmtRp(x.cur)+') — momentum bagus, dorong lebih.'); });
+  brandRise.forEach(function(x){ todos.push('🚀 '+x.b+' naik '+x.revDelta+'% MoM — pastikan stok tidak kosong.'); });
+  var bestMChan=chanMoM.filter(function(x){return x.margin!==null;}).sort(function(a,b){return b.margin-a.margin;})[0];
+  if(bestMChan&&bestMChan.margin>=10) todos.push('Channel '+bestMChan.ch+' margin tertinggi ('+bestMChan.margin+'%) — arahkan lebih banyak transaksi ke sini.');
+  if(proyeksi&&proyeksi.projDelta!==null&&proyeksi.projDelta>0) todos.push('📅 Proyeksi bulan ini '+fmtRp(proyeksi.projRev)+' (hari ke-'+proyeksi.daysPassed+'/'+proyeksi.daysInMonth+') — '+(proyeksi.projDelta>0?'+'+proyeksi.projDelta+'%':proyeksi.projDelta+'%')+' vs bulan lalu. Pertahankan pace.');
+  if(!todos.length) todos.push('Pertahankan performa — monitor margin dan stok tiap minggu.');
+
+  if(volume.length) donts.push('⚡ '+volume.map(function(x){return x.b+' margin '+x.margin+'%';}).join(', ')+' — volume tinggi tapi margin tipis. Jangan beri diskon tambahan, risiko langsung merah.');
+  if(reviewQ.length) donts.push('🔴 '+reviewQ.map(function(x){return x.b;}).join(', ')+' — qty kecil, margin kecil. Jangan nambah stok tanpa ada kepastian order.');
+  downChans.forEach(function(x){ donts.push('⚠️ Channel '+x.ch+' turun '+Math.abs(x.delta)+'% MoM — selidiki penyebabnya, jangan tunggu bulan depan.'); });
+  brandDrops.forEach(function(x){ donts.push('📉 '+x.b+' turun '+Math.abs(x.revDelta)+'% MoM — jangan tambah stok dulu.'); });
+  mismatches.forEach(function(x){ donts.push('🏷️ '+x.brand+' '+x.pct+'% terjual di Online — brand premium ini harga bersaing rendah di marketplace. Jangan pasang harga di bawah harga distributor untuk channel ini.'); });
+  missingBrands.forEach(function(x){ donts.push('👻 '+x.b+' tidak ada penjualan bulan ini (bulan lalu ada '+fmtRp(x.prevRev)+') — cek apakah stok habis, atau customer pindah ke kompetitor.'); });
+  if(concRisk) donts.push((topBrandShare>=50?'Brand '+topBrandByRev.b+' ('+topBrandShare+'% omzet)':'Channel '+topChanMoM.ch+' ('+topChanShare+'% omzet)')+' terlalu dominan — risiko konsentrasi tinggi. Diversifikasi sebelum terjadi gangguan suplai/demand.');
+  if(proyeksi&&proyeksi.projDelta!==null&&proyeksi.projDelta<-10) donts.push('📅 Proyeksi akhir bulan '+fmtRp(proyeksi.projRev)+' — masih '+Math.abs(proyeksi.projDelta)+'% di bawah bulan lalu. Perlu akselerasi di '+Math.round(proyeksi.daysInMonth-proyeksi.daysPassed)+' hari tersisa.');
+  if(!donts.length) donts.push('Jangan longgarkan approval diskon tanpa persetujuan — margin perlu dijaga ketat.');
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  var dotStyle={display:'flex',gap:8,alignItems:'flex-start',marginBottom:8,fontSize:13,lineHeight:'1.55'};
+  var insightCard=function(icon,title,body,accent){
+    return React.createElement('div',{style:{background:'var(--bg3)',borderRadius:10,padding:'12px 14px',border:'1px solid var(--border)',borderLeft:'3px solid '+(accent||'rgba(108,99,255,0.4)')}},
+      React.createElement('div',{style:{fontWeight:700,fontSize:12,marginBottom:5,display:'flex',alignItems:'center',gap:6}},
+        React.createElement('span',null,icon),
+        React.createElement('span',{style:{color:'var(--text2)',textTransform:'uppercase',letterSpacing:'0.05em'}},title)
+      ),
+      React.createElement('div',{style:{fontSize:13,color:'var(--text)',lineHeight:'1.55'}},body)
+    );
+  };
+
+  return React.createElement('div',{style:{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:14,marginBottom:20,overflow:'hidden'}},
+
+    // Header
+    React.createElement('div',{
+      style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 18px',cursor:'pointer',userSelect:'none'},
+      onClick:function(){setOpen(!open);}},
+      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}},
+        React.createElement('span',{style:{fontSize:16}},'💡'),
+        React.createElement('span',{style:{fontWeight:700,fontSize:14,color:'var(--text)'}},'Analisa Bisnis — ',periodLabel),
+        perfMode==='monthly'&&hasPrev&&totalMoM!==null&&React.createElement('span',{style:{fontSize:12,fontWeight:700,color:arwColor(totalMoM),padding:'2px 8px',borderRadius:20,background:totalMoM>0?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)'}},arw(totalMoM),' ',Math.abs(totalMoM)+'% MoM')
+      ),
+      React.createElement('span',{style:{color:'var(--text3)',fontSize:13}},open?'▲':'▼')
+    ),
+
+    open && React.createElement('div',{style:{padding:'0 18px 18px'}},
+
+      // Summary paragraph
+      React.createElement('p',{style:{fontSize:13,lineHeight:'1.7',color:'var(--text)',margin:'0 0 16px',padding:'12px 14px',background:'var(--bg3)',borderRadius:10,borderLeft:'3px solid rgba(108,99,255,0.5)'}},para),
+
+      // MoM channel cards
+      perfMode==='monthly'&&hasPrev&&React.createElement('div',{style:{display:'flex',gap:10,flexWrap:'wrap',marginBottom:16}},
+        chanMoM.map(function(x){
+          return React.createElement('div',{key:x.ch,style:{flex:1,minWidth:120,background:'var(--bg3)',borderRadius:9,padding:'10px 12px',border:'1px solid var(--border)'}},
+            React.createElement('div',{style:{fontSize:10,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:4}},x.ch),
+            React.createElement('div',{style:{fontSize:14,fontWeight:700,fontFamily:'DM Mono, monospace',color:'var(--text)'}},fmtRp(x.cur)),
+            React.createElement('div',{style:{fontSize:11,color:x.delta!==null?arwColor(x.delta):'var(--text3)',marginTop:2,fontWeight:600}},
+              x.delta!==null?(arw(x.delta)+' '+Math.abs(x.delta)+'% vs lalu'):'—',
+              x.margin!==null&&React.createElement('span',{style:{color:'var(--text3)',fontWeight:400,marginLeft:6}},'margin '+x.margin+'%'))
+          );
+        })
+      ),
+
+      // Insight cards grid
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:12,marginBottom:16}},
+
+        // Profit per unit
+        profPerUnitRank.length>0&&insightCard('💰','Profit per Unit',
+          React.createElement('div',null,
+            React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:6}},'Yang paling menguntungkan per unit terjual:'),
+            profPerUnitRank.map(function(x,i){
+              return React.createElement('div',{key:x.b,style:{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:'1px solid var(--border)',fontSize:12}},
+                React.createElement('span',{style:{fontWeight:i===0?700:400}},x.b),
+                React.createElement('span',{style:{fontFamily:'DM Mono, monospace',color:'var(--green)',fontWeight:600}},'+'+fmtRp(x.profitPerUnit)+'/unit')
+              );
+            }),
+            React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6,fontStyle:'italic'}},'Margin % tinggi ≠ profit besar jika harga jual rendah.')
+          ),'#16a34a'),
+
+        // Concentration risk
+        concRisk&&insightCard('⚠️','Risiko Konsentrasi',
+          React.createElement('div',null,
+            topBrandShare>=50&&React.createElement('div',{style:{marginBottom:4}},'Brand ',React.createElement('strong',null,topBrandByRev.b),' menyumbang ',React.createElement('strong',null,topBrandShare+'%'),' dari total omzet. Kalau supplier naik harga atau stok habis, langsung berdampak besar.'),
+            topChanShare>=65&&React.createElement('div',null,'Channel ',React.createElement('strong',null,topChanMoM.ch),' menyumbang ',React.createElement('strong',null,topChanShare+'%'),' revenue. Diversifikasi channel perlu dipertimbangkan.')
+          ),'#f59e0b'),
+
+        // Proyeksi
+        proyeksi&&insightCard('📅','Proyeksi Bulan Ini',
+          React.createElement('div',null,
+            React.createElement('div',{style:{fontSize:15,fontWeight:700,fontFamily:'DM Mono, monospace',marginBottom:4}},fmtRp(proyeksi.projRev)),
+            React.createElement('div',{style:{fontSize:12,color:'var(--text3)',marginBottom:6}},'Berdasarkan hari ke-'+proyeksi.daysPassed+' dari '+proyeksi.daysInMonth+' hari'),
+            proyeksi.projDelta!==null&&React.createElement('div',{style:{fontSize:12,fontWeight:700,color:arwColor(proyeksi.projDelta)}},arw(proyeksi.projDelta),' '+(proyeksi.projDelta>0?'+':'')+proyeksi.projDelta+'% vs bulan lalu')
+          ),proyeksi.projDelta!==null&&proyeksi.projDelta>0?'#16a34a':'#f59e0b'),
+
+        // Missing brands
+        missingBrands.length>0&&insightCard('👻','Hilang Bulan Ini',
+          React.createElement('div',null,
+            React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:6}},'Ada penjualan bulan lalu, tidak ada bulan ini:'),
+            missingBrands.map(function(x){
+              return React.createElement('div',{key:x.b,style:{display:'flex',justifyContent:'space-between',fontSize:12,padding:'2px 0'}},
+                React.createElement('strong',null,x.b),
+                React.createElement('span',{style:{color:'var(--text3)'}},fmtRp(x.prevRev)+' bulan lalu')
+              );
+            }),
+            React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginTop:6,fontStyle:'italic'}},'Cek: stok habis, harga tidak kompetitif, atau customer pindah?')
+          ),'#ef4444'),
+
+        // Channel-brand mismatch
+        mismatches.length>0&&insightCard('🏷️','Brand Premium di Online',
+          React.createElement('div',null,
+            React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:6}},'Brand enterprise yang banyak terjual di marketplace:'),
+            mismatches.map(function(x){
+              return React.createElement('div',{key:x.brand,style:{fontSize:12,marginBottom:4}},
+                React.createElement('strong',null,x.brand),': ',x.pct,'% revenue dari channel Online.',
+                React.createElement('span',{style:{color:'var(--text3)',marginLeft:4,fontSize:11}},'Hati-hati perang harga — bisa rusak positioning Corporate.')
+              );
+            })
+          ),'#8b5cf6')
+
+      ).filter(Boolean),
+
+      // Do / Don't
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:16}},
+        React.createElement('div',null,
+          React.createElement('div',{style:{fontWeight:700,fontSize:11,color:'var(--green)',letterSpacing:'0.07em',textTransform:'uppercase',marginBottom:10}},'✅ Yang Perlu Dilakukan'),
+          todos.map(function(t,i){
+            return React.createElement('div',{key:i,style:dotStyle},
+              React.createElement('span',{style:{marginTop:3,flexShrink:0,fontSize:9,lineHeight:1,padding:'2px 5px',borderRadius:3,background:'rgba(34,197,94,0.15)',color:'var(--green)',fontWeight:700}},i+1),
+              React.createElement('span',{style:{color:'var(--text)'}},t)
+            );
+          })
+        ),
+        React.createElement('div',null,
+          React.createElement('div',{style:{fontWeight:700,fontSize:11,color:'var(--red)',letterSpacing:'0.07em',textTransform:'uppercase',marginBottom:10}},'🚫 Yang Harus Dihindari'),
+          donts.map(function(t,i){
+            return React.createElement('div',{key:i,style:dotStyle},
+              React.createElement('span',{style:{marginTop:3,flexShrink:0,fontSize:9,lineHeight:1,padding:'2px 5px',borderRadius:3,background:'rgba(239,68,68,0.15)',color:'var(--red)',fontWeight:700}},i+1),
+              React.createElement('span',{style:{color:'var(--text)'}},t)
+            );
+          })
+        )
+      )
+    )
+  );
+}
+
 function ProfitDashboardPage() {
   var now = new Date();
   // Period mode + selection
@@ -50323,15 +50624,18 @@ function ProfitDashboardPage() {
       .finally(function() { setAuthLoading(false); });
   }, [sessionUser]);
 
+  // Previous period data for MoM comparison
+  var _ppd = React.useState(null); var prevPerfData = _ppd[0]; var setPrevPerfData = _ppd[1];
+
   function clearToken() {
     try { sessionStorage.removeItem('profit_jwt'); } catch(_) {}
-    setProfitJwt(null); setPerfData(null); setPerfErr(null); setProfitData(null); setAuthErr(null);
+    setProfitJwt(null); setPerfData(null); setPerfErr(null); setProfitData(null); setPrevPerfData(null); setAuthErr(null);
   }
 
-  // Fetch performance data when mode/year/month or jwt changes
+  // Fetch performance data + prev period (for MoM) when mode/year/month or jwt changes
   React.useEffect(function() {
     if (!profitJwt) return;
-    setPerfLoading(true); setPerfErr(null); setPerfData(null);
+    setPerfLoading(true); setPerfErr(null); setPerfData(null); setPrevPerfData(null);
     var qs;
     if (perfMode === 'quarterly') {
       qs = 'year=' + selYear + '&mode=quarterly';
@@ -50340,7 +50644,7 @@ function ProfitDashboardPage() {
     } else {
       qs = 'year=' + selYear + '&month=' + selMonth;
     }
-    fetch('/api/performance-dashboard?' + qs, { headers: { 'Authorization': 'Bearer ' + profitJwt } })
+    var mainFetch = fetch('/api/performance-dashboard?' + qs, { headers: { 'Authorization': 'Bearer ' + profitJwt } })
       .then(function(r) {
         if (r.status === 401 || r.status === 403) { clearToken(); return r.json().then(function(d){ throw new Error(d.error || 'Sesi berakhir.'); }); }
         if (!r.ok) return r.json().then(function(d){ throw new Error(d.error || 'HTTP ' + r.status); });
@@ -50349,6 +50653,15 @@ function ProfitDashboardPage() {
       .then(function(d) { if (d && d.error) throw new Error(d.error); setPerfData(d); })
       .catch(function(e) { setPerfErr(e.message); })
       .finally(function() { setPerfLoading(false); });
+    // Fetch previous month silently for MoM (monthly mode only)
+    if (perfMode === 'monthly') {
+      var py = selYear, pm = selMonth - 1;
+      if (pm < 1) { pm = 12; py--; }
+      fetch('/api/performance-dashboard?year=' + py + '&month=' + pm, { headers: { 'Authorization': 'Bearer ' + profitJwt } })
+        .then(function(r) { if (!r.ok) return null; return r.json(); })
+        .then(function(d) { if (d && !d.error) setPrevPerfData(d); })
+        .catch(function() {});
+    }
   }, [perfMode, selYear, selMonth, profitJwt]);
 
   // Lazy-load detail profit when expanded (monthly only)
@@ -50727,6 +51040,9 @@ function ProfitDashboardPage() {
     perfData && React.createElement(React.Fragment,null,
 
       React.createElement('div',{style:{fontSize:11,color:'var(--text3)',marginBottom:14}},'Periode: ',periodLabel,' • Diperbarui: ',new Date(perfData.generated_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})),
+
+      // ── Business Analysis ──────────────────────────────────────────────────
+      React.createElement(BusinessAnalysis,{ perfData:perfData, prevPerfData:prevPerfData, ctotals:ctotals, periodLabel:periodLabel, perfMode:perfMode, selYear:selYear, selMonth:selMonth }),
 
       // ── Channel blocks ─────────────────────────────────────────────────────
       React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:20}},
