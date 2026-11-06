@@ -51096,6 +51096,7 @@ function ProfitDashboardPage() {
                   ),
                   React.createElement('tbody',null,
                     BRANDS.filter(function(b){return map[b];}).sort(function(a,b){
+                      if(a==='Dll')return 1;if(b==='Dll')return -1;
                       var aq=Object.values(map[a]||{}).reduce(function(s,c){return s+(c.qty||0);},0);
                       var bq=Object.values(map[b]||{}).reduce(function(s,c){return s+(c.qty||0);},0);
                       return bq-aq;
@@ -51131,7 +51132,7 @@ function ProfitDashboardPage() {
                     React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Margin')
                   )),
                   React.createElement('tbody',null,
-                    BRANDS.filter(function(b){return bmap[b]&&bmap[b].qty>0;}).sort(function(a,b){return (bmap[b].qty||0)-(bmap[a].qty||0);}).map(function(b){
+                    BRANDS.filter(function(b){return bmap[b]&&bmap[b].qty>0;}).sort(function(a,b){if(a==='Dll')return 1;if(b==='Dll')return -1;return (bmap[b].qty||0)-(bmap[a].qty||0);}).map(function(b){
                       var r=bmap[b]; if(!r) return null;
                       var margin=r.has_wac&&r.revenue_wac>0?Math.round(1000*r.profit/r.revenue_wac)/10:null;
                       return React.createElement('tr',{key:b},
@@ -51209,7 +51210,7 @@ function ProfitDashboardPage() {
               React.createElement('tbody',null,
                 (function(){
                   var allBs=brandSummary('all'); var allBmap=allBs.byBrand;
-                  return BRANDS.filter(function(b){return allBmap[b]&&allBmap[b].qty>0;}).sort(function(a,b2){return (allBmap[b2].qty||0)-(allBmap[a].qty||0);}).map(function(b){
+                  return BRANDS.filter(function(b){return allBmap[b]&&allBmap[b].qty>0;}).sort(function(a,b2){if(a==='Dll')return 1;if(b2==='Dll')return -1;return (allBmap[b2].qty||0)-(allBmap[a].qty||0);}).map(function(b){
                     var hasAny=false;
                     var cells=CHANNELS.map(function(ch){
                       var bs2=brandSummary(ch); var bmap2=bs2.byBrand;
