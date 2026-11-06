@@ -51095,7 +51095,11 @@ function ProfitDashboardPage() {
                     )
                   ),
                   React.createElement('tbody',null,
-                    BRANDS.map(function(b){
+                    BRANDS.filter(function(b){return map[b];}).sort(function(a,b){
+                      var aq=Object.values(map[a]||{}).reduce(function(s,c){return s+(c.qty||0);},0);
+                      var bq=Object.values(map[b]||{}).reduce(function(s,c){return s+(c.qty||0);},0);
+                      return bq-aq;
+                    }).map(function(b){
                       var bm=map[b]; if(!bm&&!Object.keys(map).some(function(k){return k===b;})) return null;
                       return React.createElement('tr',{key:b},
                         React.createElement('td',{style:Object.assign({},td,{fontWeight:500})},b),
@@ -51127,7 +51131,7 @@ function ProfitDashboardPage() {
                     React.createElement('th',{style:Object.assign({},th,{textAlign:'right'})},'Margin')
                   )),
                   React.createElement('tbody',null,
-                    BRANDS.map(function(b){
+                    BRANDS.filter(function(b){return bmap[b]&&bmap[b].qty>0;}).sort(function(a,b){return (bmap[b].qty||0)-(bmap[a].qty||0);}).map(function(b){
                       var r=bmap[b]; if(!r) return null;
                       var margin=r.has_wac&&r.revenue_wac>0?Math.round(1000*r.profit/r.revenue_wac)/10:null;
                       return React.createElement('tr',{key:b},
@@ -51203,24 +51207,27 @@ function ProfitDashboardPage() {
                 ];})
               )),
               React.createElement('tbody',null,
-                BRANDS.map(function(b){
-                  var hasAny=false;
-                  var cells=CHANNELS.map(function(ch){
-                    var bs2=brandSummary(ch); var bmap2=bs2.byBrand;
-                    var r=bmap2[b];
-                    if(r) hasAny=true;
-                    var margin=r&&r.has_wac&&r.revenue_wac>0?Math.round(1000*r.profit/r.revenue_wac)/10:null;
-                    return [
-                      React.createElement('td',{key:ch+':r',style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},r?fmtRp(r.revenue):'—'),
-                      React.createElement('td',{key:ch+':m',style:Object.assign({},td,{textAlign:'right',color:margin!==null?profitColor(margin):'var(--text3)'})},margin!==null?margin+'%':'—'),
-                    ];
+                (function(){
+                  var allBs=brandSummary('all'); var allBmap=allBs.byBrand;
+                  return BRANDS.filter(function(b){return allBmap[b]&&allBmap[b].qty>0;}).sort(function(a,b2){return (allBmap[b2].qty||0)-(allBmap[a].qty||0);}).map(function(b){
+                    var hasAny=false;
+                    var cells=CHANNELS.map(function(ch){
+                      var bs2=brandSummary(ch); var bmap2=bs2.byBrand;
+                      var r=bmap2[b];
+                      if(r) hasAny=true;
+                      var margin=r&&r.has_wac&&r.revenue_wac>0?Math.round(1000*r.profit/r.revenue_wac)/10:null;
+                      return [
+                        React.createElement('td',{key:ch+':r',style:Object.assign({},td,{textAlign:'right',fontFamily:'DM Mono, monospace'})},r?fmtRp(r.revenue):'—'),
+                        React.createElement('td',{key:ch+':m',style:Object.assign({},td,{textAlign:'right',color:margin!==null?profitColor(margin):'var(--text3)'})},margin!==null?margin+'%':'—'),
+                      ];
+                    });
+                    if(!hasAny) return null;
+                    return React.createElement('tr',{key:b},
+                      React.createElement('td',{style:Object.assign({},td,{fontWeight:500})},b),
+                      cells
+                    );
                   });
-                  if(!hasAny) return null;
-                  return React.createElement('tr',{key:b},
-                    React.createElement('td',{style:Object.assign({},td,{fontWeight:500})},b),
-                    cells
-                  );
-                })
+                })()
               )
             )
           )
@@ -51292,11 +51299,10 @@ function SalesMatrixTab(p) {
   var rows = smData ? (smEntity==='adl'?smData.adl : smEntity==='group'?smData.group : smData.combined) : [];
   var months = smData ? smData.months : [];
 
-  // Sort by total profit last month desc
-  var lastMonth = months.length>0 ? months[months.length-1] : null;
+  // Sort by total profit across all months desc
   rows = (rows||[]).slice().sort(function(a,b) {
-    var av = a.by_month&&a.by_month[lastMonth] ? (a.by_month[lastMonth].profit||0) : -Infinity;
-    var bv = b.by_month&&b.by_month[lastMonth] ? (b.by_month[lastMonth].profit||0) : -Infinity;
+    var av = months.reduce(function(s,m){return s+((a.by_month&&a.by_month[m]&&a.by_month[m].profit)||0);},0);
+    var bv = months.reduce(function(s,m){return s+((b.by_month&&b.by_month[m]&&b.by_month[m].profit)||0);},0);
     return bv - av;
   });
 
