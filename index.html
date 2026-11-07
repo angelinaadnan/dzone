@@ -49360,7 +49360,10 @@ function DocArchivePage(props) {
           if (r.status === 401) clearToken();
           return r.json().then(function(d){ throw new Error(d.error || 'HTTP '+r.status); });
         }
-        return r.json();
+        return r.json().then(function(d) {
+          if (!r.ok && d && d.error) throw new Error(d.error);
+          return d;
+        });
       });
   }
 
@@ -50015,6 +50018,8 @@ function DocArchivePage(props) {
               setQsResult(d);
               showToast(d.message, 'ok');
               apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+            } else {
+              setQsErr(d.error || 'Gagal submit. Coba lagi.');
             }
           })
           .catch(function(e){ setQsErr(e.message); })
