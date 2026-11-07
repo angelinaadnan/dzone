@@ -89,12 +89,21 @@ async function handleRequest(context) {
       signal: AbortSignal.timeout(60000),
     });
 
-    const resBody = await upstreamRes.arrayBuffer();
-    const resHeaders = { ...CORS };
-    const ct = upstreamRes.headers.get('Content-Type');
-    if (ct) resHeaders['Content-Type'] = ct;
+    const resText = await upstreamRes.text();
+    const resHeaders = { ...CORS, 'Content-Type': 'application/json' };
 
-    return new Response(resBody, { status: upstreamRes.status, headers: resHeaders });
+    // Validate that the upstream returned JSON — Cloudflare Tunnel errors arrive as plain text
+    try {
+      JSON.parse(resText);
+    } catch (_) {
+      const preview = resText.trim().slice(0, 120);
+      return new Response(
+        JSON.stringify({ error: `Koneksi ke server gagal sementara. Coba lagi. (${preview})` }),
+        { status: 502, headers: resHeaders }
+      );
+    }
+
+    return new Response(resText, { status: upstreamRes.status, headers: resHeaders });
   } catch (e) {
     return new Response(JSON.stringify({ error: `Connector error: ${e.message}` }), { status:502, headers:CORS });
   }
