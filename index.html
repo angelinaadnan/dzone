@@ -49278,7 +49278,7 @@ function DocArchivePage(props) {
   var _l7 = React.useState(''); var filterStatus = _l7[0]; var setFilterStatus = _l7[1];
   var _l8 = React.useState(''); var filterTransNumber = _l8[0]; var setFilterTransNumber = _l8[1];
   var _l9 = React.useState(''); var filterOwner = _l9[0]; var setFilterOwner = _l9[1];
-  var _l10 = React.useState('2026-11-01'); var filterDateFrom = _l10[0]; var setFilterDateFrom = _l10[1];
+  var _l10 = React.useState('2026-10-01'); var filterDateFrom = _l10[0]; var setFilterDateFrom = _l10[1];
   var _l11 = React.useState(''); var filterDateTo = _l11[0]; var setFilterDateTo = _l11[1];
   var _l12 = React.useState(''); var filterSjNo = _l12[0]; var setFilterSjNo = _l12[1];
   // Claim modal state (for unclaimed PI rows)
@@ -49884,7 +49884,7 @@ function DocArchivePage(props) {
             style:Object.assign({},inputStyle,{width:130}) }),
           activeFilters && btn('× Reset', function(){
             setFilterStatus(''); setFilterTransNumber(''); setFilterOwner(''); setFilterDateTo('');
-            setFilterDateFrom('2026-11-01'); setFilterSjNo && setFilterSjNo(''); setListPage(1);
+            setFilterDateFrom('2026-10-01'); setFilterSjNo && setFilterSjNo(''); setListPage(1);
           }, { fontSize:11, color:'var(--text3)', background:'transparent', border:'1px solid var(--border)' }),
           React.createElement('span',{style:{fontSize:12,color:'var(--text3)',marginLeft:'auto'}}, listTotal + ' transaksi')
         ),
