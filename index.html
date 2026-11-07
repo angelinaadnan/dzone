@@ -49367,11 +49367,16 @@ function DocArchivePage(props) {
       });
   }
 
+  function loadSummary() {
+    var qs = filterDateFrom ? '?dateFrom=' + filterDateFrom + (filterDateTo ? '&dateTo=' + filterDateTo : '') : '';
+    apiCall('/summary' + qs).then(function(d) { setSummary(d.summary || null); }).catch(function(){});
+  }
+
   // ── Load summary ──────────────────────────────────────────────────────────
   React.useEffect(function() {
     if (!jwt) return;
-    apiCall('/summary').then(function(d) { setSummary(d.summary || null); }).catch(function(){});
-  }, [jwt]);
+    loadSummary();
+  }, [jwt, filterDateFrom, filterDateTo]);
 
   // ── On-demand PI sync saat halaman dibuka ─────────────────────────────────
   // Trigger incremental sync ke Accurate sehingga PI terbaru langsung muncul
@@ -49380,7 +49385,7 @@ function DocArchivePage(props) {
     if (!jwt) return;
     apiCall('/sync/pi', { method: 'POST' }).catch(function(){});
     var t = setTimeout(function() {
-      apiCall('/summary').then(function(d) { setSummary(d.summary || null); }).catch(function(){});
+      loadSummary();
       setSyncTick(function(v) { return v + 1; }); // trigger list reload
     }, 4000);
     return function() { clearTimeout(t); };
@@ -49428,7 +49433,7 @@ function DocArchivePage(props) {
         if (d.ok) {
           showToast(d.alreadyClaimed ? 'PI sudah diklaim sebelumnya.' : 'PI berhasil diklaim!', 'ok');
           setPiResults(null); setPiQ(''); setView('list'); setListPage(1);
-          apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+          loadSummary();
         }
       })
       .catch(function(e) { showToast(e.message, 'error'); });
@@ -49454,7 +49459,7 @@ function DocArchivePage(props) {
             showToast('File berhasil diupload!', 'ok');
             setUploadDocType('');
             loadDetail(txId); // reload detail
-            apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+            loadSummary();
           }
         })
         .catch(function(e) { setUploadErr(e.message); showToast(e.message, 'error'); })
@@ -49548,7 +49553,7 @@ function DocArchivePage(props) {
       .then(function(d) {
         if (d.ok) {
           showToast(d.alreadyClaimed ? 'PI sudah diklaim sebelumnya.' : 'PI berhasil diklaim!', 'ok');
-          apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+          loadSummary();
           loadDetail(d.transactionId);
         }
       })
@@ -49558,7 +49563,7 @@ function DocArchivePage(props) {
   function refreshList() {
     setListPage(1);
     // trigger useEffect by toggling a dummy — just reload summary and reset page
-    apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+    loadSummary();
   }
 
   // ── Styles ────────────────────────────────────────────────────────────────
@@ -50017,7 +50022,7 @@ function DocArchivePage(props) {
             if (d.ok) {
               setQsResult(d);
               showToast(d.message, 'ok');
-              apiCall('/summary').then(function(s){ setSummary(s.summary||null); }).catch(function(){});
+              loadSummary();
             } else {
               setQsErr(d.error || 'Gagal submit. Coba lagi.');
             }
