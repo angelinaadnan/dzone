@@ -735,6 +735,12 @@ var CABANG_NAMES = USER_ACCOUNTS.filter(function (u) {
 }).map(function (u) {
   return u.name;
 });
+// Tim penawaran: anggota 1 tim bisa lihat & proses penawaran satu sama lain
+var SALES_TEAMS = [['Tio', 'Salsa']];
+function getQuotTeammates(salesName) {
+  var team = SALES_TEAMS.find(function (t) { return t.includes(salesName); });
+  return team ? team.filter(function (n) { return n !== salesName; }) : [];
+}
 // Kategorisasi order: 'online' | 'offline' | 'cabang' | 'other'
 function getOrderSource(o) {
   if ((o.info_tambahan || '').includes('[Titip Kirim dari Cabang:')) return 'cabang';
@@ -17591,9 +17597,10 @@ function QuotationPage(_ref124) {
     sigPreview = _React$useState216[0],
     setSigPreview = _React$useState216[1];
 
-  // Supervisor lihat semua, sales hanya lihat punya sendiri
+  // Supervisor lihat semua; anggota tim bisa lihat penawaran satu sama lain
+  var _quotTeammates = getQuotTeammates(salesName);
   var myQ = supervisorMode ? quotations || [] : (quotations || []).filter(function (q) {
-    return q.sales_name === salesName;
+    return q.sales_name === salesName || _quotTeammates.includes(q.sales_name);
   });
   var filtered = filterStatus === 'all' ? myQ : myQ.filter(function (q) {
     return q.status === filterStatus;
@@ -17634,7 +17641,7 @@ function QuotationPage(_ref124) {
           case 8:
             order = {
               date: new Date().toISOString().split('T')[0],
-              sales_name: freshQ.sales_name,
+              sales_name: salesName,
               customer_name: freshQ.customer_name,
               customer_phone: freshQ.customer_phone || '',
               customer_address: freshQ.customer_address || '',
@@ -17958,7 +17965,7 @@ function QuotationPage(_ref124) {
         color: 'var(--text3)'
       }
     }, "Berlaku ", q.validity_days || 7, " hari"))), function () {
-      var isOwner = q.sales_name === salesName || supervisorMode;
+      var isOwner = q.sales_name === salesName || supervisorMode || getQuotTeammates(salesName).includes(q.sales_name);
       var canEdit = isOwner && !['converted', 'rejected'].includes(q.status);
       var canConvert = isOwner && ['draft', 'sent', 'approved'].includes(q.status);
       return /*#__PURE__*/React.createElement("div", {
