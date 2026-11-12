@@ -4486,7 +4486,8 @@ function App() {
   }), realtimeLive ? 'Live' : 'Offline'))), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '12px 0',
-      flex: 1
+      flex: 1,
+      overflowY: 'auto'
     }
   }, navItems.filter(function(n) {
     if (n._inSection === 'accurate') return accurateOpen;
