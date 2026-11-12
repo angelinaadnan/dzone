@@ -4413,6 +4413,7 @@ function App() {
     { id: 'tarik_pricelist', icon: '🗒️', label: 'Tarik Pricelist', _inSection: 'accurate' },
     { id: 'revisi_kode_pelanggan', icon: '🔧', label: 'Revisi Data Accurate', _inSection: 'accurate' },
     { id: 'tanya_kode_sku', icon: '🏷️', label: 'Tanya Kode Barang', _inSection: 'accurate' },
+    { id: 'cek_item_transfer', icon: '📦', label: 'Cek Item Transfer', _inSection: 'accurate' },
   ].concat(CEK_INVOICE_USERS.includes(userName) ? [{ id: 'cek_sales_invoice', icon: '🧾', label: 'Cek Sales Invoice', _inSection: 'accurate' }] : [])
   : (TANYA_SKU_ROLES.includes(role) ? [
     { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
@@ -4908,7 +4909,7 @@ function App() {
     userName: userName,
     role: role,
     demoMode: demoMode
-  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null), page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(TarikPricelistPage, null), page === 'revisi_kode_pelanggan' && /*#__PURE__*/React.createElement(RevisiKodePelangganPage, null), CEK_INVOICE_USERS.includes(userName) && page === 'cek_sales_invoice' && /*#__PURE__*/React.createElement(CekSalesInvoicePage, null), page === 'tanya_kode_sku' && /*#__PURE__*/React.createElement(TanyaKodeSKUPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
+  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null), page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(TarikPricelistPage, null), page === 'revisi_kode_pelanggan' && /*#__PURE__*/React.createElement(RevisiKodePelangganPage, null), CEK_INVOICE_USERS.includes(userName) && page === 'cek_sales_invoice' && /*#__PURE__*/React.createElement(CekSalesInvoicePage, null), ACCURATE_USERS.includes(userName) && page === 'cek_item_transfer' && /*#__PURE__*/React.createElement(CekItemTransferPage, null), page === 'tanya_kode_sku' && /*#__PURE__*/React.createElement(TanyaKodeSKUPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
     order: selectedOrder,
     onClose: function onClose() {
       return setSelectedOrder(null);
@@ -49417,6 +49418,98 @@ function CekSalesInvoicePage() {
           )
         )
       )
+    )
+  );
+}
+
+// ─── CEK ITEM TRANSFER PAGE ──────────────────────────────────────
+function CekItemTransferPage() {
+  var _e = React.useState('adl'); var entity = _e[0]; var setEntity = _e[1];
+  var _d = React.useState(null); var data = _d[0]; var setData = _d[1];
+  var _l = React.useState(false); var loading = _l[0]; var setLoading = _l[1];
+  var _er = React.useState(null); var err = _er[0]; var setErr = _er[1];
+
+  function load(ent) {
+    var e = ent || entity;
+    setLoading(true); setErr(null); setData(null);
+    fetch(RKP_CONNECTOR + '/api/accurate/item-transfer-audit?entity=' + e, { headers: { 'X-API-Key': RKP_API_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { if (d.error) throw new Error(d.error); setData(d); })
+      .catch(function(e2) { setErr(e2.message); })
+      .finally(function() { setLoading(false); });
+  }
+
+  React.useEffect(function() { load('adl'); }, []);
+
+  function switchEntity(ent) { setEntity(ent); load(ent); }
+
+  var items = data ? (data.items || []) : [];
+  var STATUS_COLOR = { 'Sending': '#d97706', 'Partially Received': '#dc2626' };
+
+  return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 1100, margin: '0 auto' } },
+
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
+      React.createElement('h2', { style: { fontSize: 18, fontWeight: 700, margin: 0, flex: 1 } }, '📦 Cek Item Transfer'),
+      React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, 'Gantung > H-3')
+    ),
+
+    React.createElement('div', { style: { display: 'flex', gap: 6, marginBottom: 20 } },
+      ['adl', 'group'].map(function(e) {
+        return React.createElement('button', {
+          key: e, onClick: function() { switchEntity(e); },
+          style: { padding: '7px 20px', borderRadius: 8, border: entity === e ? 'none' : '1px solid var(--border)', background: entity === e ? '#2563eb' : 'var(--surface)', color: entity === e ? '#fff' : 'var(--text1)', fontWeight: entity === e ? 700 : 400, fontSize: 13, cursor: 'pointer' }
+        }, e === 'adl' ? 'PT ADL' : 'GROUP');
+      }),
+      React.createElement('button', {
+        onClick: function() { load(entity); }, disabled: loading,
+        style: { padding: '7px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, cursor: 'pointer', color: 'var(--text1)', marginLeft: 'auto' }
+      }, loading ? '⏳' : '🔄 Refresh')
+    ),
+
+    loading && React.createElement('div', { style: { padding: 40, textAlign: 'center', color: 'var(--text3)' } }, '⏳ Mengambil data...'),
+    err    && React.createElement('div', { style: { padding: 16, color: '#dc2626', background: '#fef2f2', borderRadius: 10, border: '1px solid #fca5a5' } }, '⚠️ ', err),
+
+    data && !loading && React.createElement('div', null,
+      React.createElement('div', { style: { marginBottom: 12, fontSize: 13, color: 'var(--text2)' } },
+        React.createElement('b', { style: { color: items.length ? '#dc2626' : '#16a34a', fontSize: 15 } }, items.length),
+        ' item transfer gantung',
+        data.cutoffLabel ? (' (s/d ' + data.cutoffLabel + ' ke bawah)') : '',
+        ' — perlu ditindaklanjuti'
+      ),
+
+      items.length === 0
+        ? React.createElement('div', { style: { padding: '24px 16px', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', color: '#16a34a', fontWeight: 600, fontSize: 13 } },
+            '✅ Semua item transfer sudah selesai atau belum ada yang gantung > H-3'
+          )
+        : React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
+            React.createElement('div', { style: { overflowX: 'auto' } },
+              React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12.5 } },
+                React.createElement('thead', null,
+                  React.createElement('tr', { style: { background: 'var(--bg)' } },
+                    ['No. Transfer', 'Tanggal', 'Process Type', 'From (Ref)', 'To (Warehouse)', 'Status', 'Keterangan'].map(function(h) {
+                      return React.createElement('th', { key: h, style: { padding: '9px 12px', textAlign: 'left', fontSize: 11, color: 'var(--text3)', fontWeight: 700, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' } }, h);
+                    })
+                  )
+                ),
+                React.createElement('tbody', null,
+                  items.map(function(row, idx) {
+                    var sc = STATUS_COLOR[row.transferStatus] || 'var(--text1)';
+                    return React.createElement('tr', { key: row.id, style: { borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'var(--surface)' : 'var(--bg)' } },
+                      React.createElement('td', { style: { padding: '8px 12px', fontFamily: 'monospace', fontSize: 11, whiteSpace: 'nowrap', fontWeight: 600 } }, row.number),
+                      React.createElement('td', { style: { padding: '8px 12px', fontSize: 11, whiteSpace: 'nowrap', color: 'var(--text3)' } }, row.transDate),
+                      React.createElement('td', { style: { padding: '8px 12px', fontSize: 11, whiteSpace: 'nowrap' } }, row.processType || '—'),
+                      React.createElement('td', { style: { padding: '8px 12px', fontSize: 11, whiteSpace: 'nowrap', color: 'var(--text2)' } }, row.refWarehouse || '—'),
+                      React.createElement('td', { style: { padding: '8px 12px', fontSize: 11, whiteSpace: 'nowrap', color: 'var(--text2)' } }, row.warehouse || '—'),
+                      React.createElement('td', { style: { padding: '8px 12px', whiteSpace: 'nowrap' } },
+                        React.createElement('span', { style: { background: sc + '1a', color: sc, borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 700 } }, row.transferStatus)
+                      ),
+                      React.createElement('td', { style: { padding: '8px 12px', fontSize: 11, maxWidth: 200, color: 'var(--text2)' } }, row.description || '—')
+                    );
+                  })
+                )
+              )
+            )
+          )
     )
   );
 }
