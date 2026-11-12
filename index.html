@@ -4414,7 +4414,7 @@ function App() {
     { id: 'revisi_kode_pelanggan', icon: '🔧', label: 'Revisi Data Accurate', _inSection: 'accurate' },
     { id: 'tanya_kode_sku', icon: '🏷️', label: 'Tanya Kode Barang', _inSection: 'accurate' },
     { id: 'cek_item_transfer', icon: '📦', label: 'Cek Item Transfer', _inSection: 'accurate' },
-  ].concat(CEK_INVOICE_USERS.includes(userName) ? [{ id: 'cek_sales_invoice', icon: '🧾', label: 'Cek Sales Invoice', _inSection: 'accurate' }] : [])
+  ]
   : (TANYA_SKU_ROLES.includes(role) ? [
     { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
     { id: 'tanya_kode_sku', icon: '🏷️', label: 'Tanya Kode Barang', _inSection: 'accurate' },
@@ -4909,7 +4909,7 @@ function App() {
     userName: userName,
     role: role,
     demoMode: demoMode
-  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null), page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(TarikPricelistPage, null), page === 'revisi_kode_pelanggan' && /*#__PURE__*/React.createElement(RevisiKodePelangganPage, null), CEK_INVOICE_USERS.includes(userName) && page === 'cek_sales_invoice' && /*#__PURE__*/React.createElement(CekSalesInvoicePage, null), ACCURATE_USERS.includes(userName) && page === 'cek_item_transfer' && /*#__PURE__*/React.createElement(CekItemTransferPage, null), page === 'tanya_kode_sku' && /*#__PURE__*/React.createElement(TanyaKodeSKUPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
+  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null), page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(TarikPricelistPage, null), page === 'revisi_kode_pelanggan' && /*#__PURE__*/React.createElement(RevisiKodePelangganPage, null), ACCURATE_USERS.includes(userName) && page === 'cek_item_transfer' && /*#__PURE__*/React.createElement(CekItemTransferPage, null), page === 'tanya_kode_sku' && /*#__PURE__*/React.createElement(TanyaKodeSKUPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
     order: selectedOrder,
     onClose: function onClose() {
       return setSelectedOrder(null);
@@ -48862,7 +48862,7 @@ function RevisiKodePelangganPage() {
     return fetch(RKP_CONNECTOR + '/api/items/' + item.id + '/recategorize?entity=' + entity, {
       method: 'PUT',
       headers: { 'X-API-Key': RKP_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newCategory: item.kategoriUsulan })
+      body: JSON.stringify({ newCategory: item.kategoriUsulan, no: item.no })
     })
       .then(function(r) { return r.json(); })
       .then(function(d) {
