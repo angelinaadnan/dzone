@@ -1245,6 +1245,11 @@ function KpiOpsPage(props) {
   var courierTasks = props.courierTasks || [];
   var serviceIntakes = props.serviceIntakes || [];
   var purchaseOrders = props.purchaseOrders || [];
+  var onUpdatePO = props.onUpdatePO || null;
+  var onNavigate = props.onNavigate || null;
+  var _sc = React.useState(null); var confirmCancelId = _sc[0]; var setConfirmCancelId = _sc[1];
+  var _sl = React.useState(null); var cancellingId = _sl[0]; var setCancellingId = _sl[1];
+  var _sd = React.useState(null); var detailId = _sd[0]; var setDetailId = _sd[1];
   var now = new Date();
 
   function dayStart(d) {
@@ -1347,24 +1352,57 @@ function KpiOpsPage(props) {
         '✅ Semua orderan & tugas kurir berjalan lancar — tidak ada yang terlambat > 1 hari');
     }
     var rows = [];
+    var rowStyle = Object.assign({}, S.row, {cursor:'pointer', borderRadius:8, transition:'background 0.15s'});
     ordersNginep.forEach(function(o) {
-      rows.push(React.createElement('div', {key:'o'+o.id, style:S.row},
-        React.createElement('span', {style:{fontSize:14, flexShrink:0}}, '📦'),
-        React.createElement('div', {style:{flex:1, minWidth:0}},
-          React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
-            o.customer_name || '—'),
-          React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}}, goodsStr(o.goods))),
-        React.createElement('span', {style:ageBadgeStyle(o.created_at)}, ageLbl(o.created_at))
+      var key = 'o'+o.id;
+      var open = detailId === key;
+      rows.push(React.createElement('div', {key:key},
+        React.createElement('div', {
+          style: Object.assign({}, rowStyle, open ? {background:'rgba(255,255,255,0.05)'} : {}),
+          onClick: function(){ setDetailId(open ? null : key); }
+        },
+          React.createElement('span', {style:{fontSize:14, flexShrink:0}}, '📦'),
+          React.createElement('div', {style:{flex:1, minWidth:0}},
+            React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
+              o.customer_name || '—'),
+            React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}}, goodsStr(o.goods))),
+          React.createElement('span', {style:ageBadgeStyle(o.created_at)}, ageLbl(o.created_at)),
+          React.createElement('span', {style:{fontSize:10, color:'var(--text3)', marginLeft:4}}, open ? '▲' : '▼')
+        ),
+        open && React.createElement('div', {style:{padding:'6px 12px 10px 36px', fontSize:12, color:'var(--text2)', lineHeight:1.7, background:'rgba(255,255,255,0.03)', borderRadius:'0 0 8px 8px', marginBottom:2}},
+          React.createElement('div', null, '📋 Status: ', React.createElement('b', null, o.status || '—')),
+          o.customer_phone && React.createElement('div', null, '📞 ', o.customer_phone),
+          o.customer_address && React.createElement('div', null, '📍 ', o.customer_address),
+          o.sales_name && React.createElement('div', null, '👤 Sales: ', o.sales_name),
+          o.courier_name && React.createElement('div', null, '🚚 Kurir: ', o.courier_name),
+          o.notes && React.createElement('div', null, '📝 ', o.notes),
+          Array.isArray(o.goods) && o.goods.length > 0 && React.createElement('div', {style:{marginTop:4, color:'var(--text3)'}},
+            o.goods.map(function(g,i){ return (g.qty||1)+'× '+(g.name||g.desc||''); }).join(', '))
+        )
       ));
     });
     tasksNginep.forEach(function(t) {
-      rows.push(React.createElement('div', {key:'t'+t.id, style:S.row},
-        React.createElement('span', {style:{fontSize:14, flexShrink:0}}, '🚚'),
-        React.createElement('div', {style:{flex:1, minWidth:0}},
-          React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
-            t.destination || t.title || 'Task kurir'),
-          React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}}, 'Kurir: ' + (t.courier_name || '—'))),
-        React.createElement('span', {style:ageBadgeStyle(t.created_at)}, ageLbl(t.created_at))
+      var key = 't'+t.id;
+      var open = detailId === key;
+      rows.push(React.createElement('div', {key:key},
+        React.createElement('div', {
+          style: Object.assign({}, rowStyle, open ? {background:'rgba(255,255,255,0.05)'} : {}),
+          onClick: function(){ setDetailId(open ? null : key); }
+        },
+          React.createElement('span', {style:{fontSize:14, flexShrink:0}}, '🚚'),
+          React.createElement('div', {style:{flex:1, minWidth:0}},
+            React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
+              t.destination || t.title || 'Task kurir'),
+            React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}}, 'Kurir: ' + (t.courier_name || '—'))),
+          React.createElement('span', {style:ageBadgeStyle(t.created_at)}, ageLbl(t.created_at)),
+          React.createElement('span', {style:{fontSize:10, color:'var(--text3)', marginLeft:4}}, open ? '▲' : '▼')
+        ),
+        open && React.createElement('div', {style:{padding:'6px 12px 10px 36px', fontSize:12, color:'var(--text2)', lineHeight:1.7, background:'rgba(255,255,255,0.03)', borderRadius:'0 0 8px 8px', marginBottom:2}},
+          React.createElement('div', null, '📋 Status: ', React.createElement('b', null, t.status || '—')),
+          t.courier_name && React.createElement('div', null, '🚚 Kurir: ', t.courier_name),
+          (t.description || t.title) && React.createElement('div', null, '📝 ', t.description || t.title),
+          t.notes && React.createElement('div', null, '📄 ', t.notes)
+        )
       ));
     });
     return React.createElement('div', {style:{background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:4}},
@@ -1392,31 +1430,61 @@ function KpiOpsPage(props) {
     nginepSection(),
 
     scActive.length > 0 && React.createElement('div', null,
-      React.createElement('div', {style:S.sec}, 'DI SERVICE CENTER ('+scActive.length+')'),
-      React.createElement('div', {style:{background:'rgba(59,130,246,0.05)', border:'1px solid rgba(59,130,246,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:4}},
-        scActive.slice(0,6).map(function(si) {
-          return React.createElement('div', {key:String(si.id), style:S.row},
-            React.createElement('div', {style:{flex:1, minWidth:0}},
-              React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
-                si.customer_name || '—'),
-              React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}}, goodsStr(si.goods))),
-            React.createElement('span', {style:{background:'rgba(59,130,246,0.15)',color:'var(--blue)',borderRadius:4,padding:'1px 6px',fontSize:11,fontWeight:600,flexShrink:0}},
-              SC_LBL[si.status] || si.status)
-          );
-        }),
-        scActive.length > 6 && React.createElement('div', {style:{fontSize:11,color:'var(--text3)',marginTop:6}}, '+ '+(scActive.length-6)+' lainnya')
+      React.createElement('div', {style:S.sec}, 'SERVICE CENTER'),
+      React.createElement('div', {
+        style:{background:'rgba(59,130,246,0.07)', border:'1px solid rgba(59,130,246,0.2)', borderRadius:10, padding:'12px 16px', marginBottom:4,
+          cursor: onNavigate ? 'pointer' : 'default', display:'flex', alignItems:'center', gap:12},
+        onClick: onNavigate ? function(){ onNavigate('servis_summary'); } : undefined
+      },
+        React.createElement('span', {style:{fontSize:28}},'🔧'),
+        React.createElement('div', {style:{flex:1}},
+          React.createElement('div', {style:{fontSize:22, fontWeight:700, color:'var(--blue)', lineHeight:1}}, scActive.length),
+          React.createElement('div', {style:{fontSize:12, color:'var(--text2)', marginTop:2}}, 'unit masih di Service Center')),
+        onNavigate && React.createElement('span', {style:{fontSize:12, color:'var(--blue)', opacity:0.7}}, 'Lihat detail →')
       )
     ),
 
     poAlert.length > 0 && React.createElement('div', null,
       React.createElement('div', {style:S.sec}, 'PO STOK TERLAMBAT ('+poAlert.length+')'),
       React.createElement('div', {style:{background:'rgba(245,158,11,0.05)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:10, padding:'10px 14px', marginBottom:4}},
-        poAlert.slice(0,5).map(function(po) {
-          return React.createElement('div', {key:String(po.id), style:S.row},
-            React.createElement('div', {style:{flex:1, fontSize:13, color:'var(--text)'}},
-              React.createElement('b', null, po.supplier_name || '—'),
-              po.expected_date ? ' · Est: '+fmtDate(po.expected_date) : ' · Belum ada estimasi'),
-            React.createElement('span', {style:{fontSize:11,color:'var(--text3)',flexShrink:0}}, 'Buat: '+fmtDate(po.created_at))
+        poAlert.map(function(po) {
+          var isCancelling = cancellingId === po.id;
+          var isConfirming = confirmCancelId === po.id;
+          var itemNames = Array.isArray(po.items) ? po.items.slice(0,2).map(function(x){ return x.name||x.itemName||''; }).filter(Boolean).join(', ') : '';
+          var ageDays = Math.floor((now - new Date(po.created_at)) / 86400000);
+          return React.createElement('div', {key:String(po.id), style:Object.assign({},S.row,{flexWrap:'wrap',gap:6})},
+            React.createElement('div', {style:{flex:1, minWidth:0}},
+              React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
+                po.supplier_name || '—'),
+              React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}},
+                po.expected_date ? '📅 Est: '+fmtDate(po.expected_date) : '📅 Belum ada estimasi',
+                ' · ', ageDays+' hari lalu'),
+              itemNames && React.createElement('div', {style:{fontSize:11, color:'var(--text2)', marginTop:1}}, itemNames+(po.items.length>2?' +' + (po.items.length-2)+' item':'')),
+              po.notes && React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:1, fontStyle:'italic'}}, po.notes)
+            ),
+            isConfirming
+              ? React.createElement('div', {style:{display:'flex', gap:6, alignItems:'center', flexShrink:0}},
+                  React.createElement('span', {style:{fontSize:11, color:'var(--amber)'}}, 'Batalkan PO ini?'),
+                  React.createElement('button', {
+                    style:{background:'rgba(239,68,68,0.15)',color:'var(--red)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:6,padding:'3px 10px',fontSize:11,cursor:'pointer'},
+                    onClick: function() {
+                      if (!onUpdatePO) return;
+                      setConfirmCancelId(null);
+                      setCancellingId(po.id);
+                      onUpdatePO(po.id, {status:'cancelled', cancel_reason:'Tidak jadi datang'})
+                        .finally(function(){ setCancellingId(null); });
+                    }
+                  }, 'Ya, Batal'),
+                  React.createElement('button', {
+                    style:{background:'var(--bg3)',color:'var(--text2)',border:'1px solid var(--border2)',borderRadius:6,padding:'3px 10px',fontSize:11,cursor:'pointer'},
+                    onClick: function(){ setConfirmCancelId(null); }
+                  }, 'Tidak')
+                )
+              : React.createElement('button', {
+                  disabled: isCancelling,
+                  style:{background:'rgba(239,68,68,0.1)',color:'var(--red)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:6,padding:'4px 12px',fontSize:11,cursor:isCancelling?'default':'pointer',flexShrink:0,opacity:isCancelling?0.6:1},
+                  onClick: function(){ setConfirmCancelId(po.id); }
+                }, isCancelling ? '⏳...' : '✕ Batal')
           );
         })
       )
@@ -4862,7 +4930,9 @@ function App() {
     orders: orders,
     courierTasks: courierTasks,
     serviceIntakes: serviceIntakes,
-    purchaseOrders: purchaseOrders
+    purchaseOrders: purchaseOrders,
+    onUpdatePO: updatePurchaseOrder,
+    onNavigate: setPage
   })), (role === 'ops' || role === 'supervisor' || role === 'technician') && page === 'servis_summary' && /*#__PURE__*/React.createElement(ServisSummaryPage, {
     serviceIntakes: serviceIntakes
   }), (role === 'technician' || role === 'supervisor') && page === 'kpi_teknisi' && /*#__PURE__*/React.createElement(KpiTeknisiPage, {
