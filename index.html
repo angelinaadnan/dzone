@@ -1211,153 +1211,236 @@ function kpiRateColor(r) {
   return 'var(--red)';
 }
 
+// ─── KPI Ops Error Boundary ───────────────────────────────────────────────────
+var KpiOpsErrorBoundary = (function() {
+  function KpiOpsErrorBoundary(p) { React.Component.call(this, p); this.state = {err: null}; }
+  KpiOpsErrorBoundary.prototype = Object.create(React.Component.prototype);
+  KpiOpsErrorBoundary.getDerivedStateFromError = function(e) { return {err: e}; };
+  KpiOpsErrorBoundary.prototype.render = function() {
+    if (this.state.err) {
+      return React.createElement('div', {style:{padding:24, color:'var(--red)', fontFamily:'monospace', fontSize:13}},
+        React.createElement('div', {style:{fontWeight:700, marginBottom:8}}, '⚠ KPI Ops error:'),
+        React.createElement('div', null, String(this.state.err.message || this.state.err))
+      );
+    }
+    return this.props.children;
+  };
+  return KpiOpsErrorBoundary;
+})();
+
 // ─── KPI Ops Page ────────────────────────────────────────────────────────────
 function KpiOpsPage(props) {
-  try {
   var orders = props.orders || [];
   var courierTasks = props.courierTasks || [];
   var serviceIntakes = props.serviceIntakes || [];
   var purchaseOrders = props.purchaseOrders || [];
   var now = new Date();
-  function dStart(d) { var x = new Date(d); return new Date(x.getFullYear(), x.getMonth(), x.getDate()); }
-  var todayStart = dStart(now);
-  function isToday(d) { return dStart(d).getTime() === todayStart.getTime(); }
-  function isPrev(d)  { return dStart(d).getTime() < todayStart.getTime(); }
 
+  function dayStart(d) {
+    var x = new Date(d);
+    if (isNaN(x.getTime())) return null;
+    return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  }
+  var todayT = dayStart(now);
+  function isToday(d) { var t = dayStart(d); return t !== null && t === todayT; }
+  function ageHours(d) { var t = dayStart(d); return t === null ? 0 : Math.floor((now.getTime() - t) / 3600000); }
+
+  // --- Nginep: open lebih dari 1 hari (ageHours >= 24) ---
+  var OPEN_ORDER   = ['pending','processing','packed','picked_up','in_transit','partial_delivery','scheduled'];
+  var OPEN_TASK    = ['pending','assigned','in_progress','picked_up'];
+  var ordersNginep = orders.filter(function(o) { return !['delivered','cancelled'].includes(o.status) && ageHours(o.created_at) >= 24; });
+  var tasksNginep  = courierTasks.filter(function(t) { return !['done','in_service','cancelled'].includes(t.status) && ageHours(t.created_at) >= 24; });
+
+  // Sort by oldest first
+  ordersNginep = ordersNginep.slice().sort(function(a,b) { return new Date(a.created_at) - new Date(b.created_at); });
+  tasksNginep  = tasksNginep.slice().sort(function(a,b)  { return new Date(a.created_at) - new Date(b.created_at); });
+
+  // --- Hari ini ---
   var ordersToday = orders.filter(function(o) { return isToday(o.created_at) && o.status !== 'cancelled'; });
   var ordersDone  = ordersToday.filter(function(o) { return o.status === 'delivered'; });
-  var orderRate   = ordersToday.length > 0 ? Math.round(ordersDone.length / ordersToday.length * 100) : null;
+  var tasksToday  = courierTasks.filter(function(t) { return isToday(t.created_at); });
+  var tasksDone   = tasksToday.filter(function(t) { return t.status === 'done' || t.status === 'in_service'; });
 
-  var tasksToday = courierTasks.filter(function(t) { return isToday(t.created_at); });
-  var tasksDone  = tasksToday.filter(function(t) { return t.status === 'done' || t.status === 'in_service'; });
-  var taskRate   = tasksToday.length > 0 ? Math.round(tasksDone.length / tasksToday.length * 100) : null;
+  // --- SC aktif ---
+  var SC_SET = {to_service_center:1,at_service_center:1,sc_pickup_assigned:1,sc_ekspedisi_waiting:1,back_from_sc:1};
+  var SC_LBL = {to_service_center:'Ke SC',at_service_center:'Di SC',sc_pickup_assigned:'Jemput SC',sc_ekspedisi_waiting:'Menunggu Ekspedisi',back_from_sc:'Kembali dari SC',post_sc_checking:'Cek Pasca SC'};
+  var scActive = serviceIntakes.filter(function(si) { return SC_SET[si.status]; });
 
-  var intakesToday    = serviceIntakes.filter(function(si) { return isToday(si.created_at); });
-  var intakesAssigned = intakesToday.filter(function(si) { return si.status !== 'received'; });
-  var intakeType = intakesToday.length === 0 ? 'neutral' : intakesAssigned.length === intakesToday.length ? 'green' : 'amber';
-  var intakeVal  = intakesToday.length === 0 ? '—' : intakesAssigned.length + '/' + intakesToday.length;
-  var intakeSub  = intakesToday.length === 0 ? 'Tidak ada intake hari ini' : intakesAssigned.length === intakesToday.length ? 'Semua sudah di-assign' : (intakesToday.length - intakesAssigned.length) + ' belum di-assign';
-
-  var ordersNginep = orders.filter(function(o) { return isPrev(o.created_at) && !['delivered','cancelled'].includes(o.status); });
-  var tasksNginep  = courierTasks.filter(function(t) { return isPrev(t.created_at) && !['done','in_service'].includes(t.status); });
-  var totalNginep  = ordersNginep.length + tasksNginep.length;
-  var nginepType   = totalNginep === 0 ? 'green' : totalNginep <= 3 ? 'amber' : 'red';
-
-  var SC_STATUSES = ['to_service_center','at_service_center','sc_pickup_assigned','sc_ekspedisi_waiting','back_from_sc'];
-  var SC_LABELS = {to_service_center:'Ke SC',at_service_center:'Di SC',sc_pickup_assigned:'Jemput SC',sc_ekspedisi_waiting:'Menunggu Ekspedisi',back_from_sc:'Kembali dari SC',post_sc_checking:'Cek Pasca SC'};
-  var scActive = serviceIntakes.filter(function(si) { return SC_STATUSES.includes(si.status); });
-  var scType = scActive.length === 0 ? 'green' : 'amber';
-
+  // --- PO terlambat ---
   var poAlert = purchaseOrders.filter(function(po) {
-    if (!['pending','partial'].includes(po.status)) return false;
+    if (!po || !['pending','partial'].includes(po.status)) return false;
     if (po.expected_date && new Date(po.expected_date) < now) return true;
     return (now - new Date(po.created_at)) / 86400000 > 2;
   });
 
-  var weekData = Array.from({length:7}, function(_, idx) {
-    var d = new Date(todayStart); d.setDate(d.getDate() - (6 - idx));
-    var dT = d.getTime();
-    var dayOrders = orders.filter(function(o) { return dStart(o.created_at).getTime() === dT && o.status !== 'cancelled'; });
-    var dayDone   = dayOrders.filter(function(o) { return o.status === 'delivered'; });
-    var dayTasks  = courierTasks.filter(function(t) { return dStart(t.created_at).getTime() === dT; });
-    var dayTDone  = dayTasks.filter(function(t) { return t.status === 'done' || t.status === 'in_service'; });
-    return {
-      label: d.toLocaleDateString('id-ID', {weekday:'short', day:'2-digit', month:'short'}),
-      isToday: idx === 6,
-      oRate: dayOrders.length > 0 ? Math.round(dayDone.length / dayOrders.length * 100) : null,
-      oStr:  dayOrders.length > 0 ? dayDone.length + '/' + dayOrders.length : '—',
-      tRate: dayTasks.length > 0 ? Math.round(dayTDone.length / dayTasks.length * 100) : null,
-      tStr:  dayTasks.length > 0 ? dayTDone.length + '/' + dayTasks.length : '—',
-    };
-  });
+  // --- Trend 7 hari ---
+  var weekRows = [];
+  for (var d7 = 6; d7 >= 0; d7--) {
+    var dObj = new Date(todayT); dObj.setDate(dObj.getDate() - d7);
+    var dT7 = dObj.getTime();
+    var dOrds = orders.filter(function(o) { return dayStart(o.created_at) === dT7 && o.status !== 'cancelled'; });
+    var dDone = dOrds.filter(function(o) { return o.status === 'delivered'; });
+    var dTask = courierTasks.filter(function(t) { return dayStart(t.created_at) === dT7; });
+    var dTDone= dTask.filter(function(t) { return t.status === 'done' || t.status === 'in_service'; });
+    weekRows.push({
+      lbl: dObj.toLocaleDateString('id-ID', {weekday:'short', day:'2-digit', month:'short'}),
+      today: d7 === 0,
+      oN: dOrds.length, oD: dDone.length,
+      tN: dTask.length, tD: dTDone.length
+    });
+  }
 
-  var thS = {padding:'8px 12px', textAlign:'left', fontWeight:600, fontSize:12, color:'var(--text2)', whiteSpace:'nowrap'};
-  var tdS = {padding:'8px 12px'};
-  return React.createElement('div', {style:{padding:24, maxWidth:900}},
-    React.createElement('div', {style:{marginBottom:20, borderBottom:'1px solid var(--border)', paddingBottom:12}},
-      React.createElement('h2', {style:{margin:0, fontSize:20, fontWeight:700}}, '📊 KPI Ops'),
-      React.createElement('div', {style:{fontSize:13, color:'var(--text3)', marginTop:4}},
-        now.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long', year:'numeric'}))
+  function ageLbl(created_at) {
+    var h = ageHours(created_at);
+    if (h < 24) return h + 'j';
+    return Math.floor(h / 24) + ' hari';
+  }
+  function ageBadgeStyle(created_at) {
+    var h = ageHours(created_at);
+    if (h >= 72) return {background:'rgba(239,68,68,0.15)',color:'var(--red)',borderRadius:4,padding:'1px 6px',fontSize:11,fontWeight:700};
+    if (h >= 48) return {background:'rgba(245,158,11,0.15)',color:'var(--amber)',borderRadius:4,padding:'1px 6px',fontSize:11,fontWeight:700};
+    return {background:'rgba(255,255,255,0.08)',color:'var(--text2)',borderRadius:4,padding:'1px 6px',fontSize:11};
+  }
+
+  var totalNginep = ordersNginep.length + tasksNginep.length;
+  var nginepType = totalNginep === 0 ? 'green' : totalNginep <= 3 ? 'amber' : 'red';
+  var orderRate  = ordersToday.length > 0 ? Math.round(ordersDone.length / ordersToday.length * 100) : null;
+  var taskRate   = tasksToday.length > 0  ? Math.round(tasksDone.length  / tasksToday.length  * 100) : null;
+
+  var S = {
+    page:  {padding:20, maxWidth:860},
+    hdr:   {marginBottom:16, paddingBottom:12, borderBottom:'1px solid var(--border)'},
+    h2:    {margin:0, fontSize:18, fontWeight:700},
+    sub:   {fontSize:12, color:'var(--text3)', marginTop:3},
+    sec:   {fontSize:10, fontWeight:700, color:'var(--text3)', letterSpacing:'0.08em', marginBottom:8, marginTop:20},
+    tiles: {display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))', gap:10, marginBottom:4},
+    card:  {background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:10, padding:'10px 14px'},
+    row:   {display:'flex', alignItems:'flex-start', gap:8, padding:'8px 0', borderBottom:'1px solid var(--border)'},
+    thS:   {padding:'7px 10px', textAlign:'left', fontWeight:600, fontSize:11, color:'var(--text2)', whiteSpace:'nowrap', background:'var(--bg3)'},
+    tdS:   {padding:'7px 10px', fontSize:12}
+  };
+
+  function tileEl(label, val, sub, type) {
+    return kpiScoreTile(label, val, sub, type);
+  }
+
+  function nginepSection() {
+    if (totalNginep === 0) {
+      return React.createElement('div', {style:{padding:'10px 14px', background:'rgba(34,197,94,0.07)', border:'1px solid rgba(34,197,94,0.2)', borderRadius:10, fontSize:13, color:'var(--green)', marginBottom:4}},
+        '✅ Semua orderan & tugas kurir berjalan lancar — tidak ada yang terlambat > 1 hari');
+    }
+    var rows = [];
+    ordersNginep.forEach(function(o) {
+      rows.push(React.createElement('div', {key:'o'+o.id, style:S.row},
+        React.createElement('span', {style:{fontSize:14, flexShrink:0}}, '📦'),
+        React.createElement('div', {style:{flex:1, minWidth:0}},
+          React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
+            o.customer_name || '—'),
+          React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}},
+            (o.goods ? (o.goods.length > 50 ? o.goods.slice(0,50)+'…' : o.goods) : '—'))),
+        React.createElement('span', {style:ageBadgeStyle(o.created_at)}, ageLbl(o.created_at))
+      ));
+    });
+    tasksNginep.forEach(function(t) {
+      rows.push(React.createElement('div', {key:'t'+t.id, style:S.row},
+        React.createElement('span', {style:{fontSize:14, flexShrink:0}}, '🚚'),
+        React.createElement('div', {style:{flex:1, minWidth:0}},
+          React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
+            t.destination || t.title || 'Task kurir'),
+          React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}}, 'Kurir: ' + (t.courier_name || '—'))),
+        React.createElement('span', {style:ageBadgeStyle(t.created_at)}, ageLbl(t.created_at))
+      ));
+    });
+    return React.createElement('div', {style:{background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:4}},
+      React.createElement('div', {style:{fontWeight:700, fontSize:13, color:'var(--red)', marginBottom:8}},
+        '⏰ Belum Selesai > 1 Hari (' + totalNginep + ')'),
+      rows
+    );
+  }
+
+  return React.createElement('div', {style:S.page},
+    React.createElement('div', {style:S.hdr},
+      React.createElement('h2', {style:S.h2}, '📊 KPI Ops'),
+      React.createElement('div', {style:S.sub},
+        now.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long', year:'numeric'}))),
+
+    React.createElement('div', {style:S.sec}, 'HARI INI'),
+    React.createElement('div', {style:S.tiles},
+      tileEl('Order Selesai', orderRate !== null ? orderRate+'%' : '—', ordersDone.length+'/'+ordersToday.length+' order', kpiRateType(orderRate)),
+      tileEl('Kurir Selesai', taskRate !== null ? taskRate+'%' : '—', tasksDone.length+'/'+tasksToday.length+' task', kpiRateType(taskRate)),
+      tileEl('Belum Selesai', String(totalNginep), ordersNginep.length+' order · '+tasksNginep.length+' kurir', nginepType),
+      tileEl('Di SC', String(scActive.length), scActive.length === 0 ? 'Tidak ada di SC' : scActive.length+' item', scActive.length === 0 ? 'green' : 'amber')
     ),
-    React.createElement('div', {style:{fontSize:10, fontWeight:700, color:'var(--text3)', letterSpacing:'0.07em', marginBottom:8}}, 'HARI INI'),
-    React.createElement('div', {style:{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(175px,1fr))', gap:12, marginBottom:24}},
-      kpiScoreTile('Order Selesai', orderRate !== null ? orderRate + '%' : '—', ordersDone.length + '/' + ordersToday.length + ' order', kpiRateType(orderRate)),
-      kpiScoreTile('Kurir Selesai', taskRate !== null ? taskRate + '%' : '—', tasksDone.length + '/' + tasksToday.length + ' task', kpiRateType(taskRate)),
-      kpiScoreTile('Servis Di-assign', intakeVal, intakeSub, intakeType),
-      kpiScoreTile('Nginep', totalNginep.toString(), ordersNginep.length + ' order · ' + tasksNginep.length + ' task kurir', nginepType),
-      kpiScoreTile('Di Service Center', scActive.length.toString(), scActive.length === 0 ? 'Tidak ada item di SC' : scActive.length + ' item sedang di luar', scType)
-    ),
-    totalNginep > 0 && React.createElement('div', {style:{marginBottom:20, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:10, padding:'12px 16px'}},
-      React.createElement('div', {style:{fontWeight:700, fontSize:13, color:'var(--red)', marginBottom:8}}, '⏰ Belum Selesai dari Hari Sebelumnya'),
-      [].concat(
-        ordersNginep.slice(0,4).map(function(o) {
-          return React.createElement('div', {key:'o'+o.id, style:{fontSize:12, padding:'4px 0', borderBottom:'1px solid var(--border)', color:'var(--text2)'}},
-            '📦 ', React.createElement('b', null, o.customer_name), ' — ', o.goods ? (o.goods.length > 45 ? o.goods.slice(0,45) + '…' : o.goods) : '—',
-            ' · ', fmtDate(o.created_at));
+
+    React.createElement('div', {style:S.sec}, 'TERLAMBAT > 1 HARI'),
+    nginepSection(),
+
+    scActive.length > 0 && React.createElement('div', null,
+      React.createElement('div', {style:S.sec}, 'DI SERVICE CENTER ('+scActive.length+')'),
+      React.createElement('div', {style:{background:'rgba(59,130,246,0.05)', border:'1px solid rgba(59,130,246,0.2)', borderRadius:10, padding:'10px 14px', marginBottom:4}},
+        scActive.slice(0,6).map(function(si) {
+          return React.createElement('div', {key:String(si.id), style:S.row},
+            React.createElement('div', {style:{flex:1, minWidth:0}},
+              React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
+                si.customer_name || '—'),
+              React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}},
+                si.goods ? (si.goods.length > 50 ? si.goods.slice(0,50)+'…' : si.goods) : '—')),
+            React.createElement('span', {style:{background:'rgba(59,130,246,0.15)',color:'var(--blue)',borderRadius:4,padding:'1px 6px',fontSize:11,fontWeight:600,flexShrink:0}},
+              SC_LBL[si.status] || si.status)
+          );
         }),
-        tasksNginep.slice(0,4).map(function(t) {
-          return React.createElement('div', {key:'t'+t.id, style:{fontSize:12, padding:'4px 0', borderBottom:'1px solid var(--border)', color:'var(--text2)'}},
-            '🚚 ', React.createElement('b', null, t.destination || t.title || 'Task kurir'),
-            ' · ', fmtDate(t.created_at));
-        }),
-        (totalNginep > 8) ? [React.createElement('div', {key:'more', style:{fontSize:11, color:'var(--text3)', marginTop:6}}, '+ ' + (totalNginep - 8) + ' lainnya')] : []
+        scActive.length > 6 && React.createElement('div', {style:{fontSize:11,color:'var(--text3)',marginTop:6}}, '+ '+(scActive.length-6)+' lainnya')
       )
     ),
-    scActive.length > 0 && React.createElement('div', {style:{marginBottom:20, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.2)', borderRadius:10, padding:'12px 16px'}},
-      React.createElement('div', {style:{fontWeight:700, fontSize:13, color:'var(--blue)', marginBottom:8}}, '🏭 Item di Service Center (' + scActive.length + ')'),
-      scActive.slice(0,6).map(function(si) {
-        return React.createElement('div', {key:si.id, style:{fontSize:12, padding:'4px 0', borderBottom:'1px solid var(--border)', color:'var(--text2)'}},
-          React.createElement('b', null, si.customer_name || '—'),
-          ' — ', si.goods ? (si.goods.length > 40 ? si.goods.slice(0,40) + '…' : si.goods) : '—',
-          React.createElement('span', {style:{marginLeft:8, fontSize:11, color:'var(--blue)'}}, SC_LABELS[si.status] || si.status),
-          ' · ', fmtDate(si.created_at));
-      }),
-      scActive.length > 6 && React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:6}}, '+ ' + (scActive.length - 6) + ' lainnya')
+
+    poAlert.length > 0 && React.createElement('div', null,
+      React.createElement('div', {style:S.sec}, 'PO STOK TERLAMBAT ('+poAlert.length+')'),
+      React.createElement('div', {style:{background:'rgba(245,158,11,0.05)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:10, padding:'10px 14px', marginBottom:4}},
+        poAlert.slice(0,5).map(function(po) {
+          return React.createElement('div', {key:String(po.id), style:S.row},
+            React.createElement('div', {style:{flex:1, fontSize:13, color:'var(--text)'}},
+              React.createElement('b', null, po.supplier_name || '—'),
+              po.expected_date ? ' · Est: '+fmtDate(po.expected_date) : ' · Belum ada estimasi'),
+            React.createElement('span', {style:{fontSize:11,color:'var(--text3)',flexShrink:0}}, 'Buat: '+fmtDate(po.created_at))
+          );
+        })
+      )
     ),
-    poAlert.length > 0 && React.createElement('div', {style:{marginBottom:20, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:10, padding:'12px 16px'}},
-      React.createElement('div', {style:{fontWeight:700, fontSize:13, color:'var(--amber)', marginBottom:8}}, '📦 PO Stok Belum Tiba (' + poAlert.length + ')'),
-      poAlert.slice(0,5).map(function(po) {
-        return React.createElement('div', {key:po.id, style:{fontSize:12, padding:'4px 0', borderBottom:'1px solid var(--border)', color:'var(--text2)'}},
-          React.createElement('b', null, po.supplier_name || '—'),
-          po.expected_date ? ' · Est: ' + fmtDate(po.expected_date) : ' · Belum ada estimasi',
-          ' · Buat: ' + fmtDate(po.created_at));
-      })
-    ),
-    React.createElement('div', {style:{fontSize:10, fontWeight:700, color:'var(--text3)', letterSpacing:'0.07em', marginBottom:10}}, '7 HARI TERAKHIR'),
-    React.createElement('div', {style:{overflowX:'auto'}},
-      React.createElement('table', {style:{width:'100%', borderCollapse:'collapse', fontSize:13}},
+
+    React.createElement('div', {style:S.sec}, 'TREND 7 HARI'),
+    React.createElement('div', {style:{overflowX:'auto', borderRadius:10, border:'1px solid var(--border)'}},
+      React.createElement('table', {style:{width:'100%', borderCollapse:'collapse', fontSize:12}},
         React.createElement('thead', null,
-          React.createElement('tr', {style:{background:'var(--bg2)', borderBottom:'1px solid var(--border)'}},
-            React.createElement('th', Object.assign({}, thS, {style:Object.assign({},thS)}), 'Tanggal'),
-            React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, '% Order Selesai'),
-            React.createElement('th', {style:Object.assign({},thS,{textAlign:'center'})}, '% Kurir Selesai')
+          React.createElement('tr', {style:{background:'var(--bg3)'}},
+            React.createElement('th', {style:S.thS}, 'Tanggal'),
+            React.createElement('th', {style:Object.assign({},S.thS,{textAlign:'center'})}, 'Order Selesai'),
+            React.createElement('th', {style:Object.assign({},S.thS,{textAlign:'center'})}, 'Kurir Selesai')
           )
         ),
         React.createElement('tbody', null,
-          weekData.map(function(day, i) {
-            return React.createElement('tr', {key:i, style:{background:day.isToday?'rgba(108,99,255,0.06)':'transparent', borderBottom:'1px solid var(--border)'}},
-              React.createElement('td', {style:Object.assign({},tdS,{fontWeight:day.isToday?700:400, color:day.isToday?'var(--accent2)':'var(--text)'})},
-                day.label, day.isToday && React.createElement('span', {style:{fontSize:10, color:'var(--accent2)', marginLeft:5}}, '← hari ini')),
-              React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})},
-                day.oRate !== null ? React.createElement('span', {style:{fontWeight:700, color:kpiRateColor(day.oRate)}}, day.oRate + '%') : React.createElement('span', {style:{color:'var(--text3)'}}, '—'),
-                React.createElement('span', {style:{fontSize:11, color:'var(--text3)', marginLeft:6}}, day.oStr)
-              ),
-              React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})},
-                day.tRate !== null ? React.createElement('span', {style:{fontWeight:700, color:kpiRateColor(day.tRate)}}, day.tRate + '%') : React.createElement('span', {style:{color:'var(--text3)'}}, '—'),
-                React.createElement('span', {style:{fontSize:11, color:'var(--text3)', marginLeft:6}}, day.tStr)
-              )
+          weekRows.map(function(r, i) {
+            var rowBg = r.today ? 'rgba(108,99,255,0.07)' : 'transparent';
+            var oRate = r.oN > 0 ? Math.round(r.oD/r.oN*100) : null;
+            var tRate = r.tN > 0 ? Math.round(r.tD/r.tN*100) : null;
+            return React.createElement('tr', {key:String(i), style:{background:rowBg, borderTop:'1px solid var(--border)'}},
+              React.createElement('td', {style:Object.assign({},S.tdS,{fontWeight:r.today?700:400,color:r.today?'var(--accent2)':'var(--text)'})},
+                r.lbl, r.today && React.createElement('span', {style:{fontSize:10,color:'var(--accent2)',marginLeft:4}}, '← hari ini')),
+              React.createElement('td', {style:Object.assign({},S.tdS,{textAlign:'center'})},
+                oRate !== null
+                  ? React.createElement('span', {style:{fontWeight:700,color:kpiRateColor(oRate)}}, oRate+'%')
+                  : React.createElement('span', {style:{color:'var(--text3)'}}, '—'),
+                React.createElement('span', {style:{fontSize:10,color:'var(--text3)',marginLeft:5}}, r.oN > 0 ? r.oD+'/'+r.oN : '')),
+              React.createElement('td', {style:Object.assign({},S.tdS,{textAlign:'center'})},
+                tRate !== null
+                  ? React.createElement('span', {style:{fontWeight:700,color:kpiRateColor(tRate)}}, tRate+'%')
+                  : React.createElement('span', {style:{color:'var(--text3)'}}, '—'),
+                React.createElement('span', {style:{fontSize:10,color:'var(--text3)',marginLeft:5}}, r.tN > 0 ? r.tD+'/'+r.tN : ''))
             );
           })
         )
       )
     )
   );
-  } catch(e) {
-    return React.createElement('div', {style:{padding:24,color:'var(--red)',fontFamily:'monospace',fontSize:13}},
-      React.createElement('div', {style:{fontWeight:700,marginBottom:8}}, '⚠ KPI Ops error (hubungi admin):'),
-      React.createElement('div', null, e.message || String(e))
-    );
-  }
 }
 
 // ─── Summary Servis Page (semua antrian aktif: teknisi + SC) ─────────────────
@@ -4760,12 +4843,12 @@ function App() {
     onUpdateSI: updateServiceIntake,
     branchRequests: branchRequests,
     riwayatOnly: true
-  }), (role === 'ops' || role === 'supervisor') && page === 'kpi_ops' && /*#__PURE__*/React.createElement(KpiOpsPage, {
+  }), (role === 'ops' || role === 'supervisor') && page === 'kpi_ops' && React.createElement(KpiOpsErrorBoundary, null, React.createElement(KpiOpsPage, {
     orders: orders,
     courierTasks: courierTasks,
     serviceIntakes: serviceIntakes,
     purchaseOrders: purchaseOrders
-  }), (role === 'ops' || role === 'supervisor') && page === 'servis_summary' && /*#__PURE__*/React.createElement(ServisSummaryPage, {
+  })), (role === 'ops' || role === 'supervisor') && page === 'servis_summary' && /*#__PURE__*/React.createElement(ServisSummaryPage, {
     serviceIntakes: serviceIntakes
   }), (role === 'technician' || role === 'supervisor') && page === 'kpi_teknisi' && /*#__PURE__*/React.createElement(KpiTeknisiPage, {
     serviceIntakes: serviceIntakes,
