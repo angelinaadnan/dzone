@@ -4413,7 +4413,8 @@ function App() {
     { id: 'tarik_pricelist', icon: '🗒️', label: 'Tarik Pricelist', _inSection: 'accurate' },
     { id: 'revisi_kode_pelanggan', icon: '🔧', label: 'Revisi Data Accurate', _inSection: 'accurate' },
     { id: 'tanya_kode_sku', icon: '🏷️', label: 'Tanya Kode Barang', _inSection: 'accurate' },
-  ] : (TANYA_SKU_ROLES.includes(role) ? [
+  ].concat(CEK_INVOICE_USERS.includes(userName) ? [{ id: 'cek_sales_invoice', icon: '🧾', label: 'Cek Sales Invoice', _inSection: 'accurate' }] : [])
+  : (TANYA_SKU_ROLES.includes(role) ? [
     { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
     { id: 'tanya_kode_sku', icon: '🏷️', label: 'Tanya Kode Barang', _inSection: 'accurate' },
   ] : []);
@@ -4430,7 +4431,7 @@ function App() {
   .concat(STOCK_CALC_USERS.includes(userName) ? [{ id: 'stock_calculator', icon: '🧮', label: 'Kalkulator Stok' }] : [])
   .concat(STOCK_AGING_USERS.includes(userName) ? [{ id: 'stock_aging', icon: '📦', label: 'Review Stok' }] : [])
   .concat(PROFIT_DASHBOARD_USERS.includes(userName) ? [{ id: 'profit_dashboard', icon: '📊', label: 'Performance Dashboard' }] : [])
-  .concat(CEK_INVOICE_USERS.includes(userName) ? [{ id: 'cek_sales_invoice', icon: '🧾', label: 'Cek Sales Invoice' }] : [])
+  .concat([]/* cek_sales_invoice sudah masuk accurateSection */)
   .concat((function(){ var u = USER_ACCOUNTS.find(function(a){ return a.name === userName; }); return canDocArchive(u) ? [{ id: 'doc_archive', icon: '📁', label: 'Arsip Dokumen' }] : []; })());
   return /*#__PURE__*/React.createElement("div", {
     style: {
