@@ -1290,6 +1290,12 @@ function KpiOpsPage(props) {
     });
   }
 
+  function goodsStr(g, maxLen) {
+    if (!g) return '—';
+    var s = typeof g === 'string' ? g : Array.isArray(g) ? g.map(function(x) { return x.name || x.desc || ''; }).filter(Boolean).join(', ') : String(g);
+    var m = maxLen || 50;
+    return s.length > m ? s.slice(0, m) + '…' : s || '—';
+  }
   function ageLbl(created_at) {
     var h = ageHours(created_at);
     if (h < 24) return h + 'j';
@@ -1336,8 +1342,7 @@ function KpiOpsPage(props) {
         React.createElement('div', {style:{flex:1, minWidth:0}},
           React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
             o.customer_name || '—'),
-          React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}},
-            (o.goods ? (o.goods.length > 50 ? o.goods.slice(0,50)+'…' : o.goods) : '—'))),
+          React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}}, goodsStr(o.goods))),
         React.createElement('span', {style:ageBadgeStyle(o.created_at)}, ageLbl(o.created_at))
       ));
     });
@@ -1383,8 +1388,7 @@ function KpiOpsPage(props) {
             React.createElement('div', {style:{flex:1, minWidth:0}},
               React.createElement('div', {style:{fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}},
                 si.customer_name || '—'),
-              React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}},
-                si.goods ? (si.goods.length > 50 ? si.goods.slice(0,50)+'…' : si.goods) : '—')),
+              React.createElement('div', {style:{fontSize:11, color:'var(--text3)', marginTop:2}}, goodsStr(si.goods))),
             React.createElement('span', {style:{background:'rgba(59,130,246,0.15)',color:'var(--blue)',borderRadius:4,padding:'1px 6px',fontSize:11,fontWeight:600,flexShrink:0}},
               SC_LBL[si.status] || si.status)
           );
