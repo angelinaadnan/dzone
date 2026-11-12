@@ -48708,6 +48708,12 @@ function RevisiKodePelangganPage() {
   var _tl = React.useState(false); var taxLoading = _tl[0]; var setTaxLoading = _tl[1];
   var _te = React.useState(null); var taxErr = _te[0]; var setTaxErr = _te[1];
 
+  // ── Branch Audit state ────────────────────────────────────────────────
+  var _bd = React.useState(null); var brData = _bd[0]; var setBrData = _bd[1];
+  var _bl = React.useState(false); var brLoading = _bl[0]; var setBrLoading = _bl[1];
+  var _be = React.useState(null); var brErr = _be[0]; var setBrErr = _be[1];
+  var _brs = React.useState({}); var brRowStatus = _brs[0]; var setBrRowStatus = _brs[1];
+
   function loadAudit(ent, force) {
     var e = ent || entity;
     setLoading(true); setErr(null); setData(null); setRowStatus({});
@@ -48741,13 +48747,76 @@ function RevisiKodePelangganPage() {
       .finally(function() { setTaxLoading(false); });
   }
 
-  React.useEffect(function() { loadAudit('adl', false); loadCatAudit('adl', false); loadTaxAudit('adl', false); }, []);
+  var _brPollRef = React.useRef(null);
+  function loadBranchAudit(ent, force) {
+    var e = ent || entity;
+    if (_brPollRef.current) { clearInterval(_brPollRef.current); _brPollRef.current = null; }
+    setBrErr(null);
+    if (!force) setBrLoading(false);
+    var url = RKP_CONNECTOR + '/api/accurate/branch-audit?entity=' + e + (force ? '&refresh=1' : '');
+    fetch(url, { headers: { 'X-API-Key': RKP_API_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) throw new Error(d.error);
+        setBrData(d);
+        if (d.scanning) {
+          setBrLoading(true);
+          _brPollRef.current = setInterval(function() {
+            fetch(RKP_CONNECTOR + '/api/accurate/branch-audit?entity=' + e, { headers: { 'X-API-Key': RKP_API_KEY } })
+              .then(function(r2) { return r2.json(); })
+              .then(function(d2) {
+                setBrData(d2);
+                if (!d2.scanning) { clearInterval(_brPollRef.current); _brPollRef.current = null; setBrLoading(false); }
+              }).catch(function() {});
+          }, 4000);
+        } else {
+          setBrLoading(false);
+        }
+      })
+      .catch(function(e) { setBrErr(e.message); setBrLoading(false); });
+  }
+
+  function fixBranchOne(item) {
+    setBrRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'loading'}); });
+    return fetch(RKP_CONNECTOR + '/api/accurate/branch-audit/fix', {
+      method: 'POST',
+      headers: { 'X-API-Key': RKP_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: item.id, entity: entity })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.error) throw new Error(d.error);
+        setBrRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'done'}); });
+      })
+      .catch(function(e) {
+        setBrRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'error:' + e.message}); });
+      });
+  }
+
+  function fixAllBranch(items) {
+    var pending = items.filter(function(r) { var s = brRowStatus[r.id]; return s !== 'done' && s !== 'skip'; });
+    if (!pending.length) return;
+    if (!window.confirm('Set All Branch untuk semua ' + pending.length + ' customer sekarang?')) return;
+    var idx = 0;
+    function next() {
+      if (idx >= pending.length) return;
+      var item = pending[idx++];
+      fixBranchOne(item).then(function() { setTimeout(next, 350); });
+    }
+    next();
+  }
+
+  React.useEffect(function() {
+    loadAudit('adl', false); loadCatAudit('adl', false); loadTaxAudit('adl', false); loadBranchAudit('adl', false);
+    return function() { if (_brPollRef.current) clearInterval(_brPollRef.current); };
+  }, []);
 
   function switchEntity(e) {
     setEntity(e);
     loadAudit(e, false);
     loadCatAudit(e, false);
     loadTaxAudit(e, false);
+    loadBranchAudit(e, false);
   }
 
   // ── Fix kode pelanggan ────────────────────────────────────────────────
@@ -48950,6 +49019,69 @@ function RevisiKodePelangganPage() {
     );
   }
 
+  function BranchTable(props) {
+    var items = props.items;
+    var visible = items.filter(function(r) { var s = brRowStatus[r.id]; return s !== 'done' && s !== 'skip'; });
+    var doneCount = items.filter(function(r) { return brRowStatus[r.id] === 'done'; }).length;
+    if (!items.length) return React.createElement('div', { style: { padding: '20px 16px', color: 'var(--text3)', fontSize: 13 } }, '✅ Semua customer sudah All Branch');
+    return React.createElement('div', null,
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)' } },
+        React.createElement('span', { style: { fontSize: 12, color: 'var(--text2)', flex: 1 } },
+          React.createElement('b', { style: { color: doneCount === items.length ? '#16a34a' : '#dc2626' } }, visible.length + ' tersisa'),
+          ' dari ', items.length,
+          doneCount > 0 ? (' | ✓ ' + doneCount + ' selesai') : ''
+        ),
+        React.createElement('button', {
+          onClick: function() { fixAllBranch(items); }, disabled: !visible.length || brLoading,
+          style: { padding: '5px 14px', background: visible.length ? '#2563eb' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: visible.length ? 'pointer' : 'not-allowed' }
+        }, '⚡ Fix Semua (' + visible.length + ')')
+      ),
+      React.createElement('div', { style: { overflowX: 'auto' } },
+        React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12.5 } },
+          React.createElement('thead', null,
+            React.createElement('tr', null,
+              ['Nama Customer', 'No. Customer', 'Branch Sekarang', 'Aksi'].map(function(h) {
+                return React.createElement('th', { key: h, style: { padding: '7px 12px', textAlign: 'left', fontSize: 11, color: 'var(--text3)', fontWeight: 600, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', background: 'var(--bg)' } }, h);
+              })
+            )
+          ),
+          React.createElement('tbody', null,
+            items.map(function(item) {
+              var st = brRowStatus[item.id];
+              if (st === 'done' || st === 'skip') return null;
+              var isLoading = st === 'loading';
+              var isErr = st && st.startsWith('error:');
+              return React.createElement('tr', { key: item.id, style: { borderBottom: '1px solid var(--border)', opacity: isLoading ? 0.5 : 1, background: isErr ? '#fef2f2' : '' } },
+                React.createElement('td', { style: { padding: '7px 12px', fontWeight: 500 } },
+                  item.name,
+                  React.createElement('div', { style: { fontSize: 10, color: 'var(--text3)' } }, 'ID: ', item.id)
+                ),
+                React.createElement('td', { style: { padding: '7px 12px', fontFamily: 'monospace', fontSize: 11 } }, item.customerNo || '—'),
+                React.createElement('td', { style: { padding: '7px 12px', fontSize: 11, color: '#dc2626', fontWeight: 600 } }, item.branchName || '—'),
+                React.createElement('td', { style: { padding: '7px 12px', whiteSpace: 'nowrap' } },
+                  isErr
+                    ? React.createElement('span', { style: { color: '#dc2626', fontSize: 11 } }, '❌ ', st.slice(6))
+                    : React.createElement(React.Fragment, null,
+                        React.createElement('button', {
+                          onClick: function() { fixBranchOne(item); },
+                          disabled: isLoading,
+                          style: { padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', marginRight: 4 }
+                        }, isLoading ? '...' : '✓ Fix'),
+                        React.createElement('button', {
+                          onClick: function() { setBrRowStatus(function(prev) { return Object.assign({}, prev, {[item.id]: 'skip'}); }); },
+                          disabled: isLoading,
+                          style: { padding: '4px 8px', background: 'var(--bg)', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, cursor: 'pointer' }
+                        }, 'Skip')
+                      )
+                )
+              );
+            })
+          )
+        )
+      )
+    );
+  }
+
   var formatSalah = data ? (data.formatSalah || []) : [];
   var adaHP = data ? (data.adaHP || []) : [];
   var catWrong = catData ? (catData.wrong || []) : [];
@@ -49117,6 +49249,58 @@ function RevisiKodePelangganPage() {
                   )
                 )
               )
+        )
+      );
+    })(),
+
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 4 — Revisi Branch Customer
+    // ══════════════════════════════════════════════════════════════════
+    (function() {
+      var brCustomers = brData ? (brData.customers || []) : [];
+      var brTotal     = brData ? (brData.total || 0) : 0;
+      var scanning    = brData ? !!brData.scanning : false;
+      var progress    = brData ? (brData.progress || 0) : 0;
+      var totalPages  = brData ? (brData.totalPages || null) : null;
+      return React.createElement('div', { style: { marginTop: 32 } },
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 } },
+          React.createElement('h3', { style: { fontSize: 15, fontWeight: 700, margin: 0, flex: 1 } }, '🏢 Revisi Branch Customer'),
+          brData && !scanning && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } },
+            brData.scannedAt ? new Date(brData.scannedAt).toLocaleString('id-ID') : '—'
+          ),
+          React.createElement('button', {
+            onClick: function() { loadBranchAudit(entity, true); setBrRowStatus({}); }, disabled: brLoading,
+            style: { padding: '5px 11px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', color: 'var(--text1)' }
+          }, brLoading ? '⏳' : '🔄 Scan Ulang')
+        ),
+
+        brLoading && React.createElement('div', { style: { padding: 24, background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' } },
+          React.createElement('div', { style: { textAlign: 'center', color: 'var(--text2)', fontSize: 13 } },
+            React.createElement('div', null, '⏳ Scan semua customer... (proses ~2–3 menit)'),
+            totalPages && React.createElement('div', { style: { marginTop: 8, fontSize: 11, color: 'var(--text3)' } },
+              'Halaman ', progress.toLocaleString('id-ID'), ' dari ', totalPages.toLocaleString('id-ID'),
+              ' — ', brCustomers.length, ' non-All Branch ditemukan sejauh ini'
+            )
+          )
+        ),
+
+        brErr && React.createElement('div', { style: { padding: 16, color: '#dc2626', background: '#fef2f2', borderRadius: 10, border: '1px solid #fca5a5', marginBottom: 16 } }, '⚠️ ', brErr),
+
+        !brLoading && !brData && React.createElement('div', { style: { padding: '20px 16px', color: 'var(--text3)', fontSize: 13, background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)' } },
+          'Klik ', React.createElement('b', null, '🔄 Scan Ulang'), ' untuk memulai scan semua customer.'
+        ),
+
+        !brLoading && brData && React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
+          React.createElement('div', { style: { padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', alignItems: 'center', gap: 8 } },
+            React.createElement('span', { style: { fontSize: 14, fontWeight: 700 } }, '🌿 Bukan All Branch'),
+            React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, '— wajib diset ke [Semua Cabang]'),
+            React.createElement('span', { style: { marginLeft: 'auto', background: brCustomers.length ? '#dc2626' : '#16a34a', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 } }, brCustomers.length)
+          ),
+          React.createElement(BranchTable, { items: brCustomers })
+        ),
+
+        React.createElement('div', { style: { marginTop: 10, padding: '10px 14px', background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)', fontSize: 11, color: 'var(--text3)' } },
+          'ℹ️ Supplier tidak dapat diperiksa secara otomatis (scope vendor belum tersedia). Periksa supplier secara manual di Accurate.'
         )
       );
     })()
