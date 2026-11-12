@@ -49083,32 +49083,34 @@ function RevisiKodePelangganPage() {
                 React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12 } },
                   React.createElement('thead', null,
                     React.createElement('tr', { style: { background: 'var(--bg)' } },
-                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'No. Invoice'),
-                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'Tgl'),
-                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', fontWeight: 600, color: 'var(--text2)' } }, 'Nama Customer'),
-                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'Tipe Transaksi'),
-                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'Transaction Detail'),
-                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'Doc Transaction'),
-                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'No. Faktur Pajak'),
-                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', fontWeight: 600, color: 'var(--text2)' } }, 'Masalah')
+                      [['No. Invoice','nowrap'],['Tgl','nowrap'],['Nama Customer',''],['Tipe Transaksi','nowrap'],['Transaction Detail','nowrap'],['Doc Transaction',''],['No. Faktur Pajak','nowrap'],['DPP 11/12','nowrap'],['Tarif 12%','nowrap'],['VAT 12% ✓','nowrap'],['Masalah lain','']].map(function(col) {
+                        return React.createElement('th', { key: col[0], style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: col[1] || 'normal', fontWeight: 600, color: 'var(--text2)', fontSize: 11 } }, col[0]);
+                      })
                     )
                   ),
                   React.createElement('tbody', null,
                     flagged.map(function(row, idx) {
+                      var chkStyle = function(ok) { return { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', textAlign: 'center', fontSize: 13, background: ok === true ? '#f0fdf4' : ok === false ? '#fef2f2' : 'transparent' }; };
+                      var chkCell = function(val) {
+                        if (val === null || val === undefined) return React.createElement('td', { style: chkStyle(null) }, React.createElement('span', { style: { color: 'var(--text3)', fontSize: 11 } }, 'N/A'));
+                        return React.createElement('td', { style: chkStyle(val) }, val ? '✅' : '❌');
+                      };
+                      var vatOk = row.vatOk !== null && row.vatOk !== undefined ? row.vatOk === row.vatTotal : null;
+                      var tarifOk = row.tarif !== null && row.tarif !== undefined ? row.tarif === 12 : null;
+                      var extraIssues = row.issues.filter(function(iss) { return !iss.includes('DPP bukan') && !iss.includes('Tarif PPN') && !iss.includes('item belum VAT'); });
                       return React.createElement('tr', { key: row.id, style: { background: idx % 2 === 0 ? 'var(--surface)' : 'var(--bg)' } },
                         React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 11 } }, row.number),
                         React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', color: 'var(--text3)', fontSize: 11 } }, row.transDate || '—'),
-                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', maxWidth: 200 } }, row.customerName || '—'),
-                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' } },
-                          React.createElement('span', { style: { background: row.taxType === 'Digunggung' ? '#fef9c3' : row.taxType === 'Faktur Pajak' ? '#dbeafe' : row.taxType === 'Dokumen Tertentu' ? '#dcfce7' : 'var(--bg)', color: '#1e3a5f', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 } }, row.taxType || '—')
-                        ),
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', maxWidth: 180, fontSize: 12 } }, row.customerName || '—'),
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontSize: 11 } }, row.taxType || '—'),
                         React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 11 } }, row.transactionDetail || '—'),
-                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, maxWidth: 180 } }, row.documentTransaction || '—'),
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, maxWidth: 150 } }, row.documentTransaction || '—'),
                         React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 11, color: row.taxInvoiceNo ? 'inherit' : '#dc2626' } }, row.taxInvoiceNo || '(kosong)'),
+                        chkCell(row.dpp1112),
+                        chkCell(tarifOk),
+                        chkCell(vatOk),
                         React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, color: '#dc2626' } },
-                          row.issues.map(function(iss, i) {
-                            return React.createElement('div', { key: i }, '• ', iss);
-                          })
+                          extraIssues.map(function(iss, i) { return React.createElement('div', { key: i }, '• ', iss); })
                         )
                       );
                     })
@@ -49122,45 +49124,40 @@ function RevisiKodePelangganPage() {
 }
 
 // ─── CEK SALES INVOICE PAGE ──────────────────────────────────────
+// Khusus PT ADL saja — tidak ada tab GROUP
 var CSI_CONNECTOR = 'https://connectoracc.dzoutlet.co.id';
 var CSI_API_KEY   = 'dzone-connector-secret-2026';
 
 function CekSalesInvoicePage() {
-  var _e = React.useState('adl'); var entity = _e[0]; var setEntity = _e[1];
   var _d = React.useState(null); var data = _d[0]; var setData = _d[1];
   var _l = React.useState(false); var loading = _l[0]; var setLoading = _l[1];
   var _er = React.useState(null); var err = _er[0]; var setErr = _er[1];
 
-  function load(ent, force) {
-    var e = ent || entity;
+  function load(force) {
     setLoading(true); setErr(null); setData(null);
-    fetch(CSI_CONNECTOR + '/api/sales-invoices/tax-audit?entity=' + e + (force ? '&refresh=1' : ''), { headers: { 'X-API-Key': CSI_API_KEY } })
+    fetch(CSI_CONNECTOR + '/api/sales-invoices/tax-audit?entity=adl' + (force ? '&refresh=1' : ''), { headers: { 'X-API-Key': CSI_API_KEY } })
       .then(function(r) { return r.json(); })
       .then(function(d) { if (d.error) throw new Error(d.error); setData(d); })
       .catch(function(e) { setErr(e.message); })
       .finally(function() { setLoading(false); });
   }
 
-  React.useEffect(function() { load('adl', false); }, []);
-
-  function switchEntity(e) { setEntity(e); load(e, false); }
+  React.useEffect(function() { load(false); }, []);
 
   var flagged = data ? (data.flagged || []) : [];
   var total   = data ? (data.total || 0) : 0;
 
-  return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 1200, margin: '0 auto' } },
+  var chkStyle = function(ok) { return { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', textAlign: 'center', fontSize: 13, background: ok === true ? '#f0fdf4' : ok === false ? '#fef2f2' : 'transparent' }; };
+  var chkCell  = function(val) {
+    if (val === null || val === undefined) return React.createElement('td', { style: chkStyle(null) }, React.createElement('span', { style: { color: 'var(--text3)', fontSize: 11 } }, 'N/A'));
+    return React.createElement('td', { style: chkStyle(val) }, val ? '✅' : '❌');
+  };
 
-    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
-      React.createElement('h2', { style: { fontSize: 18, fontWeight: 700, margin: 0, flex: 1 } }, '🧾 Cek Sales Invoice')
-    ),
+  return React.createElement('div', { style: { padding: '20px 24px', maxWidth: 1300, margin: '0 auto' } },
 
-    React.createElement('div', { style: { display: 'flex', gap: 6, marginBottom: 24 } },
-      ['adl', 'group'].map(function(e) {
-        return React.createElement('button', {
-          key: e, onClick: function() { switchEntity(e); },
-          style: { padding: '7px 20px', borderRadius: 8, border: entity === e ? 'none' : '1px solid var(--border)', background: entity === e ? '#2563eb' : 'var(--surface)', color: entity === e ? '#fff' : 'var(--text1)', fontWeight: entity === e ? 700 : 400, fontSize: 13, cursor: 'pointer' }
-        }, e === 'adl' ? 'PT ADL' : 'GROUP');
-      })
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 } },
+      React.createElement('h2', { style: { fontSize: 18, fontWeight: 700, margin: 0, flex: 1 } }, '🧾 Cek Sales Invoice'),
+      React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)', background: 'var(--surface)', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: 20 } }, 'PT ADL')
     ),
 
     React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
@@ -49169,13 +49166,13 @@ function CekSalesInvoicePage() {
         data && React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, '— dari ', total.toLocaleString('id-ID'), ' faktur terbaru', data.cached ? ' (cache)' : ''),
         React.createElement('span', { style: { marginLeft: 'auto', background: flagged.length ? '#dc2626' : '#16a34a', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 } }, data ? String(flagged.length) : '…'),
         React.createElement('button', {
-          onClick: function() { load(entity, true); }, disabled: loading,
+          onClick: function() { load(true); }, disabled: loading,
           style: { marginLeft: 8, padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', color: 'var(--text1)' }
         }, loading ? '⏳' : '🔄 Refresh')
       ),
 
       loading && React.createElement('div', { style: { padding: 40, textAlign: 'center', color: 'var(--text3)' } },
-        React.createElement('div', null, '⏳ Memeriksa faktur penjualan...'),
+        React.createElement('div', null, '⏳ Memeriksa 100 faktur penjualan terbaru...'),
         React.createElement('div', { style: { fontSize: 11, marginTop: 8 } }, 'Proses ini memerlukan ~30–60 detik')
       ),
 
@@ -49187,25 +49184,29 @@ function CekSalesInvoicePage() {
         React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12 } },
           React.createElement('thead', null,
             React.createElement('tr', { style: { background: 'var(--bg)' } },
-              [['No. Invoice','nowrap'],['Tgl','nowrap'],['Nama Customer',''],['Tipe Transaksi','nowrap'],['Transaction Detail','nowrap'],['Doc Transaction',''],['No. Faktur Pajak','nowrap'],['Masalah','']].map(function(col) {
+              [['No. Invoice','nowrap'],['Tgl','nowrap'],['Nama Customer',''],['Tipe Transaksi','nowrap'],['Transaction Detail','nowrap'],['Doc Transaction',''],['No. Faktur Pajak','nowrap'],['DPP 11/12','nowrap'],['Tarif 12%','nowrap'],['VAT 12% ✓','nowrap'],['Masalah lain','']].map(function(col) {
                 return React.createElement('th', { key: col[0], style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: col[1] || 'normal', fontWeight: 600, color: 'var(--text2)', fontSize: 11 } }, col[0]);
               })
             )
           ),
           React.createElement('tbody', null,
             flagged.map(function(row, idx) {
+              var vatOk    = row.vatOk !== null && row.vatOk !== undefined ? row.vatOk === row.vatTotal : null;
+              var tarifOk  = row.tarif !== null && row.tarif !== undefined ? row.tarif === 12 : null;
+              var extraIss = row.issues.filter(function(iss) { return !iss.includes('DPP bukan') && !iss.includes('Tarif PPN') && !iss.includes('item belum VAT'); });
               return React.createElement('tr', { key: row.id, style: { background: idx % 2 === 0 ? 'var(--surface)' : 'var(--bg)' } },
                 React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 11 } }, row.number),
                 React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', color: 'var(--text3)', fontSize: 11 } }, row.transDate || '—'),
-                React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', maxWidth: 200 } }, row.customerName || '—'),
-                React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' } },
-                  React.createElement('span', { style: { background: row.taxType === 'Digunggung' ? '#fef9c3' : row.taxType === 'Faktur Pajak' ? '#dbeafe' : row.taxType === 'Dokumen Tertentu' ? '#dcfce7' : 'var(--bg)', color: '#1e3a5f', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 } }, row.taxType || '—')
-                ),
+                React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', maxWidth: 180, fontSize: 12 } }, row.customerName || '—'),
+                React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontSize: 11 } }, row.taxType || '—'),
                 React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 11 } }, row.transactionDetail || '—'),
-                React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, maxWidth: 180 } }, row.documentTransaction || '—'),
+                React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, maxWidth: 150 } }, row.documentTransaction || '—'),
                 React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 11, color: row.taxInvoiceNo ? 'inherit' : '#dc2626' } }, row.taxInvoiceNo || '(kosong)'),
+                chkCell(row.dpp1112),
+                chkCell(tarifOk),
+                chkCell(vatOk),
                 React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, color: '#dc2626' } },
-                  row.issues.map(function(iss, i) { return React.createElement('div', { key: i }, '• ', iss); })
+                  extraIss.map(function(iss, i) { return React.createElement('div', { key: i }, '• ', iss); })
                 )
               );
             })
