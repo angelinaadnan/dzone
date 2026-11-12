@@ -909,10 +909,6 @@ var ROLE_NAV = {
     icon: '🔧',
     label: 'My Jobs'
   }, {
-    id: 'kpi_teknisi',
-    icon: '📊',
-    label: 'KPI Teknisi'
-  }, {
     id: 'absensi',
     icon: '🗓',
     label: 'Absensi'
@@ -920,6 +916,21 @@ var ROLE_NAV = {
     id: 'riwayat_teknisi',
     icon: '📋',
     label: 'Riwayat'
+  }, {
+    id: '_section_kpi',
+    icon: '',
+    label: 'KPI',
+    _section: true
+  }, {
+    id: 'kpi_teknisi',
+    icon: '📊',
+    label: 'KPI Teknisi',
+    _inSection: 'kpi'
+  }, {
+    id: 'servis_summary',
+    icon: '📋',
+    label: 'Summary Servis',
+    _inSection: 'kpi'
   }],
   cabang: [{
     id: 'branch_dashboard',
@@ -4852,7 +4863,7 @@ function App() {
     courierTasks: courierTasks,
     serviceIntakes: serviceIntakes,
     purchaseOrders: purchaseOrders
-  })), (role === 'ops' || role === 'supervisor') && page === 'servis_summary' && /*#__PURE__*/React.createElement(ServisSummaryPage, {
+  })), (role === 'ops' || role === 'supervisor' || role === 'technician') && page === 'servis_summary' && /*#__PURE__*/React.createElement(ServisSummaryPage, {
     serviceIntakes: serviceIntakes
   }), (role === 'technician' || role === 'supervisor') && page === 'kpi_teknisi' && /*#__PURE__*/React.createElement(KpiTeknisiPage, {
     serviceIntakes: serviceIntakes,
