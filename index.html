@@ -820,6 +820,21 @@ var ROLE_NAV = {
     label: 'Absensi'
   }],
   ops: [{
+    id: '_section_kpi',
+    icon: '',
+    label: 'KPI',
+    _section: true
+  }, {
+    id: 'kpi_ops',
+    icon: '📊',
+    label: 'KPI Ops',
+    _inSection: 'kpi'
+  }, {
+    id: 'servis_summary',
+    icon: '📋',
+    label: 'Summary Servis',
+    _inSection: 'kpi'
+  }, {
     id: 'dashboard',
     icon: '📊',
     label: 'Dashboard'
@@ -868,21 +883,6 @@ var ROLE_NAV = {
     icon: '🚚',
     label: 'History Kurir'
   }, {
-    id: '_section_kpi',
-    icon: '',
-    label: 'KPI',
-    _section: true
-  }, {
-    id: 'kpi_ops',
-    icon: '📊',
-    label: 'KPI Ops',
-    _inSection: 'kpi'
-  }, {
-    id: 'servis_summary',
-    icon: '📋',
-    label: 'Summary Servis',
-    _inSection: 'kpi'
-  }, {
     id: 'absensi',
     icon: '🗓',
     label: 'Absensi'
@@ -901,6 +901,21 @@ var ROLE_NAV = {
     label: 'Absensi'
   }],
   technician: [{
+    id: '_section_kpi',
+    icon: '',
+    label: 'KPI',
+    _section: true
+  }, {
+    id: 'kpi_teknisi',
+    icon: '📊',
+    label: 'KPI Teknisi',
+    _inSection: 'kpi'
+  }, {
+    id: 'servis_summary',
+    icon: '📋',
+    label: 'Summary Servis',
+    _inSection: 'kpi'
+  }, {
     id: 'summary',
     icon: '📊',
     label: 'Ringkasan'
@@ -916,21 +931,6 @@ var ROLE_NAV = {
     id: 'riwayat_teknisi',
     icon: '📋',
     label: 'Riwayat'
-  }, {
-    id: '_section_kpi',
-    icon: '',
-    label: 'KPI',
-    _section: true
-  }, {
-    id: 'kpi_teknisi',
-    icon: '📊',
-    label: 'KPI Teknisi',
-    _inSection: 'kpi'
-  }, {
-    id: 'servis_summary',
-    icon: '📋',
-    label: 'Summary Servis',
-    _inSection: 'kpi'
   }],
   cabang: [{
     id: 'branch_dashboard',
@@ -997,6 +997,26 @@ var ROLE_NAV = {
     label: 'Absensi'
   }],
   supervisor: [{
+    id: '_section_kpi',
+    icon: '',
+    label: 'KPI',
+    _section: true
+  }, {
+    id: 'kpi_ops',
+    icon: '📊',
+    label: 'KPI Ops',
+    _inSection: 'kpi'
+  }, {
+    id: 'servis_summary',
+    icon: '📋',
+    label: 'Summary Servis',
+    _inSection: 'kpi'
+  }, {
+    id: 'kpi_teknisi',
+    icon: '🔧',
+    label: 'KPI Teknisi',
+    _inSection: 'kpi'
+  }, {
     id: 'sup_dashboard',
     icon: '📊',
     label: 'Dashboard'
@@ -1040,26 +1060,6 @@ var ROLE_NAV = {
     id: 'pesan_barang',
     icon: '🛒',
     label: 'Pesan Barang'
-  }, {
-    id: '_section_kpi',
-    icon: '',
-    label: 'KPI',
-    _section: true
-  }, {
-    id: 'kpi_ops',
-    icon: '📊',
-    label: 'KPI Ops',
-    _inSection: 'kpi'
-  }, {
-    id: 'servis_summary',
-    icon: '📋',
-    label: 'Summary Servis',
-    _inSection: 'kpi'
-  }, {
-    id: 'kpi_teknisi',
-    icon: '🔧',
-    label: 'KPI Teknisi',
-    _inSection: 'kpi'
   }, {
     id: 'absensi',
     icon: '🗓',
@@ -1933,7 +1933,10 @@ function App() {
   }, []);
   useEffect(function () {
     if (role) {
-      setPage(ROLE_NAV[role][0].id);
+      var _firstNav = ROLE_NAV[role].find(function(n) { return !n._section; });
+      var _firstPage = _firstNav ? _firstNav.id : ROLE_NAV[role][0].id;
+      setPage(_firstPage);
+      if (_firstNav && _firstNav._inSection === 'kpi') setKpiOpen(true);
       // Role-based loading — hanya load data yang dibutuhkan per role
       var isAdmin = ['admin', 'ops', 'supervisor'].includes(role);
       var isTech = role === 'technician';
@@ -4585,7 +4588,7 @@ function App() {
     { id: '_section_accurate', icon: '', label: 'ACCURATE', _section: true },
     { id: 'tanya_kode_sku', icon: '🏷️', label: 'Tanya Kode Barang', _inSection: 'accurate' },
   ] : []);
-  var navItems = (role === 'supervisor' && userName === 'Santo' ? [].concat(_toConsumableArray(ROLE_NAV[role]), [{
+  var _baseNav = (role === 'supervisor' && userName === 'Santo' ? [].concat(_toConsumableArray(ROLE_NAV[role]), [{
     id: 'branch_request',
     icon: '📦',
     label: 'Request Barang'
@@ -4593,13 +4596,23 @@ function App() {
     return n.id !== 'branch_request' || BRANCH_REQUEST_ALLOWED.includes(userName);
   }) : ROLE_NAV[role]).filter(function (n) {
     return n.id !== 'pesan_barang' || canAccessPesanBarang;
-  }).concat(accurateSection)
-  .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
-  .concat(STOCK_CALC_USERS.includes(userName) ? [{ id: 'stock_calculator', icon: '🧮', label: 'Kalkulator Stok', _inSection: 'kpi' }] : [])
-  .concat(STOCK_AGING_USERS.includes(userName) ? [{ id: 'stock_aging', icon: '📦', label: 'Review Stok', _inSection: 'kpi' }] : [])
-  .concat(PROFIT_DASHBOARD_USERS.includes(userName) ? [{ id: 'profit_dashboard', icon: '📊', label: 'Performance Dashboard', _inSection: 'kpi' }] : [])
-  .concat([]/* cek_sales_invoice sudah masuk accurateSection */)
-  .concat((function(){ var u = USER_ACCOUNTS.find(function(a){ return a.name === userName; }); return canDocArchive(u) ? [{ id: 'doc_archive', icon: '📁', label: 'Arsip Dokumen' }] : []; })());
+  });
+  var _extraKpi = []
+    .concat(STOCK_CALC_USERS.includes(userName) ? [{ id: 'stock_calculator', icon: '🧮', label: 'Kalkulator Stok', _inSection: 'kpi' }] : [])
+    .concat(STOCK_AGING_USERS.includes(userName) ? [{ id: 'stock_aging', icon: '📦', label: 'Review Stok', _inSection: 'kpi' }] : [])
+    .concat(PROFIT_DASHBOARD_USERS.includes(userName) ? [{ id: 'profit_dashboard', icon: '📊', label: 'Performance Dashboard', _inSection: 'kpi' }] : []);
+  // find where the KPI block ends in the base nav (items are at top now)
+  var _kpiEnd = 0;
+  for (var _ni = 0; _ni < _baseNav.length; _ni++) {
+    if (_baseNav[_ni]._inSection === 'kpi' || _baseNav[_ni].id === '_section_kpi') _kpiEnd = _ni + 1;
+    else break;
+  }
+  var navItems = _baseNav.slice(0, _kpiEnd)
+    .concat(_extraKpi)
+    .concat(_baseNav.slice(_kpiEnd))
+    .concat(accurateSection)
+    .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
+    .concat((function(){ var u = USER_ACCOUNTS.find(function(a){ return a.name === userName; }); return canDocArchive(u) ? [{ id: 'doc_archive', icon: '📁', label: 'Arsip Dokumen' }] : []; })());
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
