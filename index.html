@@ -49163,7 +49163,10 @@ function CekSalesInvoicePage() {
     React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
       React.createElement('div', { style: { padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', alignItems: 'center', gap: 8 } },
         React.createElement('span', { style: { fontSize: 14, fontWeight: 700 } }, '⚠️ Tidak Sesuai Aturan PPN'),
-        data && React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, '— dari ', total.toLocaleString('id-ID'), ' faktur terbaru', data.cached ? ' (cache)' : ''),
+        data && React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } },
+          '— dari ', total.toLocaleString('id-ID'), ' faktur',
+          data.scanFrom ? (' · ' + data.scanFrom + ' s/d ' + data.scanTo) : ' terbaru',
+          data.cached ? ' (cache)' : ''),
         React.createElement('span', { style: { marginLeft: 'auto', background: flagged.length ? '#dc2626' : '#16a34a', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 } }, data ? String(flagged.length) : '…'),
         React.createElement('button', {
           onClick: function() { load(true); }, disabled: loading,
@@ -49172,13 +49175,17 @@ function CekSalesInvoicePage() {
       ),
 
       loading && React.createElement('div', { style: { padding: 40, textAlign: 'center', color: 'var(--text3)' } },
-        React.createElement('div', null, '⏳ Memeriksa 100 faktur penjualan terbaru...'),
+        React.createElement('div', null, '⏳ Memeriksa faktur penjualan bulan ini...'),
         React.createElement('div', { style: { fontSize: 11, marginTop: 8 } }, 'Proses ini memerlukan ~30–60 detik')
       ),
 
       err && React.createElement('div', { style: { padding: 16, color: '#dc2626', background: '#fef2f2', borderRadius: 10, border: '1px solid #fca5a5', margin: 16 } }, '⚠️ ', err),
 
-      data && !loading && flagged.length === 0 && React.createElement('div', { style: { padding: '20px 16px', color: 'var(--text3)', fontSize: 13 } }, '✅ Semua faktur sesuai aturan PPN'),
+      data && !loading && flagged.length === 0 && React.createElement('div', { style: { padding: '20px 16px', color: '#16a34a', fontSize: 13, fontWeight: 600 } },
+        '✅ Semua faktur',
+        data.scanFrom ? (' ' + data.scanFrom + ' s/d ' + data.scanTo) : '',
+        ' sudah sesuai aturan PPN'
+      ),
 
       data && !loading && flagged.length > 0 && React.createElement('div', { style: { overflowX: 'auto' } },
         React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12 } },
