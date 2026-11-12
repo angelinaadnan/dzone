@@ -48701,6 +48701,11 @@ function RevisiKodePelangganPage() {
   var _ce = React.useState(null); var catErr = _ce[0]; var setCatErr = _ce[1];
   var _crs = React.useState({}); var catRowStatus = _crs[0]; var setCatRowStatus = _crs[1];
 
+  // ── Revisi Sales Invoice state ────────────────────────────────────────
+  var _td = React.useState(null); var taxData = _td[0]; var setTaxData = _td[1];
+  var _tl = React.useState(false); var taxLoading = _tl[0]; var setTaxLoading = _tl[1];
+  var _te = React.useState(null); var taxErr = _te[0]; var setTaxErr = _te[1];
+
   function loadAudit(ent, force) {
     var e = ent || entity;
     setLoading(true); setErr(null); setData(null); setRowStatus({});
@@ -48723,12 +48728,24 @@ function RevisiKodePelangganPage() {
       .finally(function() { setCatLoading(false); });
   }
 
-  React.useEffect(function() { loadAudit('adl', false); loadCatAudit('adl', false); }, []);
+  function loadTaxAudit(ent, force) {
+    var e = ent || entity;
+    setTaxLoading(true); setTaxErr(null); setTaxData(null);
+    var url = RKP_CONNECTOR + '/api/sales-invoices/tax-audit?entity=' + e + (force ? '&refresh=1' : '');
+    fetch(url, { headers: { 'X-API-Key': RKP_API_KEY } })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { if (d.error) throw new Error(d.error); setTaxData(d); })
+      .catch(function(e) { setTaxErr(e.message); })
+      .finally(function() { setTaxLoading(false); });
+  }
+
+  React.useEffect(function() { loadAudit('adl', false); loadCatAudit('adl', false); loadTaxAudit('adl', false); }, []);
 
   function switchEntity(e) {
     setEntity(e);
     loadAudit(e, false);
     loadCatAudit(e, false);
+    loadTaxAudit(e, false);
   }
 
   // ── Fix kode pelanggan ────────────────────────────────────────────────
@@ -49024,7 +49041,81 @@ function RevisiKodePelangganPage() {
         ),
         React.createElement(CatTable, { items: catWrong })
       )
-    )
+    ),
+
+    // ══════════════════════════════════════════════════════════════════
+    // SECTION 3 — Revisi Sales Invoice (PPN Compliance)
+    // ══════════════════════════════════════════════════════════════════
+    (function() {
+      var flagged = taxData ? (taxData.flagged || []) : [];
+      var total   = taxData ? (taxData.total || 0) : 0;
+      return React.createElement('div', { style: { marginTop: 32 } },
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 } },
+          React.createElement('h3', { style: { fontSize: 15, fontWeight: 700, margin: 0, flex: 1 } }, '🧾 Revisi Sales Invoice'),
+          taxData && React.createElement('div', { style: { fontSize: 11, color: 'var(--text3)' } },
+            taxData.cached ? 'cache' : 'fresh',
+            ' · dari ', total.toLocaleString('id-ID'), ' faktur'
+          ),
+          React.createElement('button', {
+            onClick: function() { loadTaxAudit(entity, true); }, disabled: taxLoading,
+            style: { padding: '5px 11px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, fontSize: 12, cursor: 'pointer', color: 'var(--text1)' }
+          }, taxLoading ? '⏳' : '🔄 Refresh')
+        ),
+
+        taxLoading && React.createElement('div', { style: { padding: 40, textAlign: 'center', color: 'var(--text3)' } },
+          React.createElement('div', null, '⏳ Memeriksa faktur penjualan...'),
+          React.createElement('div', { style: { fontSize: 11, marginTop: 8 } }, 'Proses ini memerlukan ~30–60 detik')
+        ),
+
+        taxErr && React.createElement('div', { style: { padding: 16, color: '#dc2626', background: '#fef2f2', borderRadius: 10, border: '1px solid #fca5a5', marginBottom: 16 } }, '⚠️ ', taxErr),
+
+        taxData && !taxLoading && React.createElement('div', { style: { background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' } },
+          React.createElement('div', { style: { padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', display: 'flex', alignItems: 'center', gap: 8 } },
+            React.createElement('span', { style: { fontSize: 14, fontWeight: 700 } }, '⚠️ Tidak Sesuai Aturan PPN'),
+            React.createElement('span', { style: { fontSize: 12, color: 'var(--text3)' } }, '— 100 faktur terbaru diperiksa'),
+            React.createElement('span', { style: { marginLeft: 'auto', background: flagged.length ? '#dc2626' : '#16a34a', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 } }, flagged.length)
+          ),
+          flagged.length === 0
+            ? React.createElement('div', { style: { padding: '20px 16px', color: 'var(--text3)', fontSize: 13 } }, '✅ Semua faktur sesuai aturan PPN')
+            : React.createElement('div', { style: { overflowX: 'auto' } },
+                React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12 } },
+                  React.createElement('thead', null,
+                    React.createElement('tr', { style: { background: 'var(--bg)' } },
+                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'No. Invoice'),
+                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'Tgl'),
+                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', fontWeight: 600, color: 'var(--text2)' } }, 'Nama Customer'),
+                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'Tipe Transaksi'),
+                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'Transaction Detail'),
+                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'Doc Transaction'),
+                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text2)' } }, 'No. Faktur Pajak'),
+                      React.createElement('th', { style: { padding: '8px 12px', textAlign: 'left', borderBottom: '1px solid var(--border)', fontWeight: 600, color: 'var(--text2)' } }, 'Masalah')
+                    )
+                  ),
+                  React.createElement('tbody', null,
+                    flagged.map(function(row, idx) {
+                      return React.createElement('tr', { key: row.id, style: { background: idx % 2 === 0 ? 'var(--surface)' : 'var(--bg)' } },
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 11 } }, row.number),
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', color: 'var(--text3)', fontSize: 11 } }, row.transDate || '—'),
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', maxWidth: 200 } }, row.customerName || '—'),
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' } },
+                          React.createElement('span', { style: { background: row.taxType === 'Digunggung' ? '#fef9c3' : row.taxType === 'Faktur Pajak' ? '#dbeafe' : row.taxType === 'Dokumen Tertentu' ? '#dcfce7' : 'var(--bg)', color: '#1e3a5f', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 } }, row.taxType || '—')
+                        ),
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 11 } }, row.transactionDetail || '—'),
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, maxWidth: 180 } }, row.documentTransaction || '—'),
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 11, color: row.taxInvoiceNo ? 'inherit' : '#dc2626' } }, row.taxInvoiceNo || '(kosong)'),
+                        React.createElement('td', { style: { padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, color: '#dc2626' } },
+                          row.issues.map(function(iss, i) {
+                            return React.createElement('div', { key: i }, '• ', iss);
+                          })
+                        )
+                      );
+                    })
+                  )
+                )
+              )
+        )
+      );
+    })()
   );
 }
 
