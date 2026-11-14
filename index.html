@@ -2056,7 +2056,7 @@ function KpiAdminPage(props) {
               React.createElement('tbody', null, adminStats.map(function(s){
                 return React.createElement('tr', {key:s.name,style:{borderTop:'1px solid var(--border)'}},
                   React.createElement('td', {style:Object.assign({},tdS,{fontWeight:600,fontSize:13})}, s.name),
-                  React.createElement('td', {style:Object.assign({},tdS,{fontWeight:700,color:s.today>=10?'var(--green)':s.today>=5?'var(--amber)':'var(--text)'}},s.today),
+                  React.createElement('td', {style:Object.assign({},tdS,{fontWeight:700,color:s.today>=10?'var(--green)':s.today>=5?'var(--amber)':'var(--text)'})},s.today),
                   React.createElement('td', {style:tdS}, s.month),
                   React.createElement('td', {style:Object.assign({},tdS,{color:s.avgH===null?'var(--text3)':s.avgH<=2?'var(--green)':s.avgH<=8?'var(--amber)':'var(--red)'})},
                     s.avgH!==null ? s.avgH+' jam' : '—')
