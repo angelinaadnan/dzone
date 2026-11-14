@@ -46813,39 +46813,40 @@ function ServiceCardOps(_ref272) {
       color: 'var(--teal)',
       marginBottom: 6
     }
-  }, "\uD83D\uDD04 Kirim Balik ke Service Center?"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: 'var(--text2)',
-      marginBottom: 10
-    }
-  }, "Status akan kembali ke \"Ke Service Center\". Pastikan sudah dikonfirmasi dengan SC."), /*#__PURE__*/React.createElement("div", {
+  }, "\uD83D\uDD04 Kirim Balik ke SC \u2014 Pilih Kurir:"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
-      gap: 8
+      gap: 6,
+      flexWrap: 'wrap',
+      marginBottom: 8
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, KURIR_LIST.map(function (n) {
+    return /*#__PURE__*/React.createElement("button", {
+      key: n,
+      className: "btn-secondary btn-sm",
+      style: {
+        background: 'var(--teal)',
+        color: '#fff',
+        border: 'none'
+      },
+      onClick: function onClick() {
+        onUpdate(si.id, {
+          status: 'to_service_center',
+          sc_delivery_courier: n,
+          sc_delivered_at: null
+        });
+        setShowKirimBalik(false);
+      }
+    }, n);
+  })), /*#__PURE__*/React.createElement("button", {
     className: "btn-secondary btn-sm",
     style: {
-      flex: 1,
-      background: 'var(--teal)',
-      color: '#fff',
-      border: 'none'
+      fontSize: 11
     },
-    onClick: function onClick() {
-      onUpdate(si.id, {
-        status: 'to_service_center',
-        sc_delivery_courier: null,
-        sc_delivered_at: null
-      });
-      setShowKirimBalik(false);
-    }
-  }, "\uD83D\uDD04 Ya, Kirim Balik ke SC"), /*#__PURE__*/React.createElement("button", {
-    className: "btn-secondary btn-sm",
     onClick: function onClick() {
       return setShowKirimBalik(false);
     }
-  }, "Batal"))), showBatal && /*#__PURE__*/React.createElement(BatalBox, {
+  }, "Batal")), showBatal && /*#__PURE__*/React.createElement(BatalBox, {
     reason: batalReason,
     setReason: setBatalReason,
     onConfirm: doBatalServis,
