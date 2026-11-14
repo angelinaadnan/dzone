@@ -8903,8 +8903,14 @@ function PurchaseOrderCard(_ref60) {
   var itemArrived = function itemArrived(it) {
     return itemReceived(it) >= itemQty(it);
   };
+  var itemEmpty = function itemEmpty(it) {
+    return !!it.out_of_stock;
+  };
+  var itemDone = function itemDone(it) {
+    return itemArrived(it) || itemEmpty(it);
+  };
   var arrivedCount = items.filter(function (it) {
-    return itemArrived(it);
+    return itemDone(it);
   }).length;
   var totalCount = items.length;
   var allArrived = arrivedCount === totalCount && totalCount > 0;
@@ -8939,16 +8945,51 @@ function PurchaseOrderCard(_ref60) {
       }) : item;
     });
     var n = updated.filter(function (it) {
-      return itemArrived(it);
+      return itemDone(it);
     }).length;
     var anyRecv = updated.some(function (it) {
-      return itemReceived(it) > 0;
+      return itemReceived(it) > 0 || it.out_of_stock;
     });
     onUpdate(po.id, {
       items: updated,
       status: n === totalCount && totalCount > 0 ? 'completed' : anyRecv ? 'partial' : 'pending'
     });
     setReceiveForm(null);
+  };
+
+  /* mark item as out of stock (barang kosong dari supplier) */
+  var doMarkEmpty = function doMarkEmpty(idx) {
+    var now = new Date().toISOString();
+    var updated = items.map(function (it, i) {
+      return i === idx ? _objectSpread(_objectSpread({}, it), {}, {
+        out_of_stock: true,
+        out_of_stock_at: now,
+        out_of_stock_by: userName
+      }) : it;
+    });
+    var n = updated.filter(function (it) { return itemDone(it); }).length;
+    var anyRecv = updated.some(function (it) { return itemReceived(it) > 0 || it.out_of_stock; });
+    onUpdate(po.id, {
+      items: updated,
+      status: n === totalCount && totalCount > 0 ? 'completed' : anyRecv ? 'partial' : 'pending'
+    });
+  };
+
+  /* reset out_of_stock flag */
+  var resetEmptyItem = function resetEmptyItem(idx) {
+    var updated = items.map(function (it, i) {
+      return i === idx ? _objectSpread(_objectSpread({}, it), {}, {
+        out_of_stock: false,
+        out_of_stock_at: null,
+        out_of_stock_by: null
+      }) : it;
+    });
+    var n = updated.filter(function (it) { return itemDone(it); }).length;
+    var anyRecv = updated.some(function (it) { return itemReceived(it) > 0 || it.out_of_stock; });
+    onUpdate(po.id, {
+      items: updated,
+      status: n === totalCount && totalCount > 0 ? 'completed' : anyRecv ? 'partial' : 'pending'
+    });
   };
 
   /* reset item reception */
@@ -8965,10 +9006,10 @@ function PurchaseOrderCard(_ref60) {
       }) : it;
     });
     var n = updated.filter(function (it) {
-      return itemArrived(it);
+      return itemDone(it);
     }).length;
     var anyRecv = updated.some(function (it) {
-      return itemReceived(it) > 0;
+      return itemReceived(it) > 0 || it.out_of_stock;
     });
     onUpdate(po.id, {
       items: updated,
@@ -8999,10 +9040,10 @@ function PurchaseOrderCard(_ref60) {
       });
     });
     var n = updated.filter(function (it) {
-      return itemArrived(it);
+      return itemDone(it);
     }).length;
     var anyRecv = updated.some(function (it) {
-      return itemReceived(it) > 0;
+      return itemReceived(it) > 0 || it.out_of_stock;
     });
     onUpdate(po.id, {
       items: updated,
@@ -9336,6 +9377,7 @@ function PurchaseOrderCard(_ref60) {
     var total = itemQty(it);
     var remain = itemRemain(it);
     var arrived = itemArrived(it);
+    var empty = itemEmpty(it);
     var carriedByTrip = trips.find(function (t) {
       return (t.item_indices || []).includes(i);
     });
@@ -9349,8 +9391,8 @@ function PurchaseOrderCard(_ref60) {
         padding: '10px 12px',
         marginBottom: 6,
         borderRadius: 8,
-        background: arrived ? 'rgba(34,197,94,0.08)' : received > 0 ? 'rgba(245,158,11,0.05)' : 'var(--bg3)',
-        border: "1px solid ".concat(arrived ? 'rgba(34,197,94,0.25)' : received > 0 ? 'rgba(245,158,11,0.25)' : 'var(--border)')
+        background: arrived ? 'rgba(34,197,94,0.08)' : empty ? 'rgba(107,114,128,0.08)' : received > 0 ? 'rgba(245,158,11,0.05)' : 'var(--bg3)',
+        border: "1px solid ".concat(arrived ? 'rgba(34,197,94,0.25)' : empty ? 'rgba(107,114,128,0.25)' : received > 0 ? 'rgba(245,158,11,0.25)' : 'var(--border)')
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -9359,14 +9401,14 @@ function PurchaseOrderCard(_ref60) {
         borderRadius: 6,
         flexShrink: 0,
         marginTop: 1,
-        background: arrived ? 'var(--green)' : received > 0 ? 'var(--amber)' : 'rgba(255,255,255,0.06)',
-        border: "1px solid ".concat(arrived ? 'var(--green)' : received > 0 ? 'var(--amber)' : 'var(--border2)'),
+        background: arrived ? 'var(--green)' : empty ? 'rgba(107,114,128,0.4)' : received > 0 ? 'var(--amber)' : 'rgba(255,255,255,0.06)',
+        border: "1px solid ".concat(arrived ? 'var(--green)' : empty ? 'rgba(107,114,128,0.6)' : received > 0 ? 'var(--amber)' : 'var(--border2)'),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontSize: 12
       }
-    }, arrived ? '✓' : received > 0 ? '~' : ''), /*#__PURE__*/React.createElement("div", {
+    }, arrived ? '✓' : empty ? '✕' : received > 0 ? '~' : ''), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -9426,7 +9468,9 @@ function PurchaseOrderCard(_ref60) {
         color: 'var(--amber)',
         fontWeight: 600
       }
-    }, "\uD83D\uDCDD ", it.notes)), arrived && it.arrived_by && /*#__PURE__*/React.createElement("div", {
+    }, "\uD83D\uDCDD ", it.notes)), empty && /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: 'var(--text3)', marginTop: 3 }
+    }, "\uD83D\uDEAB Kosong dari supplier", it.out_of_stock_by ? " \xB7 " + it.out_of_stock_by + (it.out_of_stock_at ? " \xB7 " + fmtDateTime(it.out_of_stock_at) : '') : ''), arrived && it.arrived_by && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         color: 'var(--green)',
@@ -9517,7 +9561,20 @@ function PurchaseOrderCard(_ref60) {
         fontSize: 11,
         whiteSpace: 'nowrap'
       }
-    }, received > 0 ? "\uD83D\uDCE6 +Terima (".concat(remain, " sisa)") : '✅ Terima Barang') : null, canMark && arrived && /*#__PURE__*/React.createElement("button", {
+    }, received > 0 ? "\uD83D\uDCE6 +Terima (".concat(remain, " sisa)") : '✅ Terima Barang') : null,
+    canMark && !arrived && !empty && /*#__PURE__*/React.createElement("button", {
+      onClick: function onClick() {
+        if (window.confirm("\uD83D\uDEAB Tandai \"" + it.name + "\" sebagai kosong dari supplier?")) doMarkEmpty(i);
+      },
+      className: "btn-secondary btn-sm",
+      style: { fontSize: 10, color: 'var(--text3)', whiteSpace: 'nowrap' }
+    }, "\uD83D\uDEAB Kosong"),
+    canMark && empty && /*#__PURE__*/React.createElement("button", {
+      onClick: function onClick() { resetEmptyItem(i); },
+      className: "btn-secondary btn-sm",
+      style: { fontSize: 10, color: 'var(--text3)' }
+    }, "Batalkan Kosong"),
+    canMark && arrived && /*#__PURE__*/React.createElement("button", {
       onClick: function onClick() {
         if (window.confirm("Reset penerimaan \"".concat(it.name, "\"?"))) resetItem(i);
       },
