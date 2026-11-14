@@ -45318,6 +45318,10 @@ function ServiceCardOps(_ref272) {
     _React$useState_skb2 = _slicedToArray(_React$useState_skb, 2),
     showKirimBalik = _React$useState_skb2[0],
     setShowKirimBalik = _React$useState_skb2[1];
+  var _React$useState_sgk = React.useState(false),
+    _React$useState_sgk2 = _slicedToArray(_React$useState_sgk, 2),
+    showGantiKurir = _React$useState_sgk2[0],
+    setShowGantiKurir = _React$useState_sgk2[1];
   // Catatan Ops
   var _React$useState481 = React.useState(false),
     _React$useState482 = _slicedToArray(_React$useState481, 2),
@@ -46301,13 +46305,32 @@ function ServiceCardOps(_ref272) {
     style: {
       fontSize: 13
     }
-  }, "\uD83C\uDFEA SC: ", /*#__PURE__*/React.createElement("b", null, si.service_center_name || '-'), si.sc_delivery_courier && /*#__PURE__*/React.createElement(React.Fragment, null, " \xB7 Kurir: ", /*#__PURE__*/React.createElement("b", null, si.sc_delivery_courier))), si.sc_delivery_courier ? /*#__PURE__*/React.createElement("div", {
+  }, "\uD83C\uDFEA SC: ", /*#__PURE__*/React.createElement("b", null, si.service_center_name || '-'), si.sc_delivery_courier && /*#__PURE__*/React.createElement(React.Fragment, null, " \xB7 Kurir: ", /*#__PURE__*/React.createElement("b", null, si.sc_delivery_courier))), si.sc_delivery_courier ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: 'var(--text3)',
-      marginTop: 2
+      marginTop: 2,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8
     }
-  }, "Kurir sedang dalam perjalanan menuju SC...") : /*#__PURE__*/React.createElement("div", {
+  }, "Kurir sedang dalam perjalanan menuju SC...", /*#__PURE__*/React.createElement("button", {
+    className: "btn-secondary btn-sm",
+    style: { fontSize: 10, padding: '2px 8px' },
+    onClick: function onClick() { return setShowGantiKurir(function(b) { return !b; }); }
+  }, showGantiKurir ? "Tutup" : "\uD83D\uDD04 Ganti Kurir")), showGantiKurir && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }
+  }, KURIR_LIST.map(function(n) {
+    return /*#__PURE__*/React.createElement("button", {
+      key: n,
+      className: "btn-secondary btn-sm",
+      style: n === si.sc_delivery_courier ? { background: 'var(--amber)', color: '#fff', border: 'none' } : {},
+      onClick: function onClick() {
+        onUpdate(si.id, { sc_delivery_courier: n });
+        setShowGantiKurir(false);
+      }
+    }, n);
+  }))) : /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 8
     }
