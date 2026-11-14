@@ -46807,9 +46807,7 @@ function ServiceCardOps(_ref272) {
     },
     onClick: function onClick() {
       onUpdate(si.id, {
-        status: 'to_service_center',
-        sc_resent_at: new Date().toISOString(),
-        sc_resent_by: si.tech_assigned || ''
+        status: 'to_service_center'
       });
       setShowKirimBalik(false);
     }
