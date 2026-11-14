@@ -9114,24 +9114,44 @@ function PurchaseOrderCard(_ref60) {
     if (hasPending) setConfirmTripDone(trip);else doFinishTrip(trip, false);
   };
   var doFinishTrip = function doFinishTrip(trip, autoReceive) {
+    var now = new Date().toISOString();
     var updatedTrips = trips.map(function (t) {
       return t.id === trip.id ? _objectSpread(_objectSpread({}, t), {}, {
         status: 'done',
-        done_at: new Date().toISOString()
+        done_at: now
       }) : t;
     });
-    onUpdate(po.id, {
-      pickups: updatedTrips,
-      pickup: null
-    });
     if (autoReceive) {
-      var tripItems = trip.trip_items || (trip.item_indices || []).map(function (i) {
-        return {
-          idx: i,
-          qty: itemRemain(items[i] || {})
-        };
+      var tripItemsArr = trip.trip_items || (trip.item_indices || []).map(function (i) {
+        return { idx: i, qty: itemRemain(items[i] || {}) };
       });
-      receiveFromTripMap(tripItems);
+      var updatedItems = items.map(function (item, i) {
+        var ti = tripItemsArr.find(function (t) { return t.idx === i; });
+        if (!ti || ti.qty <= 0) return item;
+        var toReceive = Math.min(ti.qty, itemRemain(item));
+        if (toReceive <= 0) return item;
+        var newReceived = itemReceived(item) + toReceive;
+        var arrived = newReceived >= itemQty(item);
+        return _objectSpread(_objectSpread({}, item), {}, {
+          received_qty: newReceived,
+          arrived: arrived,
+          arrived_at: arrived ? item.arrived_at || now : item.arrived_at,
+          arrived_by: arrived ? userName : item.arrived_by,
+          last_recv_at: now,
+          last_recv_by: userName,
+          last_recv_qty: toReceive
+        });
+      });
+      var n = updatedItems.filter(function (it) { return itemDone(it); }).length;
+      var anyRecv = updatedItems.some(function (it) { return itemReceived(it) > 0 || it.out_of_stock; });
+      onUpdate(po.id, {
+        pickups: updatedTrips,
+        pickup: null,
+        items: updatedItems,
+        status: n === totalCount && totalCount > 0 ? 'completed' : anyRecv ? 'partial' : 'pending'
+      });
+    } else {
+      onUpdate(po.id, { pickups: updatedTrips, pickup: null });
     }
     setConfirmTripDone(null);
   };
@@ -10243,24 +10263,25 @@ function PesanBarangPage(_ref71) {
   };
   var baseOrders = poDbResult !== null ? poDbResult : orders;
   var canMark = ['admin', 'ops', 'admin_pembelian', 'admin_online', 'supervisor'].includes(role);
+  var poComputedStatus = function poComputedStatus(po) {
+    if (po.status === 'cancelled') return 'cancelled';
+    var its = po.items || [];
+    if (its.length > 0 && its.every(function(it) {
+      var recv = it.received_qty != null ? it.received_qty : (it.received || 0);
+      return recv >= (it.qty || 1) || !!it.out_of_stock;
+    })) return 'completed';
+    return po.status;
+  };
   var filtered = baseOrders.filter(function (po) {
-    return filter === 'all' || po.status === filter;
+    return filter === 'all' || poComputedStatus(po) === filter;
   }).filter(function (po) {
     return !search || (po.supplier_name || '').toLowerCase().includes(search.toLowerCase());
   });
   var stats = {
-    pending: orders.filter(function (p) {
-      return p.status === 'pending';
-    }).length,
-    partial: orders.filter(function (p) {
-      return p.status === 'partial';
-    }).length,
-    completed: orders.filter(function (p) {
-      return p.status === 'completed';
-    }).length,
-    cancelled: orders.filter(function (p) {
-      return p.status === 'cancelled';
-    }).length
+    pending: orders.filter(function (p) { return poComputedStatus(p) === 'pending'; }).length,
+    partial: orders.filter(function (p) { return poComputedStatus(p) === 'partial'; }).length,
+    completed: orders.filter(function (p) { return poComputedStatus(p) === 'completed'; }).length,
+    cancelled: orders.filter(function (p) { return poComputedStatus(p) === 'cancelled'; }).length
   };
   if (showForm) return /*#__PURE__*/React.createElement(PesanBarangForm, {
     onSave: onSave,
