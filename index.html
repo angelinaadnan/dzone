@@ -1921,19 +1921,49 @@ function KpiAdminPage(props) {
   // ── SUPERVISOR: compare all admins ──
   var adminStats = [];
   if (isSupervisor) {
+    var userRoleMap = {};
+    (USER_ACCOUNTS||[]).forEach(function(u){ userRoleMap[u.name] = u.role; });
+
+    var weekStart = new Date(todayStart);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay()+6)%7)); // Senin
+    var lastMonthStart = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    var lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
     var nameSet = {};
     orders.forEach(function(o) {
       (o.status_history||[]).forEach(function(h){ if(h.status==='invoiced'&&h.by) nameSet[h.by]=true; });
     });
     adminStats = Object.keys(nameSet).sort().map(function(name) {
-      var byMonth = orders.filter(function(o){ var e=getInvoicedEntry(o,name); return e&&new Date(e.time)>=monthStart; });
-      var byToday = byMonth.filter(function(o){ var e=getInvoicedEntry(o,name); return e&&new Date(e.time)>=todayStart; });
-      var avgMs = 0;
-      if (byToday.length > 0) {
-        var tMs = byToday.reduce(function(acc,o){ var e=getInvoicedEntry(o,name); if(!e) return acc; var ms=new Date(e.time)-new Date(o.created_at); return acc+(ms>0?ms:0); },0);
-        avgMs = tMs / byToday.length;
+      var adminRole = userRoleMap[name] || 'admin';
+      var scopeOnline = adminRole === 'admin_online';
+      function inScope(o) {
+        var src = getOrderSource(o);
+        return scopeOnline ? ['online','cabang'].includes(src) : ['offline','other','cabang'].includes(src);
       }
-      return { name:name, today:byToday.length, month:byMonth.length, avgH: byToday.length>0 ? Math.round(avgMs/3600000*10)/10 : null };
+      var masukHariIni = orders.filter(function(o){ return inScope(o)&&new Date(o.created_at)>=todayStart; }).length;
+      var masukMinggu  = orders.filter(function(o){ return inScope(o)&&new Date(o.created_at)>=weekStart; }).length;
+      var masukBulan   = orders.filter(function(o){ return inScope(o)&&new Date(o.created_at)>=monthStart; }).length;
+      var masukBulanKemarin = orders.filter(function(o){ var d=new Date(o.created_at); return inScope(o)&&d>=lastMonthStart&&d<=lastMonthEnd; }).length;
+      function prosesInPeriod(from, to) {
+        return orders.filter(function(o){ var e=getInvoicedEntry(o,name); if(!e) return false; var t=new Date(e.time); return t>=from&&(!to||t<=to); });
+      }
+      var prosesToday        = prosesInPeriod(todayStart);
+      var prosesMinggu       = prosesInPeriod(weekStart);
+      var prosesBulan        = prosesInPeriod(monthStart);
+      var prosesBulanKemarin = prosesInPeriod(lastMonthStart, lastMonthEnd);
+      var avgH = null;
+      if (prosesToday.length > 0) {
+        var tMs = prosesToday.reduce(function(acc,o){ var e=getInvoicedEntry(o,name); if(!e) return acc; var ms=new Date(e.time)-new Date(o.created_at); return acc+(ms>0?ms:0); },0);
+        avgH = Math.round(tMs/prosesToday.length/3600000*10)/10;
+      }
+      var gantung = orders.filter(function(o){ return o.status==='new'&&inScope(o); }).length;
+      return {
+        name: name, role: adminRole,
+        masukHariIni: masukHariIni, prosesHariIni: prosesToday.length, avgH: avgH, gantung: gantung,
+        minggu: {proses:prosesMinggu.length, masuk:masukMinggu},
+        bulan:  {proses:prosesBulan.length,  masuk:masukBulan},
+        bulanKemarin: {proses:prosesBulanKemarin.length, masuk:masukBulanKemarin}
+      };
     });
   }
 
@@ -2043,23 +2073,47 @@ function KpiAdminPage(props) {
 
     // ── Supervisor comparison table ──
     isSupervisor && React.createElement('div', null,
-      React.createElement('div', {style:secLbl}, 'PERFORMA ADMIN — BULAN INI'),
+      React.createElement('div', {style:secLbl}, 'PERFORMA ADMIN — RINGKASAN'),
       adminStats.length===0
         ? React.createElement('div', {style:{color:'var(--text3)',fontSize:13}}, 'Belum ada data')
-        : React.createElement('div', {style:{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}},
-            React.createElement('table', {style:{width:'100%',borderCollapse:'collapse'}},
+        : React.createElement('div', {style:{background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:10,overflowX:'auto'}},
+            React.createElement('table', {style:{width:'100%',borderCollapse:'collapse',minWidth:720}},
               React.createElement('thead', null, React.createElement('tr', null,
-                ['Admin','Proses Hari Ini','Bulan Ini','Avg Waktu (hari ini)'].map(function(h){
-                  return React.createElement('th', {key:h,style:thS}, h);
+                [
+                  {lbl:'Username',      align:'left'},
+                  {lbl:'Masuk\nHari Ini',  align:'center'},
+                  {lbl:'Diproses\nHari Ini', align:'center'},
+                  {lbl:'Avg Waktu\nProses', align:'center'},
+                  {lbl:'Gantung',       align:'center'},
+                  {lbl:'Minggu Ini\nproses/masuk', align:'center'},
+                  {lbl:'Bulan Ini\nproses/masuk',  align:'center'},
+                  {lbl:'Bln Kemarin\nproses/masuk', align:'center'},
+                ].map(function(h){
+                  return React.createElement('th', {key:h.lbl, style:Object.assign({},thS,{textAlign:h.align,whiteSpace:'pre-line',lineHeight:'1.3'})}, h.lbl);
                 })
               )),
               React.createElement('tbody', null, adminStats.map(function(s){
-                return React.createElement('tr', {key:s.name,style:{borderTop:'1px solid var(--border)'}},
-                  React.createElement('td', {style:Object.assign({},tdS,{fontWeight:600,fontSize:13})}, s.name),
-                  React.createElement('td', {style:Object.assign({},tdS,{fontWeight:700,color:s.today>=10?'var(--green)':s.today>=5?'var(--amber)':'var(--text)'})},s.today),
-                  React.createElement('td', {style:tdS}, s.month),
-                  React.createElement('td', {style:Object.assign({},tdS,{color:s.avgH===null?'var(--text3)':s.avgH<=2?'var(--green)':s.avgH<=8?'var(--amber)':'var(--red)'})},
-                    s.avgH!==null ? s.avgH+' jam' : '—')
+                var icon = s.role==='admin_online' ? '🌐' : '🗂';
+                function frac(a,b) {
+                  return React.createElement('span', null,
+                    React.createElement('span',{style:{fontWeight:700,color:a>0?'var(--green)':'var(--text3)'}}, a),
+                    React.createElement('span',{style:{color:'var(--text3)'}}, '/'),
+                    React.createElement('span',{style:{color:'var(--text2)'}}, b)
+                  );
+                }
+                return React.createElement('tr', {key:s.name, style:{borderTop:'1px solid var(--border)'}},
+                  React.createElement('td', {style:Object.assign({},tdS,{fontWeight:600,fontSize:13,whiteSpace:'nowrap'})}, icon+' '+s.name),
+                  React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center',color:'var(--text2)'})}, s.masukHariIni),
+                  React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center',fontWeight:700,
+                    color:s.prosesHariIni>=10?'var(--green)':s.prosesHariIni>=5?'var(--amber)':'var(--text)'})}, s.prosesHariIni),
+                  React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center',
+                    color:s.avgH===null?'var(--text3)':s.avgH<=2?'var(--green)':s.avgH<=8?'var(--amber)':'var(--red)'})},
+                    s.avgH!==null ? s.avgH+' jam' : '—'),
+                  React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center',fontWeight:700,
+                    color:s.gantung===0?'var(--green)':s.gantung<=5?'var(--amber)':'var(--red)'})}, s.gantung),
+                  React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})}, frac(s.minggu.proses, s.minggu.masuk)),
+                  React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})}, frac(s.bulan.proses, s.bulan.masuk)),
+                  React.createElement('td', {style:Object.assign({},tdS,{textAlign:'center'})}, frac(s.bulanKemarin.proses, s.bulanKemarin.masuk))
                 );
               }))
             )
