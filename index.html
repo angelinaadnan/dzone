@@ -50457,6 +50457,7 @@ function DocArchivePage(props) {
   var _v2 = React.useState(null); var selTx = _v2[0]; var setSelTx = _v2[1];
   var _v3 = React.useState(null); var selTxFiles = _v3[0]; var setSelTxFiles = _v3[1];
   var _v4 = React.useState(null); var selNa = _v4[0]; var setSelNa = _v4[1];
+  var _v5 = React.useState(null); var selRetur = _v5[0]; var setSelRetur = _v5[1];
   // List state
   var _l1 = React.useState([]); var txList = _l1[0]; var setTxList = _l1[1];
   var _l2 = React.useState(false); var listLoading = _l2[0]; var setListLoading = _l2[1];
@@ -50603,7 +50604,7 @@ function DocArchivePage(props) {
   function loadDetail(txId) {
     setView('detail'); setSelTx(null); setSelTxFiles(null); setSelNa(null);
     apiCall('/transactions/' + txId)
-      .then(function(d) { setSelTx(d.transaction); setSelTxFiles(d.files || []); setSelNa(d.naOverride || null); })
+      .then(function(d) { setSelTx(d.transaction); setSelTxFiles(d.files || []); setSelNa(d.naOverride || null); setSelRetur(d.returOverride || null); })
       .catch(function(e) { showToast(e.message, 'error'); setView('list'); });
   }
 
@@ -50727,6 +50728,20 @@ function DocArchivePage(props) {
       .catch(function(e) { showToast(e.message, 'error'); });
   }
 
+  function doSetRetur(txId) {
+    var reason = window.prompt('Alasan Retur (wajib):');
+    if (!reason) return;
+    apiCall('/transactions/' + txId + '/retur', { method: 'POST', body: { reason: reason } })
+      .then(function(d) { if (d.ok) { showToast('Status Retur disimpan.', 'ok'); loadDetail(txId); loadSummary(); } })
+      .catch(function(e) { showToast(e.message, 'error'); });
+  }
+
+  function doRevokeRetur(txId) {
+    apiCall('/transactions/' + txId + '/retur', { method: 'DELETE' })
+      .then(function(d) { if (d.ok) { showToast('Retur dicabut.', 'ok'); loadDetail(txId); loadSummary(); } })
+      .catch(function(e) { showToast(e.message, 'error'); });
+  }
+
   // ── Assign owner ──────────────────────────────────────────────────────────
   function doAssignOwner(txId) {
     var owner = window.prompt('Nama owner baru (contoh: TC LUVI):');
@@ -50830,6 +50845,7 @@ function DocArchivePage(props) {
           s.partial > 0 && React.createElement('span', { style:{ color:'var(--amber)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('partial');       setListPage(1); } }, '● ' + s.partial  + ' sebagian'),
           React.createElement('span', { style:{ color:'var(--green)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('complete');      setListPage(1); } }, '● ' + s.complete + ' lengkap'),
           s.not_applicable > 0 && React.createElement('span', { style:{ color:'var(--text3)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('not_applicable'); setListPage(1); } }, '● ' + s.not_applicable + ' N/A'),
+          s.retur > 0 && React.createElement('span', { style:{ color:'var(--purple,#a78bfa)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('retur'); setListPage(1); } }, '● ' + s.retur + ' Retur'),
           s.pending_match > 0 && React.createElement('span', { style:{ color:'var(--coral)', cursor:'pointer' }, onClick:function(){ setFilterType(s.type); setFilterStatus('pending_match'); setListPage(1); } }, '● ' + s.pending_match + ' pending match')
         )
       );
@@ -50838,7 +50854,7 @@ function DocArchivePage(props) {
     return React.createElement('div', { style:{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:18 } },
       types.map(function(t) {
         var d = summary[t] || {};
-        return React.createElement(StatCard, { key:t, type:t, missing:d.missing||0, partial:d.partial||0, complete:d.complete||0, not_applicable:d.not_applicable||0, pending_match:d.pending_match||0, total:d.total||0 });
+        return React.createElement(StatCard, { key:t, type:t, missing:d.missing||0, partial:d.partial||0, complete:d.complete||0, not_applicable:d.not_applicable||0, retur:d.retur||0, pending_match:d.pending_match||0, total:d.total||0 });
       })
     );
   }
@@ -50918,11 +50934,16 @@ function DocArchivePage(props) {
           tx.counterparty_name && React.createElement('div',null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2,textTransform:'uppercase',letterSpacing:'0.06em'}},'Pihak'), React.createElement('div',{style:{fontSize:13}},tx.counterparty_name)),
           tx.owner_user_id && React.createElement('div',null, React.createElement('div',{style:{fontSize:10,color:'var(--text3)',marginBottom:2,textTransform:'uppercase',letterSpacing:'0.06em'}},'Owner'), React.createElement('div',{style:{fontSize:13}},tx.owner_user_id))
         ),
+        selRetur && React.createElement('div', { style:{ marginTop:8, padding:'8px 12px', background:'rgba(167,139,250,0.1)', borderRadius:7, border:'1px solid var(--purple,#a78bfa)', fontSize:12, color:'var(--purple,#a78bfa)' } },
+          'Retur: ', selRetur.reason, ' — oleh ', selRetur.set_by,
+          perm.canSetRetur && React.createElement('button', { onClick:function(){ doRevokeRetur(tx.id); }, style:{ marginLeft:12, fontSize:11, cursor:'pointer', color:'var(--red)', background:'none', border:'none', textDecoration:'underline' } }, 'Cabut')
+        ),
         selNa && React.createElement('div', { style:{ marginTop:8, padding:'8px 12px', background:'var(--bg3)', borderRadius:7, border:'1px solid var(--border)', fontSize:12, color:'var(--text2)' } },
           'N/A: ', selNa.reason, ' — oleh ', selNa.set_by,
           perm.canSetNA && React.createElement('button', { onClick:function(){ doRevokeNA(tx.id); }, style:{ marginLeft:12, fontSize:11, cursor:'pointer', color:'var(--red)', background:'none', border:'none', textDecoration:'underline' } }, 'Cabut')
         ),
         React.createElement('div', { style:{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' } },
+          perm.canSetRetur && !selRetur && btn('Tandai Retur', function(){ doSetRetur(tx.id); }, { fontSize:11, background:'rgba(167,139,250,0.15)', color:'var(--purple,#a78bfa)', border:'1px solid var(--purple,#a78bfa)' }),
           perm.canSetNA && !selNa && btn('Set N/A', function(){ doSetNA(tx.id); }, { fontSize:11 }),
           perm.canReassign && btn('Ganti Owner', function(){ doAssignOwner(tx.id); }, { fontSize:11 })
         )
@@ -51066,6 +51087,7 @@ function DocArchivePage(props) {
             React.createElement('option',{value:'partial'},'● Sebagian'),
             React.createElement('option',{value:'complete'},'● Lengkap'),
             React.createElement('option',{value:'not_applicable'},'● N/A'),
+            React.createElement('option',{value:'retur'},'● Retur'),
             React.createElement('option',{value:'pending_match'},'● Pending Match'),
             React.createElement('option',{value:'no_match'},'● Tidak Cocok')
           ),
