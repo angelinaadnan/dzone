@@ -49087,7 +49087,7 @@ function BuatFPPage() {
   var FP_CONNECTOR = RKP_CONNECTOR;
   var FP_KEY       = RKP_API_KEY;
 
-  var _rows = React.useState([{ siNumber: '', siDate: '' }]);
+  var _rows = React.useState(['']);
   var rows = _rows[0]; var setRows = _rows[1];
   var _status = React.useState('idle'); // idle | loading | done | error
   var status = _status[0]; var setStatus = _status[1];
@@ -49096,25 +49096,16 @@ function BuatFPPage() {
   var _errMsg = React.useState('');
   var errMsg = _errMsg[0]; var setErrMsg = _errMsg[1];
 
-  function addRow() {
-    setRows(function(r) { return r.concat([{ siNumber: '', siDate: '' }]); });
-  }
-  function removeRow(i) {
-    setRows(function(r) { return r.filter(function(_, idx) { return idx !== i; }); });
-  }
-  function updateRow(i, field, val) {
-    setRows(function(r) { return r.map(function(row, idx) { return idx === i ? Object.assign({}, row, { [field]: val }) : row; }); });
-  }
+  function addRow() { setRows(function(r) { return r.concat(['']); }); }
+  function removeRow(i) { setRows(function(r) { return r.filter(function(_, idx) { return idx !== i; }); }); }
+  function updateRow(i, val) { setRows(function(r) { return r.map(function(v, idx) { return idx === i ? val : v; }); }); }
 
   function handleSubmit() {
-    var invoices = rows.filter(function(r) { return r.siNumber.trim() && r.siDate.trim(); });
-    if (!invoices.length) { setErrMsg('Isi minimal 1 invoice.'); return; }
+    var invoices = rows.map(function(s) { return s.trim().toUpperCase(); }).filter(Boolean);
+    if (!invoices.length) { setErrMsg('Isi minimal 1 no invoice.'); return; }
     for (var i = 0; i < invoices.length; i++) {
-      if (!/^SI\.\d{4}\.\d{2}\.\d{5}$/.test(invoices[i].siNumber.trim())) {
-        setErrMsg('Format no invoice salah: ' + invoices[i].siNumber + '\nHarus: SI.YYYY.MM.XXXXX'); return;
-      }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(invoices[i].siDate.trim())) {
-        setErrMsg('Format tanggal salah: ' + invoices[i].siDate + '\nHarus: YYYY-MM-DD'); return;
+      if (!/^SI\.\d{4}\.\d{2}\.\d{5}$/.test(invoices[i])) {
+        setErrMsg('Format no invoice salah: ' + invoices[i] + '\nHarus: SI.YYYY.MM.XXXXX'); return;
       }
     }
     setErrMsg('');
@@ -49123,7 +49114,7 @@ function BuatFPPage() {
     fetch(FP_CONNECTOR + '/api/coretax/run-fp', {
       method: 'POST',
       headers: { 'X-API-Key': FP_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ invoices: invoices.map(function(r) { return { siNumber: r.siNumber.trim(), siDate: r.siDate.trim() }; }) }),
+      body: JSON.stringify({ invoices: invoices }),
     })
       .then(function(res) { return res.json(); })
       .then(function(data) { setResults(data); setStatus('done'); })
@@ -49139,21 +49130,17 @@ function BuatFPPage() {
   return e2('div', { style: { maxWidth: 700, margin: '0 auto', padding: '24px 16px' } },
     e2('h2', { style: { margin: '0 0 4px', fontSize: 20, fontWeight: 700 } }, '🧾 Buat Faktur Pajak'),
     e2('p', { style: { margin: '0 0 20px', color: 'var(--muted)', fontSize: 14 } },
-      'Masukkan no invoice dan tanggalnya. Pipeline otomatis: generate XML → Coretax → upload PDF ke Drive → update no FP di Accurate.'),
+      'Masukkan no invoice (SI.YYYY.MM.XXXXX). Pipeline otomatis: generate XML dari Accurate → upload ke Coretax → download PDF → upload ke Drive → update no FP di Accurate.'),
 
     e2('div', { style: cardStyle },
       e2('div', { style: { fontWeight: 600, marginBottom: 12 } }, 'Daftar Invoice'),
-      rows.map(function(row, i) {
+      rows.map(function(val, i) {
         return e2('div', { key: i, style: { display: 'flex', gap: 10, marginBottom: 10, alignItems: 'flex-end' } },
-          e2('div', { style: { flex: 2 } },
-            e2('div', { style: labelStyle }, 'No Invoice'),
-            e2('input', { style: inputStyle, type: 'text', placeholder: 'SI.2026.11.00855', value: row.siNumber,
-              onChange: function(ev) { updateRow(i, 'siNumber', ev.target.value); } })),
           e2('div', { style: { flex: 1 } },
-            e2('div', { style: labelStyle }, 'Tanggal Invoice'),
-            e2('input', { style: inputStyle, type: 'date', value: row.siDate,
-              onChange: function(ev) { updateRow(i, 'siDate', ev.target.value); } })),
-          rows.length > 1 ? e2('button', { style: Object.assign({}, btnGhost, { marginBottom: 1, color: '#ef4444', borderColor: '#fca5a5' }),
+            i === 0 ? e2('div', { style: labelStyle }, 'No Invoice') : null,
+            e2('input', { style: inputStyle, type: 'text', placeholder: 'SI.2026.11.00855', value: val,
+              onChange: function(ev) { updateRow(i, ev.target.value); } })),
+          rows.length > 1 ? e2('button', { style: Object.assign({}, btnGhost, { alignSelf: 'flex-end', color: '#ef4444', borderColor: '#fca5a5' }),
             onClick: function() { removeRow(i); } }, '✕') : null
         );
       }),
