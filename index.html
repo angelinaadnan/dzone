@@ -4915,7 +4915,8 @@ function App() {
     .concat(_baseNav.slice(_kpiEnd))
     .concat(accurateSection)
     .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
-    .concat((function(){ var u = USER_ACCOUNTS.find(function(a){ return a.name === userName; }); return canDocArchive(u) ? [{ id: 'doc_archive', icon: '📁', label: 'Arsip Dokumen' }] : []; })());
+    .concat((function(){ var u = USER_ACCOUNTS.find(function(a){ return a.name === userName; }); return canDocArchive(u) ? [{ id: 'doc_archive', icon: '📁', label: 'Arsip Dokumen' }] : []; })())
+    .concat((['admin','ops','admin_online'].includes(role) || ['Eliwaty','GITA'].includes(userName)) ? [{ id: 'buat_fp', icon: '🧾', label: 'Buat FP' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -5402,7 +5403,7 @@ function App() {
     userName: userName,
     role: role,
     demoMode: demoMode
-  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null), page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(TarikPricelistPage, null), page === 'revisi_kode_pelanggan' && /*#__PURE__*/React.createElement(RevisiKodePelangganPage, null), ACCURATE_USERS.includes(userName) && page === 'cek_item_transfer' && /*#__PURE__*/React.createElement(CekItemTransferPage, null), page === 'tanya_kode_sku' && /*#__PURE__*/React.createElement(TanyaKodeSKUPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
+  }), page === 'sales_harian' && /*#__PURE__*/React.createElement(SalesHarianPage, null), page === 'tarik_pricelist' && /*#__PURE__*/React.createElement(TarikPricelistPage, null), page === 'revisi_kode_pelanggan' && /*#__PURE__*/React.createElement(RevisiKodePelangganPage, null), ACCURATE_USERS.includes(userName) && page === 'cek_item_transfer' && /*#__PURE__*/React.createElement(CekItemTransferPage, null), page === 'tanya_kode_sku' && /*#__PURE__*/React.createElement(TanyaKodeSKUPage, null), page === 'buat_fp' && /*#__PURE__*/React.createElement(BuatFPPage, null)), selectedOrder && /*#__PURE__*/React.createElement(OrderDetailModal, {
     order: selectedOrder,
     onClose: function onClose() {
       return setSelectedOrder(null);
@@ -49078,6 +49079,119 @@ var KAT_LABELS = [
 
 var SKU_CONNECTOR = 'https://connectoracc.dzoutlet.co.id';
 var SKU_API_KEY   = 'dzone-connector-secret-2026';
+
+// ─── BuatFPPage ──────────────────────────────────────────────────────────────
+function BuatFPPage() {
+  var e2 = React.createElement;
+  // Pakai connector yang sama dengan fitur lain (RKP_CONNECTOR + RKP_API_KEY sudah defined global)
+  var FP_CONNECTOR = RKP_CONNECTOR;
+  var FP_KEY       = RKP_API_KEY;
+
+  var _rows = React.useState([{ siNumber: '', siDate: '' }]);
+  var rows = _rows[0]; var setRows = _rows[1];
+  var _status = React.useState('idle'); // idle | loading | done | error
+  var status = _status[0]; var setStatus = _status[1];
+  var _results = React.useState(null);
+  var results = _results[0]; var setResults = _results[1];
+  var _errMsg = React.useState('');
+  var errMsg = _errMsg[0]; var setErrMsg = _errMsg[1];
+
+  function addRow() {
+    setRows(function(r) { return r.concat([{ siNumber: '', siDate: '' }]); });
+  }
+  function removeRow(i) {
+    setRows(function(r) { return r.filter(function(_, idx) { return idx !== i; }); });
+  }
+  function updateRow(i, field, val) {
+    setRows(function(r) { return r.map(function(row, idx) { return idx === i ? Object.assign({}, row, { [field]: val }) : row; }); });
+  }
+
+  function handleSubmit() {
+    var invoices = rows.filter(function(r) { return r.siNumber.trim() && r.siDate.trim(); });
+    if (!invoices.length) { setErrMsg('Isi minimal 1 invoice.'); return; }
+    for (var i = 0; i < invoices.length; i++) {
+      if (!/^SI\.\d{4}\.\d{2}\.\d{5}$/.test(invoices[i].siNumber.trim())) {
+        setErrMsg('Format no invoice salah: ' + invoices[i].siNumber + '\nHarus: SI.YYYY.MM.XXXXX'); return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(invoices[i].siDate.trim())) {
+        setErrMsg('Format tanggal salah: ' + invoices[i].siDate + '\nHarus: YYYY-MM-DD'); return;
+      }
+    }
+    setErrMsg('');
+    setStatus('loading');
+    setResults(null);
+    fetch(FP_CONNECTOR + '/api/coretax/run-fp', {
+      method: 'POST',
+      headers: { 'X-API-Key': FP_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoices: invoices.map(function(r) { return { siNumber: r.siNumber.trim(), siDate: r.siDate.trim() }; }) }),
+    })
+      .then(function(res) { return res.json(); })
+      .then(function(data) { setResults(data); setStatus('done'); })
+      .catch(function(err) { setErrMsg(err.message || 'Koneksi gagal'); setStatus('error'); });
+  }
+
+  var cardStyle = { background: 'var(--card)', borderRadius: 10, padding: '20px 24px', marginBottom: 20, boxShadow: '0 1px 4px rgba(0,0,0,.08)' };
+  var labelStyle = { fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 4 };
+  var inputStyle = { width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg)', color: 'var(--fg)', fontSize: 14, boxSizing: 'border-box' };
+  var btnPrimary = { background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 7, padding: '10px 22px', fontWeight: 600, cursor: 'pointer', fontSize: 14 };
+  var btnGhost   = { background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--muted)' };
+
+  return e2('div', { style: { maxWidth: 700, margin: '0 auto', padding: '24px 16px' } },
+    e2('h2', { style: { margin: '0 0 4px', fontSize: 20, fontWeight: 700 } }, '🧾 Buat Faktur Pajak'),
+    e2('p', { style: { margin: '0 0 20px', color: 'var(--muted)', fontSize: 14 } },
+      'Masukkan no invoice dan tanggalnya. Pipeline otomatis: generate XML → Coretax → upload PDF ke Drive → update no FP di Accurate.'),
+
+    e2('div', { style: cardStyle },
+      e2('div', { style: { fontWeight: 600, marginBottom: 12 } }, 'Daftar Invoice'),
+      rows.map(function(row, i) {
+        return e2('div', { key: i, style: { display: 'flex', gap: 10, marginBottom: 10, alignItems: 'flex-end' } },
+          e2('div', { style: { flex: 2 } },
+            e2('div', { style: labelStyle }, 'No Invoice'),
+            e2('input', { style: inputStyle, type: 'text', placeholder: 'SI.2026.11.00855', value: row.siNumber,
+              onChange: function(ev) { updateRow(i, 'siNumber', ev.target.value); } })),
+          e2('div', { style: { flex: 1 } },
+            e2('div', { style: labelStyle }, 'Tanggal Invoice'),
+            e2('input', { style: inputStyle, type: 'date', value: row.siDate,
+              onChange: function(ev) { updateRow(i, 'siDate', ev.target.value); } })),
+          rows.length > 1 ? e2('button', { style: Object.assign({}, btnGhost, { marginBottom: 1, color: '#ef4444', borderColor: '#fca5a5' }),
+            onClick: function() { removeRow(i); } }, '✕') : null
+        );
+      }),
+      e2('button', { style: Object.assign({}, btnGhost, { marginTop: 4 }), onClick: addRow }, '+ Tambah Invoice')
+    ),
+
+    errMsg ? e2('div', { style: { background: 'rgba(239,68,68,.1)', color: '#ef4444', borderRadius: 7, padding: '10px 14px', marginBottom: 16, fontSize: 13, whiteSpace: 'pre-line' } }, errMsg) : null,
+
+    e2('button', {
+      style: Object.assign({}, btnPrimary, status === 'loading' ? { opacity: .6, cursor: 'not-allowed' } : {}),
+      onClick: status === 'loading' ? undefined : handleSubmit,
+      disabled: status === 'loading',
+    }, status === 'loading' ? '⏳ Sedang proses... (5–10 menit)' : '🚀 Buat Faktur Pajak'),
+
+    status === 'loading' && e2('p', { style: { color: 'var(--muted)', fontSize: 13, marginTop: 10 } },
+      'Pipeline berjalan di server: generate XML → Coretax → Drive → Accurate. Mohon tunggu...'),
+
+    results && e2('div', { style: Object.assign({}, cardStyle, { marginTop: 20 }) },
+      e2('div', { style: { fontWeight: 700, marginBottom: 12, color: results.successCount === results.total ? '#16a34a' : '#f59e0b' } },
+        results.successCount === results.total
+          ? '✅ Selesai ' + results.successCount + '/' + results.total + ' sukses'
+          : '⚠️ ' + results.successCount + '/' + results.total + ' sukses'),
+      (results.results || []).map(function(r, i) {
+        return e2('div', { key: i, style: { borderTop: i > 0 ? '1px solid var(--border)' : 'none', paddingTop: i > 0 ? 12 : 0, marginTop: i > 0 ? 12 : 0 } },
+          e2('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } },
+            e2('span', { style: { fontWeight: 600 } }, r.siNumber),
+            e2('span', { style: { background: r.success ? 'rgba(22,163,74,.12)' : 'rgba(239,68,68,.12)', color: r.success ? '#16a34a' : '#ef4444', borderRadius: 5, padding: '2px 8px', fontSize: 12 } },
+              r.success ? 'Sukses' : 'Gagal'),
+            r.fpNumber && e2('span', { style: { fontSize: 13, color: 'var(--muted)' } }, 'FP: ' + r.fpNumber),
+            r.driveLink && e2('a', { href: r.driveLink, target: '_blank', rel: 'noopener noreferrer',
+              style: { fontSize: 12, color: 'var(--accent)' } }, '📂 Drive')
+          ),
+          r.log && e2('pre', { style: { margin: '8px 0 0', fontSize: 11, color: 'var(--muted)', background: 'var(--bg)', borderRadius: 5, padding: '8px 10px', overflowX: 'auto', maxHeight: 120, whiteSpace: 'pre-wrap', wordBreak: 'break-all' } }, r.log)
+        );
+      })
+    )
+  );
+}
 
 function TanyaKodeSKUPage() {
   var e2 = React.createElement;
