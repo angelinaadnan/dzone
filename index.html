@@ -49083,7 +49083,6 @@ var SKU_API_KEY   = 'dzone-connector-secret-2026';
 // ─── BuatFPPage ──────────────────────────────────────────────────────────────
 function BuatFPPage() {
   var e2 = React.createElement;
-  // Pakai connector yang sama dengan fitur lain (RKP_CONNECTOR + RKP_API_KEY sudah defined global)
   var FP_CONNECTOR = RKP_CONNECTOR;
   var FP_KEY       = RKP_API_KEY;
 
@@ -49091,14 +49090,40 @@ function BuatFPPage() {
   var rows = _rows[0]; var setRows = _rows[1];
   var _status = React.useState('idle'); // idle | loading | done | error
   var status = _status[0]; var setStatus = _status[1];
-  var _results = React.useState(null);
-  var results = _results[0]; var setResults = _results[1];
+  var _job = React.useState(null); // { jobId, total, done, current, results, successCount }
+  var job = _job[0]; var setJob = _job[1];
   var _errMsg = React.useState('');
   var errMsg = _errMsg[0]; var setErrMsg = _errMsg[1];
+  var pollRef = React.useRef(null);
+
+  // Bersihkan polling saat unmount
+  React.useEffect(function() {
+    return function() { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
 
   function addRow() { setRows(function(r) { return r.concat(['']); }); }
   function removeRow(i) { setRows(function(r) { return r.filter(function(_, idx) { return idx !== i; }); }); }
   function updateRow(i, val) { setRows(function(r) { return r.map(function(v, idx) { return idx === i ? val : v; }); }); }
+
+  function startPolling(jobId, total) {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(function() {
+      fetch(FP_CONNECTOR + '/api/coretax/run-fp/' + jobId, {
+        headers: { 'X-API-Key': FP_KEY },
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          setJob({ jobId: jobId, total: total, done: data.done || 0, current: data.current, results: data.results || [], successCount: data.successCount || 0 });
+          if (data.status === 'done' || data.status === 'error') {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+            if (data.status === 'error') { setErrMsg('Pipeline error: ' + (data.error || 'unknown')); setStatus('error'); }
+            else setStatus('done');
+          }
+        })
+        .catch(function(err) { console.warn('[BuatFP] poll error:', err.message); });
+    }, 5000);
+  }
 
   function handleSubmit() {
     var invoices = rows.map(function(s) { return s.trim().toUpperCase(); }).filter(Boolean);
@@ -49110,14 +49135,18 @@ function BuatFPPage() {
     }
     setErrMsg('');
     setStatus('loading');
-    setResults(null);
+    setJob(null);
     fetch(FP_CONNECTOR + '/api/coretax/run-fp', {
       method: 'POST',
       headers: { 'X-API-Key': FP_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ invoices: invoices }),
     })
       .then(function(res) { return res.json(); })
-      .then(function(data) { setResults(data); setStatus('done'); })
+      .then(function(data) {
+        if (!data.jobId) throw new Error(data.error || 'Server tidak kirim jobId');
+        setJob({ jobId: data.jobId, total: invoices.length, done: 0, current: null, results: [], successCount: 0 });
+        startPolling(data.jobId, invoices.length);
+      })
       .catch(function(err) { setErrMsg(err.message || 'Koneksi gagal'); setStatus('error'); });
   }
 
@@ -49126,6 +49155,9 @@ function BuatFPPage() {
   var inputStyle = { width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg)', color: 'var(--fg)', fontSize: 14, boxSizing: 'border-box' };
   var btnPrimary = { background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 7, padding: '10px 22px', fontWeight: 600, cursor: 'pointer', fontSize: 14 };
   var btnGhost   = { background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--muted)' };
+
+  var isLoading = status === 'loading';
+  var isDone    = status === 'done';
 
   return e2('div', { style: { maxWidth: 700, margin: '0 auto', padding: '24px 16px' } },
     e2('h2', { style: { margin: '0 0 4px', fontSize: 20, fontWeight: 700 } }, '🧾 Buat Faktur Pajak'),
@@ -49150,20 +49182,28 @@ function BuatFPPage() {
     errMsg ? e2('div', { style: { background: 'rgba(239,68,68,.1)', color: '#ef4444', borderRadius: 7, padding: '10px 14px', marginBottom: 16, fontSize: 13, whiteSpace: 'pre-line' } }, errMsg) : null,
 
     e2('button', {
-      style: Object.assign({}, btnPrimary, status === 'loading' ? { opacity: .6, cursor: 'not-allowed' } : {}),
-      onClick: status === 'loading' ? undefined : handleSubmit,
-      disabled: status === 'loading',
-    }, status === 'loading' ? '⏳ Sedang proses... (5–10 menit)' : '🚀 Buat Faktur Pajak'),
+      style: Object.assign({}, btnPrimary, isLoading ? { opacity: .6, cursor: 'not-allowed' } : {}),
+      onClick: isLoading ? undefined : handleSubmit,
+      disabled: isLoading,
+    }, isLoading ? '⏳ Sedang proses...' : '🚀 Buat Faktur Pajak'),
 
-    status === 'loading' && e2('p', { style: { color: 'var(--muted)', fontSize: 13, marginTop: 10 } },
-      'Pipeline berjalan di server: generate XML → Coretax → Drive → Accurate. Mohon tunggu...'),
+    // ── Progress card ─────────────────────────────────────────────────────────
+    isLoading && job && e2('div', { style: Object.assign({}, cardStyle, { marginTop: 20, borderLeft: '3px solid var(--accent)' }) },
+      e2('div', { style: { fontWeight: 600, marginBottom: 8 } },
+        '⏳ Pipeline berjalan… (' + (job.done || 0) + '/' + (job.total || 0) + ' selesai)'),
+      job.current && e2('div', { style: { fontSize: 13, color: 'var(--muted)' } },
+        'Sedang proses: ' + job.current),
+      e2('div', { style: { fontSize: 12, color: 'var(--muted)', marginTop: 6 } },
+        'generate XML → Coretax → Drive → Accurate. Halaman ini update tiap 5 detik.')
+    ),
 
-    results && e2('div', { style: Object.assign({}, cardStyle, { marginTop: 20 }) },
-      e2('div', { style: { fontWeight: 700, marginBottom: 12, color: results.successCount === results.total ? '#16a34a' : '#f59e0b' } },
-        results.successCount === results.total
-          ? '✅ Selesai ' + results.successCount + '/' + results.total + ' sukses'
-          : '⚠️ ' + results.successCount + '/' + results.total + ' sukses'),
-      (results.results || []).map(function(r, i) {
+    // ── Hasil akhir ───────────────────────────────────────────────────────────
+    (isDone && job) && e2('div', { style: Object.assign({}, cardStyle, { marginTop: 20 }) },
+      e2('div', { style: { fontWeight: 700, marginBottom: 12, color: job.successCount === job.total ? '#16a34a' : '#f59e0b' } },
+        job.successCount === job.total
+          ? '✅ Selesai ' + job.successCount + '/' + job.total + ' sukses'
+          : '⚠️ ' + job.successCount + '/' + job.total + ' sukses'),
+      (job.results || []).map(function(r, i) {
         return e2('div', { key: i, style: { borderTop: i > 0 ? '1px solid var(--border)' : 'none', paddingTop: i > 0 ? 12 : 0, marginTop: i > 0 ? 12 : 0 } },
           e2('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } },
             e2('span', { style: { fontWeight: 600 } }, r.siNumber),
