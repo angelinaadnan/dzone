@@ -490,9 +490,9 @@ var AO_APPROVER_SALES = ['ade', 'lili'];
 var USER_ACCOUNTS = [
 // Ops & Admin
 {
-  name: 'Admin Corp',
+  name: 'Admin',
   role: 'admin',
-  password: 'admincorp01',
+  password: 'admin01',
   doc_pi: true
 }, {
   name: 'Ops',
@@ -4916,7 +4916,7 @@ function App() {
     .concat(accurateSection)
     .concat(userName === 'Eliwaty' ? [{ id: 'op_kurir_history', icon: '🚚', label: 'History Kurir' }] : [])
     .concat((function(){ var u = USER_ACCOUNTS.find(function(a){ return a.name === userName; }); return canDocArchive(u) ? [{ id: 'doc_archive', icon: '📁', label: 'Arsip Dokumen' }] : []; })())
-    .concat((['admin','ops','admin_online'].includes(role) || ['Eliwaty','GITA'].includes(userName)) ? [{ id: 'buat_fp', icon: '🧾', label: 'Buat FP' }] : []);
+    .concat((['admin','ops','admin_online'].includes(role) || ['Eliwaty','GITA','Liana'].includes(userName)) ? [{ id: 'buat_fp', icon: '🧾', label: 'Buat FP' }] : []);
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
